@@ -20,12 +20,12 @@ export interface SlotDef {
 }
 
 export const SLOTS: SlotDef[] = [
-  { id: 'm5', label: '5 minutes', everyMs: 5 * 60_000 },
-  { id: 'm30', label: '30 minutes', everyMs: 30 * 60_000 },
-  { id: 'h4', label: '4 hours', everyMs: 4 * 3_600_000 },
-  { id: 'away', label: 'on returning' },
-  { id: 'premigration', label: 'before an update' },
-  { id: 'undo', label: 'replaced by a restore' },
+  { id: 'm5', label: 'rewritten every 5 minutes', everyMs: 5 * 60_000 },
+  { id: 'm30', label: 'rewritten every 30 minutes', everyMs: 30 * 60_000 },
+  { id: 'h4', label: 'rewritten every 4 hours', everyMs: 4 * 3_600_000 },
+  { id: 'away', label: 'taken on returning', everyMs: undefined },
+  { id: 'premigration', label: 'taken before an update', everyMs: undefined },
+  { id: 'undo', label: 'replaced by a restore', everyMs: undefined },
 ]
 
 export interface BackupInfo {
@@ -38,6 +38,10 @@ export interface BackupInfo {
 }
 
 // Backups follow the slot, so one slot's copies cannot overwrite another's.
+function everyOf(id: string): number {
+  return SLOTS.find((s) => s.id === id)?.everyMs ?? Infinity
+}
+
 const key = (id: string) => `${SAVE_KEY}-backup-${currentSlotSuffix()}${id}`
 function currentSlotSuffix(): string {
   const k = slotKey()
@@ -108,7 +112,12 @@ export function listBackups(): BackupInfo[] {
     }
     out.push({ id: slot.id, label: slot.label, at, ink, version })
   }
-  return out.sort((a, b) => b.at - a.at)
+  // Timed slots in interval order, which is also freshest to oldest, because a
+  // slot rewritten every five minutes is never further back than one rewritten
+  // every four hours. Sorting these by timestamp instead looks arbitrary: on
+  // the first save all three are written in the same millisecond. The untimed
+  // slots have no interval to order by, so they fall to the end, newest first.
+  return out.sort((a, b) => everyOf(a.id) - everyOf(b.id) || b.at - a.at)
 }
 
 /** Puts a backup back as the live save. The caller reloads. */

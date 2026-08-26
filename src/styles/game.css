@@ -430,6 +430,13 @@
   opacity: 0.35;
 }
 
+.backup-note {
+  display: block;
+  color: var(--fg-muted);
+  font-size: 0.56rem;
+  letter-spacing: 0.04em;
+}
+
 .backup-restore {
   flex: 0 0 auto;
   min-width: 5.5rem;

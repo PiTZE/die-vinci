@@ -94,18 +94,38 @@ export function optionsPane(): Pane {
       storageRow.appendChild(el('span', 'grow dim', 'STORAGE'))
       const storageState = el('span', 'num dim', 'checking')
       storageRow.appendChild(storageState)
+      const storageAsk = el('button', 'backup-restore', 'ASK AGAIN')
+      storageAsk.hidden = true
       save.appendChild(storageRow)
+      // Chrome decides silently and can refuse. Asking again from a real tap
+      // sometimes succeeds where the automatic request did not, and Firefox
+      // prompts, so the row is tappable.
+      storageRow.appendChild(storageAsk)
+      storageAsk.type = 'button'
+      storageAsk.addEventListener('click', async () => {
+        storageAsk.textContent = 'ASKING'
+        try {
+          await navigator.storage?.persist?.()
+        } catch {
+          // Refused or unsupported; paintStorage reports whichever it is.
+        }
+        void paintStorage()
+      })
+
       const paintStorage = async () => {
         try {
           if (!navigator.storage?.persisted) {
             storageState.textContent = 'unknown'
+            storageAsk.hidden = true
             return
           }
-          storageState.textContent = (await navigator.storage.persisted())
-            ? 'protected'
-            : 'evictable'
+          const ok = await navigator.storage.persisted()
+          storageState.textContent = ok ? 'protected' : 'evictable'
+          storageAsk.hidden = ok
+          storageAsk.textContent = 'ASK AGAIN'
         } catch {
           storageState.textContent = 'unknown'
+          storageAsk.hidden = true
         }
       }
       void paintStorage()
@@ -268,8 +288,12 @@ export function optionsPane(): Pane {
         for (const b of found) {
           const row = el('div', 'row')
           const age = formatTime((Date.now() - b.at) / 1000)
-          row.appendChild(el('span', 'grow dim', `${b.label}`))
-          row.appendChild(el('span', 'num dim', `${age} ago`))
+          // Age first: it is the only thing that matters when choosing which
+          // copy to go back to. The label says when it is next rewritten.
+          const left = el('span', 'grow')
+          left.appendChild(el('span', 'num', `${age} old`))
+          left.appendChild(el('span', 'backup-note', b.label))
+          row.appendChild(left)
           const btn = el('button', 'backup-restore', armedBackup === b.id ? 'SURE?' : 'RESTORE')
           btn.type = 'button'
           btn.addEventListener('click', () => {
@@ -291,7 +315,7 @@ export function optionsPane(): Pane {
         }
       }
       paintBackups()
-      setInterval(paintBackups, 20_000)
+      setInterval(paintBackups, 5_000)
 
       const about = el('div', 'section')
       const ah = el('div', 'section-head')
