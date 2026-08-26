@@ -20,6 +20,7 @@ import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey, holdable } from './hold'
+import { Confirmer } from './confirm'
 import { wireframe } from './wireframe'
 
 interface Row {
@@ -39,11 +40,13 @@ function setText(n: HTMLElement, v: string): void {
 }
 
 export function tablePane(): Pane {
+  let confirm: Confirmer
   const rows: Row[] = []
   let maxBtn: HTMLButtonElement
   let barFolio: HTMLButtonElement
   let barStudy: HTMLButtonElement
   let actionGroup: HTMLElement
+  let confirmResets = true
   let rollLine: HTMLElement
   let rollBtn: HTMLButtonElement
   let studyBtn: HTMLButtonElement
@@ -57,17 +60,22 @@ export function tablePane(): Pane {
     label: 'TABLE',
 
     mount(root, actions: Actions) {
+      confirm = new Confirmer(() => confirmResets)
       // The same three actions as the panes below, in the thumb's reach. Folio
       // sits left of study to match the section, and both sit left of max.
       barFolio = el('button', 'bar-btn', 'F')
       barFolio.type = 'button'
       barFolio.title = 'Bind a folio  (f)'
-      holdable(barFolio, () => actions.buyFolio())
+      barFolio.addEventListener('click', () => {
+        if (confirm.request('folio')) actions.buyFolio()
+      })
 
       barStudy = el('button', 'bar-btn', 'S')
       barStudy.type = 'button'
       barStudy.title = 'Take a study  (s)'
-      holdable(barStudy, () => actions.buyStudy())
+      barStudy.addEventListener('click', () => {
+        if (confirm.request('study')) actions.buyStudy()
+      })
 
       maxBtn = el('button', 'bar-btn max', 'M')
       maxBtn.type = 'button'
@@ -154,12 +162,16 @@ export function tablePane(): Pane {
       folioBtn = el('button', 'action', '')
       folioBtn.type = 'button'
       folioBtn.title = 'Bind a folio  (f)'
-      holdable(folioBtn, () => actions.buyFolio())
+      folioBtn.addEventListener('click', () => {
+        if (confirm.request('folio')) actions.buyFolio()
+      })
 
       studyBtn = el('button', 'action', '')
       studyBtn.type = 'button'
       studyBtn.title = 'Take a study  (s)'
-      holdable(studyBtn, () => actions.buyStudy())
+      studyBtn.addEventListener('click', () => {
+        if (confirm.request('study')) actions.buyStudy()
+      })
 
       const resetRow = el('div', 'row')
       resetRow.append(folioBtn, studyBtn)
@@ -179,8 +191,12 @@ export function tablePane(): Pane {
       // the physical key so shift+1 still means the first solid.
       bindKey('m', () => actions.maxAll())
       bindKey('r', () => actions.buyRollRate())
-      bindKey('s', () => actions.buyStudy())
-      bindKey('f', () => actions.buyFolio())
+      bindKey('s', () => {
+        if (confirm.request('study')) actions.buyStudy()
+      })
+      bindKey('f', () => {
+        if (confirm.request('folio')) actions.buyFolio()
+      })
       for (const def of SOLIDS) {
         bindKey(String(def.idx), (mods) => actions.buySolid(def.idx, mods.shift))
       }
@@ -242,9 +258,17 @@ export function tablePane(): Pane {
       rollBtn.disabled = !canRoll
       rollBtn.classList.toggle('buyable', canRoll)
 
+      confirmResets = s.options.confirmResets
+      const studyArmed = confirm.isArmed('study')
+      const folioArmed = confirm.isArmed('folio')
+
       const sq = studyReq(s)
       setText(studyLine, `${s.studies}`)
-      setText(studyBtn, `STUDY / ${formatWhole(sq.need, n)} ${SOLIDS[sq.idx - 1].short}`)
+      setText(
+        studyBtn,
+        studyArmed ? 'SURE? THIS RESETS' : `STUDY / ${formatWhole(sq.need, n)} ${SOLIDS[sq.idx - 1].short}`,
+      )
+      setText(barStudy, studyArmed ? '?' : 'S')
       const canStudy = canBuyStudy(s)
       studyBtn.disabled = !canStudy
       studyBtn.classList.toggle('buyable', canStudy)
@@ -261,7 +285,11 @@ export function tablePane(): Pane {
       if (showFolio) {
         const { idx, need } = folioReq(s)
         setText(folioLine, `${s.folios}`)
-        setText(folioBtn, `FOLIO / ${formatWhole(need, n)} ${SOLIDS[idx - 1].short}`)
+        setText(
+          folioBtn,
+          folioArmed ? 'SURE? THIS RESETS' : `FOLIO / ${formatWhole(need, n)} ${SOLIDS[idx - 1].short}`,
+        )
+        setText(barFolio, folioArmed ? '?' : 'F')
         const canFolio = canBuyFolio(s)
         folioBtn.disabled = !canFolio
         folioBtn.classList.toggle('buyable', canFolio)

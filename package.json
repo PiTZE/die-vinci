@@ -21,7 +21,8 @@
     "test:save": "node tools/save-test.mjs",
     "test:wager": "node tools/wager-test.mjs",
     "test:backup": "node tools/backup-test.mjs",
-    "test:challenge": "node tools/challenge-test.mjs"
+    "test:challenge": "node tools/challenge-test.mjs",
+    "test:confirm": "node tools/confirm-test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

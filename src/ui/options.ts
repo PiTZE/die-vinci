@@ -10,6 +10,7 @@ import { formatTime } from '../format'
 export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
   let themeBtns: { id: string; btn: HTMLButtonElement }[] = []
+  let confirmBtns: { on: boolean; btn: HTMLButtonElement }[] = []
   let tickBtns: { n: number; btn: HTMLButtonElement }[] = []
   let offlineBtns: { on: boolean; btn: HTMLButtonElement }[] = []
   let io: HTMLTextAreaElement
@@ -185,6 +186,25 @@ export function optionsPane(): Pane {
       offline.appendChild(tickRow)
       offline.appendChild(el('div', 'empty', 'ticks to simulate a long absence in'))
 
+      // AD asks before every destructive reset, with a toggle for each. One
+      // toggle here, because there are no modals to configure.
+      const confirmSec = el('div', 'section')
+      const cfh = el('div', 'section-head')
+      cfh.appendChild(el('span', 'grow', 'CONFIRM RESETS'))
+      confirmSec.appendChild(cfh)
+      const cfRow = el('div', 'row')
+      for (const [label, on] of [['ON', true], ['OFF', false]] as const) {
+        const b = el('button', 'action', label)
+        b.type = 'button'
+        b.addEventListener('click', () => actions.setConfirmResets(on))
+        confirmBtns.push({ on, btn: b })
+        cfRow.appendChild(b)
+      }
+      confirmSec.appendChild(cfRow)
+      confirmSec.appendChild(
+        el('div', 'empty', 'study, folio, the wager and challenges ask twice'),
+      )
+
       const channel = el('div', 'section')
       const ch = el('div', 'section-head')
       ch.appendChild(el('span', 'grow', 'CHANNEL'))
@@ -261,7 +281,7 @@ export function optionsPane(): Pane {
       buildRow.appendChild(el('span', 'num dim', __BUILD_ID__))
       about.appendChild(buildRow)
 
-      root.append(theme, notation, install, offline, channel, save, backups, about)
+      root.append(theme, notation, install, offline, confirmSec, channel, save, backups, about)
       paintTheme()
 
       function say(msg: string) {
@@ -279,6 +299,7 @@ export function optionsPane(): Pane {
         n.btn.classList.toggle('buyable', n.id === s.options.notation)
       }
       for (const o of offlineBtns) o.btn.classList.toggle('buyable', o.on === s.options.offline)
+      for (const c of confirmBtns) c.btn.classList.toggle('buyable', c.on === s.options.confirmResets)
       for (const t of tickBtns) {
         t.btn.classList.toggle('buyable', t.n === s.options.offlineTicks)
         t.btn.disabled = !s.options.offline

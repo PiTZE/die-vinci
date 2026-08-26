@@ -19,6 +19,7 @@ export interface Actions {
   setNotation(n: GameState['options']['notation']): void
   setOffline(on: boolean): void
   setOfflineTicks(n: number): void
+  setConfirmResets(on: boolean): void
   exportSave(): string
   importSave(blob: string): boolean
   wipe(): void

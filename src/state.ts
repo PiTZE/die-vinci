@@ -54,6 +54,8 @@ export interface GameState {
     offline: boolean
     /** How many ticks a long absence is simulated in. */
     offlineTicks: number
+    /** Ask twice before anything that throws a run away. */
+    confirmResets: boolean
   }
   stats: {
     started: number
@@ -87,6 +89,7 @@ export function newGame(now: number): GameState {
       tab: 'table',
       offline: true,
       offlineTicks: OFFLINE_TICKS_DEFAULT,
+      confirmResets: true,
     },
     stats: { started: now, playMs: 0, wagerMs: 0 },
   }

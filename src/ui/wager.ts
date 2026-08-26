@@ -11,13 +11,16 @@ import {
 import { canWager, pointsFromWager, wagerProgress } from '../game/wager'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
-import { bindKey, holdable } from './hold'
+import { bindKey } from './hold'
+import { Confirmer } from './confirm'
 
 function setText(n: HTMLElement, v: string): void {
   if (n.textContent !== v) n.textContent = v
 }
 
 export function wagerPane(): Pane {
+  let confirm: Confirmer
+  let confirmResets = true
   let callBtn: HTMLButtonElement
   let callBar: HTMLElement
   let callLine: HTMLElement
@@ -33,6 +36,7 @@ export function wagerPane(): Pane {
     visible: (s) => s.wagers > 0 || s.ink.gte(WAGER_AT.div(1e60)),
 
     mount(root, actions: Actions) {
+      confirm = new Confirmer(() => confirmResets)
       const call = el('div', 'section')
       const ch = el('div', 'section-head')
       ch.appendChild(el('span', 'grow', 'THE WAGER'))
@@ -48,7 +52,9 @@ export function wagerPane(): Pane {
       callBtn = el('button', 'action', '')
       callBtn.type = 'button'
       callBtn.title = 'Call the Wager  (w)'
-      holdable(callBtn, () => actions.wager())
+      callBtn.addEventListener('click', () => {
+        if (confirm.request('wager')) actions.wager()
+      })
       const cr = el('div', 'row')
       cr.appendChild(callBtn)
       call.appendChild(cr)
@@ -81,7 +87,9 @@ export function wagerPane(): Pane {
 
       root.append(call, grid)
 
-      bindKey('w', () => actions.wager())
+      bindKey('w', () => {
+        if (confirm.request('wager')) actions.wager()
+      })
     },
 
     update(s: GameState) {
@@ -90,10 +98,13 @@ export function wagerPane(): Pane {
       setText(callLine, `${s.wagers}`)
       const pct = `${(wagerProgress(s) * 100).toFixed(1)}%`
       if (callBar.style.width !== pct) callBar.style.width = pct
+      confirmResets = s.options.confirmResets
       const ready = canWager(s)
       setText(
         callBtn,
-        ready
+        confirm.isArmed('wager')
+          ? 'SURE? THIS RESETS EVERYTHING'
+          : ready
           ? `CALL THE WAGER  +${format(pointsFromWager(), n)}`
           : `${format(s.ink, n)} / ${format(WAGER_AT, n)} INK`,
       )

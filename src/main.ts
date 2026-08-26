@@ -236,6 +236,10 @@ const actions: Actions = {
     state.options.offlineTicks = n
     persistSoon()
   },
+  setConfirmResets: (on) => {
+    state.options.confirmResets = on
+    persistSoon()
+  },
   exportSave: () => exportSave(state),
   importSave: (blob) => {
     const next = importSave(blob, Date.now())
