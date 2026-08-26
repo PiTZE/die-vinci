@@ -61,21 +61,23 @@ export function tablePane(): Pane {
         const r = el('div', 'solid')
         r.appendChild(wireframe(def.id))
 
-        const name = el('div', 'solid-name')
-        name.appendChild(el('span', '', `${def.short} ${def.name.toUpperCase()}`))
-        const mult = el('span', 'solid-mult', '')
-        name.append(' ', mult)
+        const name = el('div', 'solid-name', `${def.short} ${def.name.toUpperCase()}`)
         r.appendChild(name)
 
         const amount = el('div', 'solid-amount', '0')
-        const rate = el('div', 'solid-rate', '')
+        // The multiplier shares the rate line. On a 390px screen the name row
+        // ellipsised it away entirely, which is worse than small.
+        const rate = el('div', 'solid-rate')
+        const mult = el('span', 'solid-mult', '')
+        const flow = el('span', '', '')
+        rate.append(mult, ' ', flow)
         const buy = el('button', 'solid-buy', '')
         buy.type = 'button'
         buy.addEventListener('click', () => actions.buySolid(def.idx))
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, mult, amount, rate, buy })
+        rows.push({ root: r, mult, amount, rate: flow, buy })
       }
 
       const roll = el('div', 'section')

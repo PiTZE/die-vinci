@@ -31,12 +31,17 @@ export const PER_TEN_MULT = new Decimal(2)
 
 // -- roll rate, the tickspeed analogue ------------------------------------
 
+// Tuned against a perfect-play simulation: these reach the Wager in about 57
+// simulated minutes, which lands a real first run somewhere near two hours.
+// The curve is deliberately steep at the top. Layer 0 running out of road at
+// 1e308 is the reason the Wager exists.
+
 /** Seconds between rolls before any upgrade. */
 export const ROLL_INTERVAL_BASE = 1
 /** Each upgrade multiplies the interval by this. Folios push it lower. */
-export const ROLL_POWER_BASE = 0.89
-export const ROLL_POWER_PER_FOLIO = 0.005
-export const ROLL_POWER_FLOOR = 0.7
+export const ROLL_POWER_BASE = 0.85
+export const ROLL_POWER_PER_FOLIO = 0.008
+export const ROLL_POWER_FLOOR = 0.6
 /** Ink cost of the first roll-rate upgrade, then x10 each. */
 export const ROLL_COST_BASE = new Decimal(1000)
 export const ROLL_COST_MULT = new Decimal(10)
@@ -53,7 +58,7 @@ export const STUDIES_THAT_UNLOCK = 3
 
 /** How many of your highest solid the nth study costs. n is 1-based. */
 export function studyRequirement(n: number): number {
-  return 20 + 15 * (n - 1)
+  return 20 + 14 * (n - 1)
 }
 /** Multiplier to every solid, per study owned past the unlocking ones. */
 export const STUDY_MULT = new Decimal(2)
@@ -61,5 +66,5 @@ export const STUDY_MULT = new Decimal(2)
 // -- folios, the antimatter galaxy analogue -------------------------------
 
 export function folioRequirement(owned: number): number {
-  return 80 + 60 * owned
+  return 70 + 45 * owned
 }

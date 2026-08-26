@@ -11,17 +11,19 @@ import {
   ROLL_POWER_BASE,
   ROLL_POWER_FLOOR,
   ROLL_POWER_PER_FOLIO,
-  STUDIES_THAT_UNLOCK,
   STUDY_MULT,
   folioRequirement,
   studyRequirement,
 } from './balance'
 import { unlockedSolids, type GameState } from '../state'
 
-/** Studies past the ones that unlock solids turn into a flat multiplier. */
+/**
+ * Every study multiplies every solid, including the three that also unlock one.
+ * An AD dimension boost works the same way, and gating the bonus behind the
+ * unlocking studies left the whole middle of the curve flat.
+ */
 export function studyBonus(s: GameState): Decimal {
-  const extra = Math.max(0, s.studies - STUDIES_THAT_UNLOCK)
-  return STUDY_MULT.pow(extra)
+  return STUDY_MULT.pow(s.studies)
 }
 
 /** idx is 1-based. Doubles every ten bought, times the study bonus. */

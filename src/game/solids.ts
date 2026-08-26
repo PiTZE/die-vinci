@@ -76,7 +76,7 @@ export const SOLIDS: SolidDef[] = [
     element: 'water',
     faces: 20,
     baseCost: new Decimal(1e9),
-    costMult: new Decimal(1e8),
+    costMult: new Decimal(1e7),
   },
   {
     idx: 6,
@@ -87,7 +87,7 @@ export const SOLIDS: SolidDef[] = [
     element: 'proportion',
     faces: 26,
     baseCost: new Decimal(1e13),
-    costMult: new Decimal(1e10),
+    costMult: new Decimal(1e8),
   },
 ]
 
