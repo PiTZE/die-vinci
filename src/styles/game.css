@@ -62,23 +62,6 @@
   min-width: 8px;
 }
 
-.theme-toggle {
-  border: 1px solid var(--fg);
-  padding: 7px 10px;
-  font-size: 0.66rem;
-  letter-spacing: 0.08em;
-  flex-shrink: 0;
-  /* Fixed width so VIVENDI and OPERANDI cannot resize the bar between them. */
-  min-width: 7.5rem;
-  min-height: 38px;
-  text-align: center;
-}
-
-.theme-toggle:hover {
-  background: var(--fill);
-  text-shadow: 0 0 6px var(--glow);
-}
-
 /* -- tabs, bottom on mobile and a left nav on desktop -------------------- */
 
 .tabs {
@@ -294,6 +277,7 @@
 
 .action {
   display: block;
+  flex: 1 1 7rem;
   width: 100%;
   min-height: 48px;
   padding: 10px;
@@ -306,6 +290,8 @@
 .row {
   display: flex;
   align-items: center;
+  /* Four notation buttons do not fit one line at 390px. */
+  flex-wrap: wrap;
   gap: 10px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border-faint);

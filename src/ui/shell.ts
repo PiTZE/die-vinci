@@ -1,7 +1,6 @@
 import Decimal from 'break_infinity.js'
 import { format } from '../format'
 import type { GameState, TabId } from '../state'
-import { currentTheme, nextTheme, themes } from './theme'
 
 /** What a pane is allowed to do to the game. Implemented in main.ts. */
 export interface Actions {
@@ -77,7 +76,6 @@ export class Shell {
   private actionInner = el('div', 'action-bar-inner')
   private inkOut = new Readout('INK')
   private pointsOut = new Readout('POINTS')
-  private themeBtn = el('button', 'theme-toggle')
   private active: TabId = 'table'
 
   constructor(
@@ -90,14 +88,10 @@ export class Shell {
 
     const bar = el('div', 'bar')
     const barInner = el('div', 'bar-inner')
+    // Readouts only. Theme lives in OPTIONS, which is the only place it needs
+    // to be, and the bar is for numbers that change.
     barInner.append(this.inkOut.root, this.pointsOut.root, el('div', 'bar-spacer'))
     bar.appendChild(barInner)
-    this.themeBtn.type = 'button'
-    this.themeBtn.addEventListener('click', () => {
-      nextTheme()
-      this.paintThemeButton()
-    })
-    barInner.appendChild(this.themeBtn)
 
     const tabs = el('nav', 'tabs')
     tabs.setAttribute('role', 'tablist')
@@ -133,17 +127,7 @@ export class Shell {
     for (const pane of this.paneEls.values()) this.root.appendChild(pane)
     this.root.append(this.actionBar, tabs)
 
-    this.paintThemeButton()
     this.select(initial)
-  }
-
-  /** The button names the theme it will switch to, and cycles past two. */
-  private paintThemeButton(): void {
-    const all = themes()
-    const i = all.findIndex((t) => t.id === currentTheme().id)
-    const next = all[(i + 1) % all.length]
-    this.themeBtn.textContent = next.label
-    this.themeBtn.setAttribute('aria-label', `Switch to the ${next.label} theme`)
   }
 
   select(id: TabId): void {

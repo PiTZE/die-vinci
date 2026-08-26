@@ -2,9 +2,10 @@
 // module and a notation the player picks.
 import Decimal from 'break_infinity.js'
 
-export type NotationId = 'scientific' | 'engineering' | 'letters'
+export type NotationId = 'mixed' | 'scientific' | 'engineering' | 'letters'
 
 export const NOTATIONS: { id: NotationId; label: string }[] = [
+  { id: 'mixed', label: 'MIXED' },
   { id: 'scientific', label: 'SCIENTIFIC' },
   { id: 'engineering', label: 'ENGINEERING' },
   { id: 'letters', label: 'LETTERS' },
@@ -43,10 +44,22 @@ function letters(d: Decimal, places: number): string {
 }
 
 /**
+ * Antimatter Dimensions' default, and the one here. Suffixes read better than
+ * exponents right up until the suffixes stop meaning anything, so it uses them
+ * below a decillion and scientific at or above it. AD switches at the same
+ * place, one past nonillion.
+ */
+const MIXED_SWITCH_EXPONENT = 33
+
+function mixed(d: Decimal, places: number): string {
+  return d.exponent < MIXED_SWITCH_EXPONENT ? letters(d, places) : scientific(d, places)
+}
+
+/**
  * Small numbers print plainly, because "3.00e0 ink" is nobody's idea of
  * readable. Everything past a thousand goes to the chosen notation.
  */
-export function format(value: Decimal, notation: NotationId = 'scientific', places = 2): string {
+export function format(value: Decimal, notation: NotationId = 'mixed', places = 2): string {
   if (!Number.isFinite(value.mantissa) || !Number.isFinite(value.exponent)) return 'Infinity'
   if (value.lt(0)) return `-${format(value.neg(), notation, places)}`
   if (value.lt(1000)) {
@@ -60,13 +73,15 @@ export function format(value: Decimal, notation: NotationId = 'scientific', plac
       return engineering(value, places)
     case 'letters':
       return letters(value, places)
-    default:
+    case 'scientific':
       return scientific(value, places)
+    default:
+      return mixed(value, places)
   }
 }
 
 /** Counts of things you own. Always whole, never in scientific until it has to be. */
-export function formatWhole(value: Decimal, notation: NotationId = 'scientific'): string {
+export function formatWhole(value: Decimal, notation: NotationId = 'mixed'): string {
   if (value.lt(1e6)) return Math.floor(value.toNumber()).toLocaleString('en-US')
   return format(value, notation, 2)
 }

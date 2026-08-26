@@ -65,7 +65,7 @@ export function newGame(now: number): GameState {
     wagers: 0,
     tarot: {},
     options: {
-      notation: 'scientific',
+      notation: 'mixed',
       tab: 'table',
       offline: true,
       offlineTicks: OFFLINE_TICKS_DEFAULT,
