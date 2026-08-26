@@ -126,6 +126,7 @@
 /* -- a solid in the production chain ------------------------------------- */
 
 .solid {
+  position: relative;
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) auto;
   grid-template-areas:
@@ -150,7 +151,15 @@
 
 .solid-name {
   grid-area: name;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
   font-size: 0.8rem;
+}
+
+.solid-name-text {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -158,6 +167,24 @@
 
 .solid-mult {
   color: var(--fg-dim);
+}
+
+/* Progress into the current group of ten, which is what earns the next x2. */
+.solid-step {
+  flex: 0 0 auto;
+  color: var(--fg-muted);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.solid-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 0;
+  background: var(--fg-dim);
+  pointer-events: none;
 }
 
 .solid-amount {

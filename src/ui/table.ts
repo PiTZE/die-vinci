@@ -25,6 +25,8 @@ import { wireframe } from './wireframe'
 interface Row {
   root: HTMLElement
   mult: HTMLElement
+  step: HTMLElement
+  bar: HTMLElement
   amount: HTMLElement
   rate: HTMLElement
   buy: HTMLButtonElement
@@ -76,7 +78,13 @@ export function tablePane(): Pane {
         const r = el('div', 'solid')
         r.appendChild(wireframe(def.id))
 
-        const name = el('div', 'solid-name', `${def.short} ${def.name.toUpperCase()}`)
+        const name = el('div', 'solid-name')
+        name.appendChild(el('span', 'solid-name-text', `${def.short} ${def.name.toUpperCase()}`))
+        // Purchases into the current group of ten. Ten of them doubles the
+        // row's multiplier, and without this the doubling arrives unannounced.
+        // It sits outside the name span so a long name still truncates alone.
+        const step = el('span', 'solid-step', '')
+        name.appendChild(step)
         r.appendChild(name)
 
         const amount = el('div', 'solid-amount', '0')
@@ -86,6 +94,9 @@ export function tablePane(): Pane {
         const mult = el('span', 'solid-mult', '')
         const flow = el('span', '', '')
         rate.append(mult, ' ', flow)
+
+        const bar = el('div', 'solid-progress')
+        r.appendChild(bar)
         const buy = el('button', 'solid-buy', '')
         buy.type = 'button'
         // Shift buys a single die, the way AD's shift+1-8 does.
@@ -93,7 +104,7 @@ export function tablePane(): Pane {
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, mult, amount, rate: flow, buy })
+        rows.push({ root: r, mult, step, bar, amount, rate: flow, buy })
       }
 
       const roll = el('div', 'section')
@@ -191,6 +202,11 @@ export function tablePane(): Pane {
         const st = s.solids[def.idx - 1]
         const mult = solidMultiplier(s, def.idx)
         setText(r.mult, `x${format(mult, n)}`)
+
+        const into = st.bought % 10
+        setText(r.step, `${into}/10`)
+        const pct = `${into * 10}%`
+        if (r.bar.style.width !== pct) r.bar.style.width = pct
         setText(r.amount, formatWhole(st.amount, n))
 
         const per = st.amount.times(mult).times(rate)
