@@ -27,7 +27,7 @@ await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4000)
 
 // These exercise the mechanics, not the confirm-once in front of them, which
 // has its own suite. Without this every reset here would need two clicks.
-await ev(`window.LD.state.options.confirmResets = false`)
+await ev(`(() => { const c = window.LD.state.options.confirms\n  for (const k of Object.keys(c)) c[k] = false })()`)
 await sleep(300)
 
 const atThreshold = `(() => { const s = window.LD.state, D = window.LD.Decimal

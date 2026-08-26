@@ -5,12 +5,15 @@ import { applyTheme, currentTheme, themes } from './theme'
 import { installState, manualHint, onInstallChange, promptInstall } from '../install'
 import { CHANNEL_PATHS, OFFLINE_TICK_CHOICES } from '../game/balance'
 import { listBackups } from '../backup'
+import { SLOT_COUNT, currentSlot, slotSummary } from '../save'
+import { CONFIRM_KEYS } from './confirm'
 import { formatTime } from '../format'
 
 export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
   let themeBtns: { id: string; btn: HTMLButtonElement }[] = []
-  let confirmBtns: { on: boolean; btn: HTMLButtonElement }[] = []
+  let confirmBtns: { key: string; btn: HTMLButtonElement }[] = []
+  let currentConfirms: Record<string, boolean> = {}
   let tickBtns: { n: number; btn: HTMLButtonElement }[] = []
   let offlineBtns: { on: boolean; btn: HTMLButtonElement }[] = []
   let io: HTMLTextAreaElement
@@ -186,24 +189,23 @@ export function optionsPane(): Pane {
       offline.appendChild(tickRow)
       offline.appendChild(el('div', 'empty', 'ticks to simulate a long absence in'))
 
-      // AD asks before every destructive reset, with a toggle for each. One
-      // toggle here, because there are no modals to configure.
+      // One switch per action, as AD's confirmation-types.js has.
       const confirmSec = el('div', 'section')
       const cfh = el('div', 'section-head')
-      cfh.appendChild(el('span', 'grow', 'CONFIRM RESETS'))
+      cfh.appendChild(el('span', 'grow', 'CONFIRM BEFORE'))
       confirmSec.appendChild(cfh)
-      const cfRow = el('div', 'row')
-      for (const [label, on] of [['ON', true], ['OFF', false]] as const) {
-        const b = el('button', 'action', label)
-        b.type = 'button'
-        b.addEventListener('click', () => actions.setConfirmResets(on))
-        confirmBtns.push({ on, btn: b })
-        cfRow.appendChild(b)
+      for (const c of CONFIRM_KEYS) {
+        const row = el('div', 'row')
+        row.appendChild(el('span', 'grow dim', c.label))
+        const on = el('button', 'auto-toggle', 'ON')
+        on.type = 'button'
+        on.addEventListener('click', () =>
+          actions.setConfirm(c.key, !(currentConfirms[c.key] !== false)),
+        )
+        row.appendChild(on)
+        confirmBtns.push({ key: c.key, btn: on })
+        confirmSec.appendChild(row)
       }
-      confirmSec.appendChild(cfRow)
-      confirmSec.appendChild(
-        el('div', 'empty', 'study, folio, the wager and challenges ask twice'),
-      )
 
       const channel = el('div', 'section')
       const ch = el('div', 'section-head')
@@ -224,6 +226,26 @@ export function optionsPane(): Pane {
       channel.appendChild(
         el('div', 'empty', 'each channel keeps its own save'),
       )
+
+      // Three slots, as AD has. Switching saves the one you are on first.
+      const slots = el('div', 'section')
+      const slh = el('div', 'section-head')
+      slh.appendChild(el('span', 'grow', 'SAVE SLOT'))
+      slots.appendChild(slh)
+      const slotRow = el('div', 'row')
+      for (let n = 0; n < SLOT_COUNT; n++) {
+        const info = slotSummary(n)
+        const b = el('button', 'action', `${n + 1}`)
+        b.type = 'button'
+        b.title = info.used ? `ink ${info.ink}, ${info.wagers} wagers` : 'empty'
+        b.classList.toggle('buyable', n === currentSlot())
+        b.addEventListener('click', () => {
+          if (n !== currentSlot()) actions.useSlot(n)
+        })
+        slotRow.appendChild(b)
+      }
+      slots.appendChild(slotRow)
+      slots.appendChild(el('div', 'empty', 'each slot keeps its own save and backups'))
 
       // Several copies of different ages, the way Antimatter Dimensions keeps
       // its eight. A single well-guarded save is no help once something has
@@ -281,7 +303,18 @@ export function optionsPane(): Pane {
       buildRow.appendChild(el('span', 'num dim', __BUILD_ID__))
       about.appendChild(buildRow)
 
-      root.append(theme, notation, install, offline, confirmSec, channel, save, backups, about)
+      root.append(
+        theme,
+        notation,
+        install,
+        offline,
+        confirmSec,
+        channel,
+        slots,
+        save,
+        backups,
+        about,
+      )
       paintTheme()
 
       function say(msg: string) {
@@ -299,7 +332,12 @@ export function optionsPane(): Pane {
         n.btn.classList.toggle('buyable', n.id === s.options.notation)
       }
       for (const o of offlineBtns) o.btn.classList.toggle('buyable', o.on === s.options.offline)
-      for (const c of confirmBtns) c.btn.classList.toggle('buyable', c.on === s.options.confirmResets)
+      currentConfirms = s.options.confirms
+      for (const c of confirmBtns) {
+        const on = s.options.confirms[c.key] !== false
+        c.btn.textContent = on ? 'ON' : 'OFF'
+        c.btn.classList.toggle('buyable', on)
+      }
       for (const t of tickBtns) {
         t.btn.classList.toggle('buyable', t.n === s.options.offlineTicks)
         t.btn.disabled = !s.options.offline

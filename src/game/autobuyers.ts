@@ -36,9 +36,20 @@ export const AUTOBUYERS: AutobuyerDef[] = [
   { id: 'folio', label: 'FOLIO', baseInterval: 20000 },
 ]
 
+/** AD's autobuyers carry a mode. Single buys one, ten fills the group of ten,
+ *  max keeps going while the ink lasts. */
+export type AutobuyerMode = 'single' | 'ten' | 'max'
+
+export const MODES: { id: AutobuyerMode; label: string }[] = [
+  { id: 'single', label: '1' },
+  { id: 'ten', label: '10' },
+  { id: 'max', label: 'MAX' },
+]
+
 export interface AutobuyerState {
   unlocked: boolean
   on: boolean
+  mode: AutobuyerMode
   /** Points spent so far. Interval and cost are derived from it. */
   level: number
   /** Milliseconds since this one last fired. */
@@ -47,14 +58,14 @@ export interface AutobuyerState {
 
 export function newAutobuyers(): Record<string, AutobuyerState> {
   const out: Record<string, AutobuyerState> = {}
-  for (const a of AUTOBUYERS) out[a.id] = { unlocked: false, on: true, level: 0, since: 0 }
+  for (const a of AUTOBUYERS) out[a.id] = { unlocked: false, on: true, mode: 'ten', level: 0, since: 0 }
   return out
 }
 
 function slot(s: GameState, id: AutobuyerId): AutobuyerState {
   const held = s.autobuyers[id]
   if (held) return held
-  const fresh = { unlocked: false, on: true, level: 0, since: 0 }
+  const fresh: AutobuyerState = { unlocked: false, on: true, mode: 'ten', level: 0, since: 0 }
   s.autobuyers[id] = fresh
   return fresh
 }
@@ -101,13 +112,23 @@ export function toggle(s: GameState, id: AutobuyerId): void {
   a.on = !a.on
 }
 
+export function mode(s: GameState, id: AutobuyerId): AutobuyerMode {
+  return slot(s, id).mode ?? 'ten'
+}
+
+export function cycleMode(s: GameState, id: AutobuyerId): void {
+  const a = slot(s, id)
+  const i = MODES.findIndex((m) => m.id === (a.mode ?? 'ten'))
+  a.mode = MODES[(i + 1) % MODES.length].id
+}
+
 export function anyUnlocked(s: GameState): boolean {
   return AUTOBUYERS.some((a) => slot(s, a.id).unlocked)
 }
 
 /** What each autobuyer does when its interval elapses. Wired up in production. */
 export interface AutobuyerActions {
-  buySolid: (idx: number) => boolean
+  buySolid: (idx: number, one: boolean) => boolean
   buyRollRate: () => boolean
   buyStudy: () => boolean
   buyFolio: () => boolean
@@ -125,14 +146,19 @@ export function runAutobuyers(s: GameState, dtMs: number, act: AutobuyerActions)
     let fires = Math.min(Math.floor(a.since / every), 200)
     a.since -= fires * every
     while (fires-- > 0) {
+      const m = mode(s, d.id)
       const ok = d.id.startsWith('solid')
-        ? act.buySolid(Number(d.id.slice(5)))
+        ? act.buySolid(Number(d.id.slice(5)), m === 'single')
         : d.id === 'rollRate'
           ? act.buyRollRate()
           : d.id === 'study'
             ? act.buyStudy()
             : act.buyFolio()
       if (!ok) break
+      // Max keeps buying within the same tick until the ink runs out.
+      if (m === 'max' && d.id.startsWith('solid')) {
+        for (let n = 0; n < 60; n++) if (!act.buySolid(Number(d.id.slice(5)), false)) break
+      }
     }
   }
 }

@@ -20,10 +20,10 @@ import { devTools } from './dev'
 import { doWager } from './game/wager'
 import { buyUpgrade } from './game/upgrades'
 import { enterChallenge, exitChallenge } from './game/challenges'
-import { toggle as toggleAuto, upgrade as upgradeAuto } from './game/autobuyers'
+import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode } from './game/autobuyers'
 import { resetForChallenge } from './game/production'
 import type { UpgradeId } from './game/upgrades'
-import { exportSave, importSave, loadGame, saveGame, wipeSave } from './save'
+import { exportSave, importSave, loadGame, saveGame, switchSlot, wipeSave } from './save'
 import type { GameState } from './state'
 import { Shell, type Actions } from './ui/shell'
 import { tablePane } from './ui/table'
@@ -31,6 +31,8 @@ import { optionsPane } from './ui/options'
 import { wagerPane } from './ui/wager'
 import { challengesPane } from './ui/challenges'
 import { automationPane } from './ui/automation'
+import { archivePane } from './ui/archive'
+import { helpPane } from './ui/help'
 import { applyTheme, currentTheme } from './ui/theme'
 import { registerSW } from 'virtual:pwa-register'
 
@@ -236,9 +238,19 @@ const actions: Actions = {
     state.options.offlineTicks = n
     persistSoon()
   },
-  setConfirmResets: (on) => {
-    state.options.confirmResets = on
+  setConfirm: (key, on) => {
+    state.options.confirms = { ...state.options.confirms, [key]: on }
     persistSoon()
+  },
+  cycleAutobuyerMode: (id) => {
+    cycleAutoMode(state, id)
+    persistSoon()
+  },
+  useSlot: (n) => {
+    savingEnabled = false
+    saveGame(state)
+    switchSlot(n)
+    location.reload()
   },
   exportSave: () => exportSave(state),
   importSave: (blob) => {
@@ -266,7 +278,15 @@ const actions: Actions = {
 
 const shell = new Shell(root, actions)
 shell.build(
-  [tablePane(), wagerPane(), challengesPane(), automationPane(), optionsPane()],
+  [
+    tablePane(),
+    wagerPane(),
+    challengesPane(),
+    automationPane(),
+    archivePane(),
+    optionsPane(),
+    helpPane(),
+  ],
   state.options.tab,
 )
 

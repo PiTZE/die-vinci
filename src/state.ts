@@ -9,6 +9,7 @@ import {
 } from './game/balance'
 import type { NotationId } from './format'
 import { newAutobuyers, type AutobuyerState } from './game/autobuyers'
+import { defaultConfirms } from './ui/confirm'
 
 export interface SolidState {
   /** Purchases since the last reset. Drives the doubling every ten. */
@@ -17,7 +18,15 @@ export interface SolidState {
   amount: Decimal
 }
 
-export type TabId = 'table' | 'wager' | 'challenges' | 'tarot' | 'automation' | 'options'
+export type TabId =
+  | 'table'
+  | 'wager'
+  | 'challenges'
+  | 'tarot'
+  | 'automation'
+  | 'archive'
+  | 'options'
+  | 'help'
 
 export interface GameState {
   version: number
@@ -43,6 +52,8 @@ export interface GameState {
   challengeRunning: number
   challengesDone: number[]
   autobuyers: Record<string, AutobuyerState>
+  /** Ids of met entries in the Conquestion Archive. */
+  achievements: string[]
   /** Milliseconds of production still halted by a challenge restriction. */
   haltMs: number
   tarot: Record<string, number>
@@ -54,8 +65,8 @@ export interface GameState {
     offline: boolean
     /** How many ticks a long absence is simulated in. */
     offlineTicks: number
-    /** Ask twice before anything that throws a run away. */
-    confirmResets: boolean
+    /** One switch per destructive action. See ui/confirm.ts. */
+    confirms: Record<string, boolean>
   }
   stats: {
     started: number
@@ -82,6 +93,7 @@ export function newGame(now: number): GameState {
     challengeRunning: 0,
     challengesDone: [],
     autobuyers: newAutobuyers(),
+    achievements: [],
     haltMs: 0,
     tarot: {},
     options: {
@@ -89,7 +101,7 @@ export function newGame(now: number): GameState {
       tab: 'table',
       offline: true,
       offlineTicks: OFFLINE_TICKS_DEFAULT,
-      confirmResets: true,
+      confirms: defaultConfirms(),
     },
     stats: { started: now, playMs: 0, wagerMs: 0 },
   }

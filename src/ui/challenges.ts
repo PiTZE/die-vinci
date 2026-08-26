@@ -11,7 +11,7 @@ function setText(n: HTMLElement, v: string): void {
 
 export function challengesPane(): Pane {
   let confirm: Confirmer
-  let confirmResets = true
+  let confirmSettings: Record<string, boolean> = {}
   let head: HTMLElement
   let exitBtn: HTMLButtonElement
   let exitRow: HTMLElement
@@ -23,7 +23,7 @@ export function challengesPane(): Pane {
     visible: (s) => challengesUnlocked(s),
 
     mount(root, actions: Actions) {
-      confirm = new Confirmer(() => confirmResets)
+      confirm = new Confirmer((k) => confirmSettings[k] !== false)
       const section = el('div', 'section')
       const h = el('div', 'section-head')
       h.appendChild(el('span', 'grow', 'CHALLENGES'))
@@ -35,7 +35,7 @@ export function challengesPane(): Pane {
       exitBtn = el('button', 'action', 'LEAVE THE CHALLENGE')
       exitBtn.type = 'button'
       exitBtn.addEventListener('click', () => {
-        if (confirm.request('exit')) actions.exitChallenge()
+        if (confirm.request('exitChallenge')) actions.exitChallenge()
       })
       exitRow.appendChild(exitBtn)
       section.appendChild(exitRow)
@@ -49,7 +49,7 @@ export function challengesPane(): Pane {
         const state = el('span', 'challenge-state', '')
         btn.append(title, note, state)
         btn.addEventListener('click', () => {
-          if (confirm.request(`enter${c.id}`)) actions.enterChallenge(c.id)
+          if (confirm.request('enterChallenge')) actions.enterChallenge(c.id)
         })
         list.appendChild(btn)
         cells.set(c.id, { btn, state })
@@ -59,12 +59,12 @@ export function challengesPane(): Pane {
     },
 
     update(s: GameState) {
-      confirmResets = s.options.confirmResets
+      confirmSettings = s.options.confirms
       const done = s.challengesDone.length
       setText(head, `${done}/${CHALLENGES.length}`)
       // The row, not just the button: an empty row keeps its padding.
       exitRow.hidden = !s.challengeRunning
-      setText(exitBtn, confirm.isArmed('exit') ? 'SURE? THIS RESETS' : 'LEAVE THE CHALLENGE')
+      setText(exitBtn, confirm.isArmed('exitChallenge') ? 'SURE? THIS RESETS' : 'LEAVE THE CHALLENGE')
 
       for (const c of CHALLENGES) {
         const cell = cells.get(c.id)
@@ -76,7 +76,7 @@ export function challengesPane(): Pane {
         cell.btn.disabled = active
         setText(
           cell.state,
-          confirm.isArmed(`enter${c.id}`)
+          confirm.isArmed('enterChallenge') && active === false && !complete
             ? 'SURE? THIS RESETS'
             : active
             ? `RUNNING  ${format(s.ink, s.options.notation)} / ${format(WAGER_AT, s.options.notation)}`

@@ -39,7 +39,7 @@ const cooled = await ev(`${studyBtn}.textContent`)
 check('arming expires', !cooled.startsWith('SURE?'), cooled)
 
 // And the setting turns it off.
-await ev(`window.LD.state.options.confirmResets = false`); await sleep(400)
+await ev(`window.LD.state.options.confirms.study = false`); await sleep(400)
 const s2 = await ev(`window.LD.state.studies`)
 await ev(`${studyBtn}.click()`); await sleep(400)
 check('setting off means one press', (await ev(`window.LD.state.studies`)) === s2 + 1)

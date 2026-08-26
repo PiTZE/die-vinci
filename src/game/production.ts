@@ -313,7 +313,7 @@ export function tick(s: GameState, dt: number): void {
   }
 
   runAutobuyers(s, dt * 1000, {
-    buySolid: (idx) => buySolid(s, idx),
+    buySolid: (idx, one) => buySolid(s, idx, one),
     buyRollRate: () => buyRollRate(s),
     buyStudy: () => buyStudy(s),
     buyFolio: () => buyFolio(s),

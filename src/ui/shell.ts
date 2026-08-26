@@ -1,6 +1,8 @@
 import Decimal from 'break_infinity.js'
 import { format, formatTime } from '../format'
 import { consumeAway } from '../game/offline'
+import { pickThought } from './thoughts'
+import { checkAchievements, byId as achievementById } from '../game/achievements'
 import type { GameState, TabId } from '../state'
 
 /** What a pane is allowed to do to the game. Implemented in main.ts. */
@@ -19,7 +21,9 @@ export interface Actions {
   setNotation(n: GameState['options']['notation']): void
   setOffline(on: boolean): void
   setOfflineTicks(n: number): void
-  setConfirmResets(on: boolean): void
+  setConfirm(key: string, on: boolean): void
+  cycleAutobuyerMode(id: string): void
+  useSlot(n: number): void
   exportSave(): string
   importSave(blob: string): boolean
   wipe(): void
@@ -84,6 +88,10 @@ export class Shell {
   private actionBar = el('div', 'action-bar')
   private actionInner = el('div', 'action-bar-inner')
   private toastEl = el('div', 'toast')
+  private thoughtEl = el('div', 'thought')
+  private thoughtAt = 0
+  private seenTabs = new Set<TabId>()
+  private announced = false
   private toastTimer = 0
   private inkOut = new Readout('INK')
   private pointsOut = new Readout('POINTS')
@@ -137,6 +145,8 @@ export class Shell {
     this.toastEl.setAttribute('role', 'status')
     this.root.appendChild(this.toastEl)
     this.root.append(bar)
+    this.thoughtEl.setAttribute('aria-live', 'off')
+    this.root.appendChild(this.thoughtEl)
     for (const pane of this.paneEls.values()) this.root.appendChild(pane)
     this.root.append(this.actionBar, tabs)
 
@@ -169,6 +179,19 @@ export class Shell {
   }
 
   update(s: GameState, inkRate: Decimal): void {
+    // Vinci's Thoughts. A new line every twenty seconds, chosen from the ones
+    // that apply to the save as it stands.
+    const now = Date.now()
+    if (now - this.thoughtAt > 20_000) {
+      this.thoughtAt = now
+      this.thoughtEl.textContent = pickThought(s, this.thoughtEl.textContent ?? '')
+    }
+
+    for (const id of checkAchievements(s)) {
+      const a = achievementById(id)
+      if (a) this.toast(`ARCHIVE  ${a.name}`)
+    }
+
     const away = consumeAway()
     if (away) {
       const tail = away.capped ? ' (capped)' : ''
@@ -187,10 +210,15 @@ export class Shell {
       const btn = this.tabButtons.get(p.id)
       const on = p.visible ? p.visible(s) : true
       if (btn) btn.hidden = !on
+      // Announce a tab the first time it appears, but not on the first frame,
+      // when everything already open would announce itself at once.
+      if (on && this.announced && !this.seenTabs.has(p.id)) this.toast(`UNLOCKED  ${p.label}`)
+      if (on) this.seenTabs.add(p.id)
       // A tab that vanishes under the player drops them back to the table.
       if (!on && this.active === p.id) this.select('table')
       if (on && this.active === p.id) p.update(s)
     }
+    this.announced = true
   }
 }
 

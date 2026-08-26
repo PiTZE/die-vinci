@@ -20,7 +20,7 @@ function setText(n: HTMLElement, v: string): void {
 
 export function wagerPane(): Pane {
   let confirm: Confirmer
-  let confirmResets = true
+  let confirmSettings: Record<string, boolean> = {}
   let callBtn: HTMLButtonElement
   let callBar: HTMLElement
   let callLine: HTMLElement
@@ -36,7 +36,7 @@ export function wagerPane(): Pane {
     visible: (s) => s.wagers > 0 || s.ink.gte(WAGER_AT.div(1e60)),
 
     mount(root, actions: Actions) {
-      confirm = new Confirmer(() => confirmResets)
+      confirm = new Confirmer((k) => confirmSettings[k] !== false)
       const call = el('div', 'section')
       const ch = el('div', 'section-head')
       ch.appendChild(el('span', 'grow', 'THE WAGER'))
@@ -98,7 +98,7 @@ export function wagerPane(): Pane {
       setText(callLine, `${s.wagers}`)
       const pct = `${(wagerProgress(s) * 100).toFixed(1)}%`
       if (callBar.style.width !== pct) callBar.style.width = pct
-      confirmResets = s.options.confirmResets
+      confirmSettings = s.options.confirms
       const ready = canWager(s)
       setText(
         callBtn,

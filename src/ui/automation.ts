@@ -5,6 +5,7 @@ import {
   interval,
   isMaxed,
   isUnlocked,
+  mode,
   upgradeCost,
 } from '../game/autobuyers'
 import { format } from '../format'
@@ -18,7 +19,13 @@ function setText(n: HTMLElement, v: string): void {
 export function automationPane(): Pane {
   const rows = new Map<
     string,
-    { root: HTMLElement; every: HTMLElement; onBtn: HTMLButtonElement; up: HTMLButtonElement }
+    {
+      root: HTMLElement
+      every: HTMLElement
+      onBtn: HTMLButtonElement
+      modeBtn: HTMLButtonElement
+      up: HTMLButtonElement
+    }
   >()
 
   return {
@@ -42,13 +49,19 @@ export function automationPane(): Pane {
         onBtn.type = 'button'
         onBtn.addEventListener('click', () => actions.toggleAutobuyer(a.id))
 
+        // Single, a group of ten, or as much as the ink allows. AD's modes.
+        const modeBtn = el('button', 'auto-toggle', '10')
+        modeBtn.type = 'button'
+        modeBtn.title = 'What each purchase buys'
+        modeBtn.addEventListener('click', () => actions.cycleAutobuyerMode(a.id))
+
         const up = el('button', 'auto-up', '')
         up.type = 'button'
         up.addEventListener('click', () => actions.upgradeAutobuyer(a.id))
 
-        row.append(onBtn, up)
+        row.append(onBtn, modeBtn, up)
         section.appendChild(row)
-        rows.set(a.id, { root: row, every, onBtn, up })
+        rows.set(a.id, { root: row, every, onBtn, modeBtn, up })
       }
       root.append(section)
     },
@@ -66,6 +79,10 @@ export function automationPane(): Pane {
         const on = s.autobuyers[a.id]?.on ?? true
         setText(row.onBtn, on ? 'ON' : 'OFF')
         row.onBtn.classList.toggle('buyable', on)
+
+        const m = mode(s, a.id)
+        setText(row.modeBtn, m === 'single' ? '1' : m === 'ten' ? '10' : 'MAX')
+        row.modeBtn.hidden = !a.id.startsWith('solid')
 
         const maxed = isMaxed(s, a.id)
         setText(row.up, maxed ? 'FASTEST' : `FASTER / ${format(upgradeCost(s, a.id), n)}`)

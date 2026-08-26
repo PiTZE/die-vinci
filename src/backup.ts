@@ -10,6 +10,7 @@
 // of the untouched save taken before any migration runs. Migrations here have
 // twice cleared layer 0 on purpose, and without this there was no way back.
 import { SAVE_KEY } from './game/balance'
+import { slotKey } from './save'
 
 export interface SlotDef {
   id: string
@@ -36,7 +37,12 @@ export interface BackupInfo {
   version: number
 }
 
-const key = (id: string) => `${SAVE_KEY}-backup-${id}`
+// Backups follow the slot, so one slot's copies cannot overwrite another's.
+const key = (id: string) => `${SAVE_KEY}-backup-${currentSlotSuffix()}${id}`
+function currentSlotSuffix(): string {
+  const k = slotKey()
+  return k === SAVE_KEY ? '' : `${k.slice(SAVE_KEY.length + 1)}-`
+}
 const written: Record<string, number> = {}
 
 function wrap(raw: string): string {
@@ -112,9 +118,9 @@ export function restoreBackup(id: string): boolean {
   try {
     // The save being replaced becomes a backup itself, so a restore chosen by
     // mistake is not the end of it.
-    const current = localStorage.getItem(SAVE_KEY)
+    const current = localStorage.getItem(slotKey())
     if (current) writeBackup('undo', current)
-    localStorage.setItem(SAVE_KEY, save)
+    localStorage.setItem(slotKey(), save)
     return true
   } catch {
     return false

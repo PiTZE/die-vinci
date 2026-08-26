@@ -44,7 +44,10 @@ async function gap(seconds, { offline = true } = {}) {
     ink: Number(await ev(`window.LD.state.ink.toString()`)),
     rate: Number(await ev(`window.LD.state.solids[0].amount.toString()`)),
     notice: await ev(`(() => { const t = document.querySelector('.toast')
-      return t && t.classList.contains('show') ? t.textContent : null })()`),
+      // The toast is shared with archive announcements now, so only an AWAY
+      // line counts here.
+      const text = t && t.classList.contains('show') ? t.textContent : null
+      return text && text.startsWith('AWAY') ? text : null })()`),
   }
 }
 
@@ -61,7 +64,8 @@ check('notice shown for a long gap', /AWAY 10m/.test(long.notice ?? ''), String(
 // assertion reads the one still on screen.
 await sleep(5400)
 check('toast fades on its own',
-  await ev(`!document.querySelector('.toast').classList.contains('show')`))
+  await ev(`(() => { const t = document.querySelector('.toast')
+    return !t.classList.contains('show') || !t.textContent.startsWith('AWAY') })()`))
 
 const off = await gap(600, { offline: false })
 // Compared against the credited run rather than an absolute figure: the wait

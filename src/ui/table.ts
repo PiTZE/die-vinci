@@ -46,7 +46,7 @@ export function tablePane(): Pane {
   let barFolio: HTMLButtonElement
   let barStudy: HTMLButtonElement
   let actionGroup: HTMLElement
-  let confirmResets = true
+  let confirmSettings: Record<string, boolean> = {}
   let rollLine: HTMLElement
   let rollBtn: HTMLButtonElement
   let studyBtn: HTMLButtonElement
@@ -60,7 +60,7 @@ export function tablePane(): Pane {
     label: 'TABLE',
 
     mount(root, actions: Actions) {
-      confirm = new Confirmer(() => confirmResets)
+      confirm = new Confirmer((k) => confirmSettings[k] !== false)
       // The same three actions as the panes below, in the thumb's reach. Folio
       // sits left of study to match the section, and both sit left of max.
       barFolio = el('button', 'bar-btn', 'F')
@@ -258,7 +258,7 @@ export function tablePane(): Pane {
       rollBtn.disabled = !canRoll
       rollBtn.classList.toggle('buyable', canRoll)
 
-      confirmResets = s.options.confirmResets
+      confirmSettings = s.options.confirms
       const studyArmed = confirm.isArmed('study')
       const folioArmed = confirm.isArmed('folio')
 

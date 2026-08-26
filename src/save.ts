@@ -1,6 +1,45 @@
 import Decimal from 'break_infinity.js'
 import { rollBackups, writeBackup } from './backup'
 import { SAVE_KEY, SAVE_VERSION } from './game/balance'
+
+// Three save slots, as Antimatter Dimensions has. Each is its own key, and the
+// chosen one is remembered separately. A save written before slots existed is
+// adopted as slot 0 the first time this runs, so nobody loses anything.
+export const SLOT_COUNT = 3
+const SLOT_CHOICE_KEY = `${SAVE_KEY}-slot`
+
+export function currentSlot(): number {
+  try {
+    const n = Number(localStorage.getItem(SLOT_CHOICE_KEY) ?? 0)
+    return Number.isInteger(n) && n >= 0 && n < SLOT_COUNT ? n : 0
+  } catch {
+    return 0
+  }
+}
+
+export function slotKey(n = currentSlot()): string {
+  return n === 0 ? SAVE_KEY : `${SAVE_KEY}-${n}`
+}
+
+export function switchSlot(n: number): void {
+  try {
+    localStorage.setItem(SLOT_CHOICE_KEY, String(n))
+  } catch {
+    // Nothing to do; the caller reloads either way.
+  }
+}
+
+/** Enough to label a slot in the picker without loading it. */
+export function slotSummary(n: number): { used: boolean; ink: string; wagers: number } {
+  try {
+    const raw = localStorage.getItem(slotKey(n))
+    if (!raw) return { used: false, ink: '0', wagers: 0 }
+    const p = JSON.parse(raw)
+    return { used: true, ink: String(p.ink ?? '0'), wagers: Number(p.wagers ?? 0) }
+  } catch {
+    return { used: false, ink: '0', wagers: 0 }
+  }
+}
 import { newGame, type GameState } from './state'
 
 // Decimals do not survive JSON, so every one of them goes out as a string and
@@ -69,12 +108,17 @@ function decode(raw: Raw, now: number): GameState {
   const s: GameState = {
     ...base,
     ...m,
-    options: { ...base.options, ...(m.options ?? {}) },
+    options: {
+      ...base.options,
+      ...(m.options ?? {}),
+      confirms: { ...base.options.confirms, ...(m.options?.confirms ?? {}) },
+    },
     stats: { ...base.stats, ...(m.stats ?? {}) },
     tarot: { ...(m.tarot ?? {}) },
     pointUpgrades: Array.isArray(m.pointUpgrades) ? [...m.pointUpgrades] : [],
     challengesDone: Array.isArray(m.challengesDone) ? [...m.challengesDone] : [],
     autobuyers: { ...base.autobuyers, ...(m.autobuyers ?? {}) },
+    achievements: Array.isArray(m.achievements) ? [...m.achievements] : [],
   }
   for (const f of DECIMAL_FIELDS) {
     (s as any)[f] = new Decimal(m[f] ?? 0)
@@ -91,7 +135,7 @@ function decode(raw: Raw, now: number): GameState {
 export function saveGame(s: GameState): void {
   try {
     const raw = JSON.stringify(encode(s))
-    localStorage.setItem(SAVE_KEY, raw)
+    localStorage.setItem(slotKey(), raw)
     rollBackups(raw)
   } catch {
     // A full or blocked localStorage should not take the game down mid-tick.
@@ -103,7 +147,7 @@ const AWAY_BACKUP_MS = 30 * 60_000
 
 export function loadGame(now: number): GameState {
   try {
-    const raw = localStorage.getItem(SAVE_KEY)
+    const raw = localStorage.getItem(slotKey())
     if (!raw) return newGame(now)
     const parsed = JSON.parse(raw)
 
@@ -136,7 +180,7 @@ export function importSave(blob: string, now: number): GameState | null {
 
 export function wipeSave(): void {
   try {
-    localStorage.removeItem(SAVE_KEY)
+    localStorage.removeItem(slotKey())
   } catch {
     // Nothing to do. The caller reloads either way.
   }
