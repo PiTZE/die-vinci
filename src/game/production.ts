@@ -387,7 +387,9 @@ export const FACE_READABLE_S = 0.18
  * pass each for no visible difference.
  */
 function produce(s: GameState, rolls: number, factors: number[]): void {
-  const n = unlockedSolids(s)
+  // openSolids, not unlockedSolids: a challenge that shortens the chain takes
+  // the deep solids off the table, and off the table means out of the roll.
+  const n = openSolids(s)
   const before = s.solids.map((d) => d.amount)
 
   const ink = before[0]
@@ -406,14 +408,22 @@ function produce(s: GameState, rolls: number, factors: number[]): void {
   }
 }
 
-/** Rolls every open die, records the faces, and produces from them. */
+/**
+ * A die is thrown when there is a die to throw. Locked solids are not on the
+ * table, and a solid you own none of has nothing to land: showing a face on an
+ * empty row said a number and then paid nothing, which reads as a bug.
+ */
+function rolls(s: GameState, i: number): boolean {
+  return i < openSolids(s) && s.solids[i].amount.gt(0)
+}
+
+/** Rolls every die on the table, records the faces, and produces from them. */
 function resolveOneRoll(s: GameState): void {
-  const n = unlockedSolids(s)
   const factors: number[] = []
   for (let i = 0; i < s.solids.length; i++) {
-    if (i >= n) {
+    if (!rolls(s, i)) {
       s.faces[i] = 0
-      factors.push(1)
+      factors.push(0)
       continue
     }
     const face = rollFace(SOLIDS[i].faces)
@@ -428,23 +438,22 @@ function resolveOneRoll(s: GameState): void {
  * frame so the dice look alive, but production uses the mean, which is what a
  * thousand independent rolls a second converges to anyway.
  */
-function resolveManyRolls(s: GameState, rolls: number): void {
-  const n = unlockedSolids(s)
+function resolveManyRolls(s: GameState, count: number): void {
   for (let i = 0; i < s.solids.length; i++) {
-    s.faces[i] = i < n ? rollFace(SOLIDS[i].faces) : 0
+    s.faces[i] = rolls(s, i) ? rollFace(SOLIDS[i].faces) : 0
   }
   // The mean, per die, not a flat one. A d72 averages 36.5 and a d4 averages
   // 2.5, so a flat factor here would make the automator pay a fraction of what
   // the same rolls pay by hand.
-  produce(s, rolls, s.solids.map((_, i) => meanFace(SOLIDS[i].faces)))
+  produce(s, count, s.solids.map((_, i) => (rolls(s, i) ? meanFace(SOLIDS[i].faces) : 0)))
 }
 
-function applyRolls(s: GameState, rolls: number): void {
-  if (rolls <= 0) return
-  if (rolls <= ROLLS_DRAWN_INDIVIDUALLY) {
-    for (let i = 0; i < rolls; i++) resolveOneRoll(s)
+function applyRolls(s: GameState, count: number): void {
+  if (count <= 0) return
+  if (count <= ROLLS_DRAWN_INDIVIDUALLY) {
+    for (let i = 0; i < count; i++) resolveOneRoll(s)
   } else {
-    resolveManyRolls(s, rolls)
+    resolveManyRolls(s, count)
   }
 }
 

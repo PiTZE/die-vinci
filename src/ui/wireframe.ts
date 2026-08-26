@@ -215,6 +215,13 @@ class Wire {
   /** And the nine bounces, so they do not all hit the table together. */
   private hopPhase = Math.random() * 0.4
   visible = true
+  /** A row with no dice on it. It stays where it is. */
+  rolls = true
+
+  /** Puts it back square, for when it stops taking part mid-throw. */
+  rest(): void {
+    if (this.el.style.transform) this.el.style.transform = ''
+  }
 
   /** A new throw. Fresh axis, fresh rate. */
   throw(): void {
@@ -280,7 +287,7 @@ class Wire {
     this.t += dt * rate * this.speed
     // Rolling too fast to watch. A light constant wobble, no bounce: there is
     // no landing to settle onto.
-    const j = Math.min(1, rate / SPIN_BLUR)
+    const j = Math.min(1, rate / MAX_SPIN)
     this.place(
       Math.sin(this.t * 0.6 + this.phase * 2) * 0.9 * j,
       Math.sin(this.t * 0.9 + this.phase) * 1.4 * j,
@@ -394,8 +401,21 @@ const byEl = new Map<SVGSVGElement, Wire>()
 const TURNS_MIN = 1.15
 const TURNS_SPREAD = 0.7
 
-/** Continuous rotation for when rolls come faster than they can be watched. */
-const SPIN_BLUR = 4.2
+/**
+ * The ceiling on how fast a die turns, in radians a second. About 4.8
+ * revolutions, which at 60fps is 29 degrees a frame.
+ *
+ * The limit is aliasing, not taste. A shape turning more than one symmetry
+ * step per frame reads as turning backwards, or as standing still. The
+ * tetrahedron's step is 120 degrees and the 72-face sphere's is 30, so the
+ * sphere sets the bound, and this sits just under it.
+ *
+ * Everything below the ceiling scales with the roll rate: the same throw
+ * inside a shorter interval is a faster throw. Above it the dice stop getting
+ * faster and simply do not stop, which is what a roll rate too high to watch
+ * should look like.
+ */
+const MAX_SPIN = 30
 
 /** Hops per throw. Three is a die landing; one is a heave. */
 const BOUNCES = 3
@@ -417,10 +437,24 @@ function easeOut(p: number): number {
  * how a new throw announces itself, which covers both a fresh press and the
  * automator rolling continuously.
  */
-export function setThrow(p: number): void {
+/**
+ * How far a die turns during one throw of `duration` seconds.
+ *
+ * A fixed number of revolutions was right at a roll a second and wrong
+ * everywhere else: the same 1.5 turns crammed into a fifth of a second is a
+ * strobe. Past the point where the ceiling binds, the throw covers less ground
+ * instead of turning faster, so it stays a legible flick.
+ */
+function turnsFor(duration: number): number {
+  const wanted = TURNS_MIN + Math.random() * TURNS_SPREAD
+  if (duration <= 0) return wanted
+  return Math.min(wanted, (MAX_SPIN * duration) / (Math.PI * 2))
+}
+
+export function setThrow(p: number, duration: number): void {
   const clamped = Math.max(0, Math.min(1, p))
   if (clamped < lastProgress - 0.02) {
-    turns = TURNS_MIN + Math.random() * TURNS_SPREAD
+    turns = turnsFor(duration)
     for (const w of live) w.throw()
   }
   lastProgress = clamped
@@ -429,14 +463,16 @@ export function setThrow(p: number): void {
   if (next === 'rest' && mode !== 'rest') {
     // Coming to rest stops the loop, so the settled frame has to be drawn
     // here or the die keeps whatever tilt it happened to be at.
-    for (const w of live) w.render(turns, 1)
+    for (const w of live) if (w.rolls) w.render(turns, 1)
   }
   mode = next
   if (mode === 'throw') ensureLoop()
 }
 
-/** Rolls too fast to watch. One smooth continuous turn, no per-roll easing:
- *  restarting a curve every 30ms is a stutter, not an animation. */
+/** Rolls too fast to watch. One continuous turn at the ceiling, no per-roll
+ *  easing: restarting a curve every 30ms is a stutter, not an animation. The
+ *  ceiling is also what the fastest readable throw reaches, so crossing into
+ *  this does not visibly change speed. */
 export function setBlur(on: boolean): void {
   if (on) {
     mode = 'blur'
@@ -456,12 +492,12 @@ function frame(now: number): void {
 
   if (mode === 'throw') {
     const e = easeOut(progress)
-    for (const w of live) if (w.visible) w.render(turns * e, progress)
+    for (const w of live) if (w.visible && w.rolls) w.render(turns * e, progress)
     return
   }
 
   if (mode === 'blur') {
-    for (const w of live) if (w.visible) w.step(dt, SPIN_BLUR)
+    for (const w of live) if (w.visible && w.rolls) w.step(dt, MAX_SPIN)
     return
   }
 
@@ -481,6 +517,17 @@ function stopLoop(): void {
 }
 
 REDUCED.addEventListener('change', () => (REDUCED.matches ? stopLoop() : ensureLoop()))
+
+/**
+ * Whether this die takes part in a throw. A row you own none of does not:
+ * it has nothing to land, and a solid tumbling to no effect is noise.
+ */
+export function setDieRolling(el: SVGSVGElement, on: boolean): void {
+  const w = byEl.get(el)
+  if (!w || w.rolls === on) return
+  w.rolls = on
+  if (!on) w.rest()
+}
 
 export function wireframe(id: SolidId, cls = 'solid-icon'): SVGSVGElement {
   const w = new Wire(id)

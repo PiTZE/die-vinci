@@ -102,15 +102,14 @@ const FIRST_CLIMBING_STUDY = STUDIES_THAT_UNLOCK + 1
 const STUDY_CLIMB = 15
 
 /**
- * The opening is cheaper than the rest.
+ * The first study is cheaper than the rest.
  *
  * Antimatter Dimensions charges a flat 20 for every dimension shift, but it
- * hands you four dimensions to start with and its first shift is a long way
- * in. Here the table opens with one die, so the same flat 20 put four full
- * resets between the player and a chain worth looking at. These four cost
- * half that; from the fifth the schedule is AD's again.
+ * hands you four dimensions to start with. Here the table opens with one die,
+ * so that flat 20 sat between a new player and a chain that does anything at
+ * all. Only the first one is discounted; from the second the schedule is AD's.
  */
-const EARLY_STUDIES = 4
+const EARLY_STUDIES = 1
 const EARLY_STUDY_REQUIREMENT = 10
 
 /** Which solid the nth study is measured against. n is 1-based. */

@@ -30,12 +30,12 @@ import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey, holdable } from './hold'
 import { Confirmer } from './confirm'
-import { setBlur, setThrow, wireframe } from './wireframe'
-import { playThrow } from './sound'
+import { setBlur, setDieRolling, setThrow, wireframe } from './wireframe'
+import { playThrow, setSpinBed, THROW_ABOVE_S } from './sound'
 
 interface Row {
   root: HTMLElement
-  die: HTMLElement
+  icon: SVGSVGElement
   face: HTMLElement
   mult: HTMLElement
   step: HTMLElement
@@ -142,14 +142,12 @@ export function tablePane(): Pane {
 
       for (const def of SOLIDS) {
         const r = el('div', 'solid')
-        // The face sits on the die rather than in its own column: the row is
-        // already seven columns on a 390px screen, and a number printed over
-        // the solid is what a die actually looks like.
-        const die = el('div', 'solid-die')
-        die.appendChild(wireframe(def.id))
+        // The face reads left of the solid rather than printed over it. On top
+        // it had to dim the wireframe to stay legible, which meant the die
+        // faded out at the exact moment it had something to say.
         const face = el('span', 'solid-face', '')
-        die.appendChild(face)
-        r.appendChild(die)
+        const icon = wireframe(def.id)
+        r.append(face, icon)
 
         const name = el('div', 'solid-name')
         name.appendChild(el('span', 'solid-name-text', `${def.short} ${def.name.toUpperCase()}`))
@@ -182,7 +180,7 @@ export function tablePane(): Pane {
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, die, face, mult, step, bar, barCan, amount, rate: flow, buy, buyLabel })
+        rows.push({ root: r, icon, face, mult, step, bar, barCan, amount, rate: flow, buy, buyLabel })
       }
 
       const roll = el('div', 'section')
@@ -295,21 +293,25 @@ export function tablePane(): Pane {
       wagerNow.textContent = confirm.isArmed('wager') ? 'SURE? THIS RESETS' : 'CALL THE WAGER'
       // Under a fast roll rate the digit would change every frame, which is
       // noise rather than a reading. The dice just spin then.
-      const readable = rollInterval(s) >= FACE_READABLE_S
+      const duration = rollInterval(s)
+      const readable = duration >= FACE_READABLE_S
 
       // A throw is an eased curve arriving at rest. Rolls too fast to watch
       // get one continuous turn instead, because restarting that curve every
       // thirty milliseconds is a stutter rather than an animation.
       setBlur(spinning && !readable)
-      if (!spinning) setThrow(1)
-      else if (readable) setThrow(rollProgress(s, now))
+      if (!spinning) setThrow(1, duration)
+      else if (readable) setThrow(rollProgress(s, now), duration)
 
-      // The clatter goes with what you can see. Past a few rolls a second the
-      // dice are a blur and the sound would be a machine gun, so both stop.
-      // Manual throws make their sound on the press, where the gesture is.
-      // Automated ones have no press, so they sound on each landing.
-      const autoLanded = readable && s.autoRoll && s.faces[0] !== lastFace
+      // A throw is its own sound only while rolls are far enough apart to hear
+      // apart. Below that the shake loop underneath takes over, rising and
+      // then fading as the rate climbs past the point where a rattle means
+      // anything. Manual throws sound on the press, where the gesture is;
+      // automated ones have no press, so they sound on each landing.
+      const heard = duration >= THROW_ABOVE_S
+      const autoLanded = heard && s.autoRoll && s.faces[0] !== lastFace
       if (s.options.sound && autoLanded) playThrow()
+      setSpinBed(duration, s.options.sound && spinning)
       lastFace = s.faces[0]
 
       // Once the automator is in, the button has nothing left to do: it can
@@ -349,12 +351,12 @@ export function tablePane(): Pane {
         if (r.barCan.style.left !== pct) r.barCan.style.left = pct
         if (r.barCan.style.width !== canPct) r.barCan.style.width = canPct
         setText(r.amount, formatWhole(st.amount, n))
-        // The face and the wireframe trade places rather than stacking: a
-        // number printed over live edges was two things at full contrast
-        // fighting for the same 38 pixels.
-        const face = readable ? s.faces[def.idx - 1] : 0
+        // A row with no dice on it sits the throw out entirely, so an empty
+        // solid does not tumble and announce a number that pays nothing.
+        const rolling = st.amount.gt(0)
+        setDieRolling(r.icon, rolling)
+        const face = readable && rolling ? s.faces[def.idx - 1] : 0
         setText(r.face, face ? String(face) : '')
-        r.die.classList.toggle('landed', face > 0)
 
         // Averaged over the faces, because that is what the row actually
         // pays over any run of rolls.

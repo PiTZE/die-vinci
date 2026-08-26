@@ -18,7 +18,7 @@ import {
   tick,
 } from './game/production'
 import { publishAway, simulateAway } from './game/offline'
-import { playThrow } from './ui/sound'
+import { playThrow, THROW_ABOVE_S } from './ui/sound'
 import { restoreBackup } from './backup'
 import { devTools } from './dev'
 import { doWager } from './game/wager'
@@ -195,7 +195,9 @@ const actions: Actions = {
     if (!startRoll(state, Date.now())) return
     // Built on this gesture the first time. An AudioContext cannot start
     // without one, and a roll is always one.
-    if (state.options.sound) playThrow()
+    // Below this the shake loop is carrying the sound, and a throw on top of
+    // it would be one more thing in an already continuous rattle.
+    if (state.options.sound && rollInterval(state) >= THROW_ABOVE_S) playThrow()
   },
   buyAutomator: () => {
     buyAutomator(state)

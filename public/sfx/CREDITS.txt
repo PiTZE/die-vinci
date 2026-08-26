@@ -6,6 +6,9 @@ work deserves it and because a future reader should not have to guess where
 an audio file in a repository came from.
 
 Source: https://kenney.nl/assets/casino-audio
-Taken from dice-throw-1/2/3.ogg, downmixed to mono and re-encoded to 32kHz
-80kbps MP3, which every browser can decode. The originals are Ogg Vorbis,
-which Safari cannot be relied on to play.
+Taken from dice-throw-1/2/3.ogg and dice-shake-1.ogg, downmixed to mono and
+re-encoded to 32kHz 80kbps MP3, which every browser can decode. The originals
+are Ogg Vorbis, which Safari cannot be relied on to play.
+
+The throws play one per roll while rolls are slow enough to hear apart. The
+shake is looped and pitched up underneath them once they are not.

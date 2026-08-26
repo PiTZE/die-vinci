@@ -122,14 +122,18 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 1000 : 0) }) })()`)
 const t0 = Date.now()
 const i0 = Number(await ev(`window.LD.state.ink.toString()`))
-await sleep(2000)
+await sleep(3000)
 const i1 = Number(await ev(`window.LD.state.ink.toString()`))
 const secs = (Date.now() - t0) / 1000
 const rate = Number(await ev(`1 / window.LD.rollInterval`))
 // 1000 d4, mean face 2.5, so 2500 ink a roll.
 const want = 1000 * 2.5 * rate * secs
 const got = (i1 - i0) / want
-check('a batch pays the mean face per die', got > 0.75 && got < 1.25,
+// Wide, because this is a wall clock against a 100ms tick and it measured
+// anywhere from 99% to 145% across runs. It is not trying to verify the rate.
+// The regression it exists to catch is a batch paying a flat factor of 1
+// instead of each die's mean face, which on a d4 lands at 40%.
+check('a batch pays the mean face per die', got > 0.55 && got < 1.75,
   `${(got * 100).toFixed(0)}% of expected`)
 
 // The throw is one eased curve arriving at rest, not a constant spin that
@@ -188,23 +192,85 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0 })()`)
 await sleep(400)
 await ev(`${ROLL}.click()`); await sleep(120)
-const air = await ev(`({ cls: document.querySelector('.solid-die').className,
-  face: document.querySelector('.solid-face').textContent })`)
-check('a die in the air shows no face', air.face === '' && !air.cls.includes('landed'),
-  JSON.stringify(air))
+const air = await ev(`({ face: document.querySelector('.solid-face').textContent })`)
+check('a die in the air shows no face', air.face === '', JSON.stringify(air))
 await sleep(1200)
-const rest = await ev(`({ cls: document.querySelector('.solid-die').className,
-  icon: getComputedStyle(document.querySelector('.solid-icon')).opacity })`)
-check('a landed die dims its wireframe for the face',
-  rest.cls.includes('landed') && Number(rest.icon) < 0.3, JSON.stringify(rest))
+const rest = await ev(`(() => {
+  const row = document.querySelector('.solid')
+  const face = row.querySelector('.solid-face').getBoundingClientRect()
+  const icon = row.querySelector('.solid-icon').getBoundingClientRect()
+  return { face: row.querySelector('.solid-face').textContent,
+    faceRight: Math.round(face.right), iconLeft: Math.round(icon.left),
+    opacity: getComputedStyle(row.querySelector('.solid-icon')).opacity }
+})()`)
+check('the face reads left of the solid, not over it',
+  rest.faceRight <= rest.iconLeft && rest.face !== '', JSON.stringify(rest))
+check('and the wireframe stays at full strength',
+  Number(rest.opacity) === 1, rest.opacity)
 
 // Too fast to read means no numbers at all, just a blur.
 await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.rollUpgrades = 60 })()`)
 await sleep(500)
-const blur = await ev(`({ face: document.querySelector('.solid-face').textContent,
-  cls: document.querySelector('.solid-die').className })`)
-check('an unreadable roll rate drops the numbers',
-  blur.face === '' && !blur.cls.includes('landed'), JSON.stringify(blur))
+const blur = await ev(`({ face: document.querySelector('.solid-face').textContent })`)
+check('an unreadable roll rate drops the numbers', blur.face === '', JSON.stringify(blur))
+
+// A row you own none of sits the throw out: no face, and its wireframe does
+// not move while the ones with dice on them do.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0; s.studies = 2
+  s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 5 : 0) }) })()`)
+await sleep(500)
+await ev(`${ROLL}.click()`); await sleep(260)
+const empties = await ev(`(() => {
+  const rows = [...document.querySelectorAll('.solid')].filter(r => getComputedStyle(r).display !== 'none')
+  return rows.map(r => ({ face: r.querySelector('.solid-face').textContent,
+    moved: r.querySelector('.solid-icon').style.transform !== '' }))
+})()`)
+check('the row with dice on it is thrown', empties[0] && empties[0].moved === true,
+  JSON.stringify(empties))
+check('and the empty rows are not',
+  empties.slice(1).length > 0 && empties.slice(1).every(r => !r.moved && r.face === ''),
+  JSON.stringify(empties.slice(1)))
+await sleep(1200)
+check('an empty row lands on nothing',
+  (await ev(`[...document.querySelectorAll('.solid')].filter(r => getComputedStyle(r).display !== 'none')
+     .slice(1).every(r => r.querySelector('.solid-face').textContent === '')`)) === true)
+
+// Spin speed has to rise with the roll rate and then stop rising, or crossing
+// out of the readable range makes the dice visibly slow down, which is what it
+// used to do: a fixed blur rate slower than the fastest eased throw.
+async function spinRate(upgrades) {
+  await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+    s.autoRoll = true; s.studies = 2; s.rollUpgrades = ${upgrades}
+    s.solids.forEach((d, i) => { if (i < 2) { d.bought = 10; d.amount = new D(50) } }) })()`)
+  await sleep(700)
+  await ev(`(() => { window.__sp = []
+    const ln = document.querySelector('.solid-icon line')
+    window.__spt = setInterval(() => window.__sp.push([
+      Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1'))]), 32) })()`)
+  await sleep(1400)
+  await ev(`clearInterval(window.__spt)`)
+  return ev(`(() => { const s = window.__sp, d = []
+    for (let i = 1; i < s.length; i++) d.push(Math.hypot(s[i][0]-s[i-1][0], s[i][1]-s[i-1][1]))
+    const m = d.filter(v => v > 0)
+    return m.length ? m.reduce((a,b)=>a+b,0) / m.length : 0 })()`)
+}
+const slow = await spinRate(0)
+const quicker = await spinRate(6)
+const fast = await spinRate(40)
+check('the dice spin faster as the roll rate climbs', quicker > slow * 1.3,
+  `1/s: ${slow.toFixed(4)}  ->  ${quicker.toFixed(4)}`)
+check('and stop speeding up at the ceiling instead of dropping',
+  fast >= quicker * 0.75, `${quicker.toFixed(4)} -> ${fast.toFixed(4)}`)
+
+// The throws hand over to the shake loop rather than both playing at once.
+const bed = await ev(`(async () => {
+  const ctx = new AudioContext()
+  const r = await fetch('/sfx/shake.mp3')
+  const b = await ctx.decodeAudioData(await r.arrayBuffer())
+  return b.duration.toFixed(2) + 's ' + b.numberOfChannels + 'ch'
+})()`)
+check('the shake loop is there and decodes', /^1\.[0-9]+s 1ch$/.test(bed), bed)
 
 // The threshold stops everything and takes over the bar.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
