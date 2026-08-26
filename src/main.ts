@@ -121,27 +121,97 @@ applyTheme(currentTheme().id)
  * save goes through persist() so a wipe can switch them all off first.
  */
 let savingEnabled = true
+let dirtyTimer = 0
 
 function persist(): void {
-  if (savingEnabled) saveGame(state)
+  if (!savingEnabled) return
+  window.clearTimeout(dirtyTimer)
+  dirtyTimer = 0
+  saveGame(state)
+}
+
+/**
+ * Writes shortly after something the player did, rather than waiting for the
+ * next autosave.
+ *
+ * The autosave alone left a purchase unwritten for up to ten seconds, measured
+ * at 9.2 on a real build, and an installed app closed inside that window loses
+ * it. The delay is short enough not to matter and long enough that holding MAX,
+ * which buys many times a second, does not serialise the whole save on every
+ * one of them.
+ */
+function persistSoon(): void {
+  if (!savingEnabled) return
+  // Tied to the first thing the player actually does, rather than fired at a
+  // visitor who has not started yet. Chrome decides silently; Firefox prompts.
+  void requestPersistentStorage()
+  if (dirtyTimer) return
+  dirtyTimer = window.setTimeout(persist, 250)
+}
+
+/**
+ * Asks the browser not to evict this origin.
+ *
+ * Without it localStorage is best-effort: Chrome clears least-recently-used
+ * origins under storage pressure, which is how a save disappears after a while
+ * away with nobody touching anything. An installed app is usually granted this
+ * without a prompt.
+ */
+let persistenceAsked = false
+
+async function requestPersistentStorage(): Promise<void> {
+  if (persistenceAsked) return
+  persistenceAsked = true
+  try {
+    if (!navigator.storage?.persist) return
+    if (await navigator.storage.persisted()) return
+    const granted = await navigator.storage.persist()
+    console.info(`[die-vinci] persistent storage ${granted ? 'granted' : 'refused'}`)
+  } catch {
+    // Not supported, or refused. The autosave is still doing its job.
+  }
 }
 
 const actions: Actions = {
-  maxAll: () => maxAll(state),
-  buySolid: (idx, one) => void buySolid(state, idx, one),
-  buyRollRate: () => void buyRollRate(state),
-  buyStudy: () => void buyStudy(state),
-  buyFolio: () => void buyFolio(state),
-  wager: () => void doWager(state),
-  buyUpgrade: (id) => void buyUpgrade(state, id as UpgradeId),
+  maxAll: () => {
+    maxAll(state)
+    persistSoon()
+  },
+  buySolid: (idx, one) => {
+    buySolid(state, idx, one)
+    persistSoon()
+  },
+  buyRollRate: () => {
+    buyRollRate(state)
+    persistSoon()
+  },
+  buyStudy: () => {
+    buyStudy(state)
+    persistSoon()
+  },
+  buyFolio: () => {
+    buyFolio(state)
+    persistSoon()
+  },
+  wager: () => {
+    doWager(state)
+    persistSoon()
+  },
+  buyUpgrade: (id) => {
+    buyUpgrade(state, id as UpgradeId)
+    persistSoon()
+  },
   setNotation: (n) => {
     state.options.notation = n
+    persistSoon()
   },
   setOffline: (on) => {
     state.options.offline = on
+    persistSoon()
   },
   setOfflineTicks: (n) => {
     state.options.offlineTicks = n
+    persistSoon()
   },
   exportSave: () => exportSave(state),
   importSave: (blob) => {
@@ -244,9 +314,11 @@ function resume(): void {
   startRender()
 }
 
+// Save on either direction. Which of these a platform actually delivers when
+// an installed app is closed varies, and a redundant write costs nothing.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) persist()
-  else resume()
+  persist()
+  if (!document.hidden) resume()
 })
 
 // bfcache restore, page-lifecycle resume, and plain window focus. Which of
@@ -256,6 +328,10 @@ window.addEventListener('focus', resume)
 window.addEventListener('resume', resume)
 
 window.addEventListener('pagehide', persist)
+window.addEventListener('blur', persist)
+// Chrome fires this before it discards a frozen page, and it is the last
+// chance to write anything.
+window.addEventListener('freeze', persist)
 
 // A hook for balance work in the console. Not referenced by the game itself.
 ;(window as unknown as Record<string, unknown>).LD = {

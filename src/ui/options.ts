@@ -81,6 +81,30 @@ export function optionsPane(): Pane {
       btns.append(exp, imp)
       save.appendChild(btns)
 
+      // Whether the browser has agreed not to evict this origin. A refused
+      // request is why a save can vanish after a long absence, so it is worth
+      // being able to see rather than guess at.
+      const storageRow = el('div', 'row')
+      storageRow.appendChild(el('span', 'grow dim', 'STORAGE'))
+      const storageState = el('span', 'num dim', 'checking')
+      storageRow.appendChild(storageState)
+      save.appendChild(storageRow)
+      const paintStorage = async () => {
+        try {
+          if (!navigator.storage?.persisted) {
+            storageState.textContent = 'unknown'
+            return
+          }
+          storageState.textContent = (await navigator.storage.persisted())
+            ? 'protected'
+            : 'evictable'
+        } catch {
+          storageState.textContent = 'unknown'
+        }
+      }
+      void paintStorage()
+      setInterval(paintStorage, 30_000)
+
       status = el('div', 'empty', '')
       // Nothing to say yet, and an empty div still reserves its padding.
       status.hidden = true
