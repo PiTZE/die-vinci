@@ -53,8 +53,11 @@ await sleep(400)
 // months and then started failing on a slower deploy, which says nothing about
 // the code and everything about the sleep.
 await send('Page.navigate',{url:'https://leo.generis.ir/dev/'}); await sleep(3000)
+// Both conditions, not just the scope. The worker can be registered and
+// scoped correctly a beat before the page's own script has run, and polling on
+// scope alone returned while window.LD was still undefined.
 let b = await ev(probe)
-for (let i = 0; i < 20 && !b.scope.endsWith('/dev/'); i++) {
+for (let i = 0; i < 20 && !(b.scope.endsWith('/dev/') && b.channel === 'dev'); i++) {
   await sleep(1000)
   b = await ev(probe)
 }
