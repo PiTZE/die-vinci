@@ -310,6 +310,24 @@
   -webkit-user-select: none;
 }
 
+/* Folio and study sit side by side once both exist, and each header half
+   lines up with the button under it. */
+.reset-head {
+  gap: 0;
+}
+
+.reset-half {
+  display: flex;
+  flex: 1 1 0;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reset-half + .reset-half {
+  padding-left: 10px;
+}
+
 /* -- generic wide action button ------------------------------------------ */
 
 .action {

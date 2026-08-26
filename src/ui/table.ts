@@ -42,7 +42,7 @@ export function tablePane(): Pane {
   let rollBtn: HTMLButtonElement
   let studyBtn: HTMLButtonElement
   let studyLine: HTMLElement
-  let folioSection: HTMLElement
+  let folioLabel: HTMLElement
   let folioBtn: HTMLButtonElement
   let folioLine: HTMLElement
 
@@ -109,33 +109,35 @@ export function tablePane(): Pane {
       rr.appendChild(rollBtn)
       roll.appendChild(rr)
 
-      const study = el('div', 'section')
-      const sh = el('div', 'section-head')
-      sh.appendChild(el('span', 'grow', 'STUDY'))
-      studyLine = el('span', 'num dim', '')
-      sh.appendChild(studyLine)
-      study.appendChild(sh)
-      studyBtn = el('button', 'action', '')
-      studyBtn.type = 'button'
-      studyBtn.title = 'Take a study  (s)'
-      holdable(studyBtn, () => actions.buyStudy())
-      const sr = el('div', 'row')
-      sr.appendChild(studyBtn)
-      study.appendChild(sr)
+      // Folio and study share one section, folio on the left because it is
+      // the deeper reset. Before folios are unlocked, study has it to itself.
+      const resets = el('div', 'section')
+      const resetHead = el('div', 'section-head reset-head')
 
-      folioSection = el('div', 'section')
-      const fh = el('div', 'section-head')
-      fh.appendChild(el('span', 'grow', 'FOLIO'))
+      folioLabel = el('span', 'reset-half')
       folioLine = el('span', 'num dim', '')
-      fh.appendChild(folioLine)
-      folioSection.appendChild(fh)
+      folioLabel.append(el('span', 'grow', 'FOLIO'), folioLine)
+
+      const studyLabel = el('span', 'reset-half')
+      studyLine = el('span', 'num dim', '')
+      studyLabel.append(el('span', 'grow', 'STUDY'), studyLine)
+
+      resetHead.append(folioLabel, studyLabel)
+      resets.appendChild(resetHead)
+
       folioBtn = el('button', 'action', '')
       folioBtn.type = 'button'
       folioBtn.title = 'Bind a folio  (f)'
       holdable(folioBtn, () => actions.buyFolio())
-      const fr = el('div', 'row')
-      fr.appendChild(folioBtn)
-      folioSection.appendChild(fr)
+
+      studyBtn = el('button', 'action', '')
+      studyBtn.type = 'button'
+      studyBtn.title = 'Take a study  (s)'
+      holdable(studyBtn, () => actions.buyStudy())
+
+      const resetRow = el('div', 'row')
+      resetRow.append(folioBtn, studyBtn)
+      resets.appendChild(resetRow)
 
       // Wide screens put the chain and its controls side by side. Stacked, the
       // controls left most of a desktop empty and pushed the chain off centre.
@@ -143,7 +145,7 @@ export function tablePane(): Pane {
       // Roll rate multiplies the whole chain, so it sits above the chain
       // rather than beside it.
       const controls = el('div', 'table-controls')
-      controls.append(study, folioSection)
+      controls.append(resets)
       grid.append(chain, controls)
       root.append(roll, grid)
 
@@ -212,8 +214,10 @@ export function tablePane(): Pane {
       studyBtn.disabled = !canStudy
       studyBtn.classList.toggle('buyable', canStudy)
 
-      folioSection.hidden = !folioUnlocked(s)
-      if (folioUnlocked(s)) {
+      const showFolio = folioUnlocked(s)
+      folioLabel.hidden = !showFolio
+      folioBtn.hidden = !showFolio
+      if (showFolio) {
         const { idx, need } = folioReq(s)
         setText(folioLine, `${s.folios}`)
         setText(folioBtn, `FOLIO / ${formatWhole(need, n)} ${SOLIDS[idx - 1].short}`)

@@ -117,6 +117,20 @@ try {
   check('buys the dearest option first', picked.d8 === 1 && picked.d4 === 0 && picked.roll === 0,
     `d8=${picked.d8} d4=${picked.d4} roll=${picked.roll}`)
 
+  // MAX buys dice and roll rate. It must never spend a study or a folio, both
+  // of which reset the table, which would be a catastrophic thing to do to
+  // someone holding a button down.
+  await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal
+    s.ink = new D('1e40'); s.studies = 5; s.folios = 0
+    s.solids.forEach(d => { d.bought = 0; d.amount = new D(0) })
+    s.solids[8].amount = new D(300) })()`)
+  await key('m', 'rawKeyDown'); await sleep(600); await key('m', 'keyUp')
+  const resets = await evaluate(`({ studies: window.LD.state.studies, folios: window.LD.state.folios,
+    bought: window.LD.state.solids.reduce((a, d) => a + d.bought, 0) })`)
+  check('max never spends a study or a folio',
+    resets.studies === 5 && resets.folios === 0 && resets.bought > 0,
+    `studies=${resets.studies} folios=${resets.folios} dice bought=${resets.bought}`)
+
   // Shift+1 must buy exactly one, not a group of ten.
   await evaluate(reset)
   const b1 = await evaluate(`window.LD.state.solids[0].bought`)
