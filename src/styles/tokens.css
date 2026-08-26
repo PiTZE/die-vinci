@@ -1,0 +1,12 @@
+/* Layout tokens. These do not change between themes. Colour lives in
+   themes.css, and every colour token there is listed in ui/theme.ts so a new
+   theme cannot be added half-finished. */
+
+:root {
+  --nav-w: 232px;
+  --gap: 14px;
+  --bar-h: 52px;
+  --tabs-h: 56px;
+  /* Numbers get their own width so a growing value never reflows a row. */
+  --num-w: 9.5rem;
+}

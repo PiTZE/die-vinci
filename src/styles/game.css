@@ -1,0 +1,356 @@
+/* Mobile is the primary layout. The desktop left nav is the media query, not
+   the other way round. */
+
+.app {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+/* -- top bar ------------------------------------------------------------- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--bar-h);
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--chrome);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.bar::-webkit-scrollbar {
+  display: none;
+}
+
+.res[hidden],
+.solid[hidden],
+.section[hidden] {
+  display: none;
+}
+
+.res {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  flex-shrink: 0;
+}
+
+.res-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-muted);
+}
+
+.res-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+.res-rate {
+  font-size: 0.62rem;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.theme-toggle {
+  border: 1px solid var(--fg);
+  padding: 7px 10px;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+  /* Fixed width so VIVENDI and OPERANDI cannot resize the bar between them. */
+  min-width: 7.5rem;
+  min-height: 38px;
+  text-align: center;
+}
+
+.theme-toggle:hover {
+  background: var(--fill);
+  text-shadow: 0 0 6px var(--glow);
+}
+
+/* -- tabs, bottom on mobile and a left nav on desktop -------------------- */
+
+.tabs {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--border);
+  background: var(--chrome);
+  min-height: var(--tabs-h);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab {
+  flex: 1;
+  border: 0;
+  border-right: 1px solid var(--border-faint);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  padding: 8px 2px;
+  min-height: 44px;
+}
+
+.tab:last-child {
+  border-right: 0;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--fg);
+  background: var(--fill);
+  box-shadow: inset 0 2px 0 var(--fg);
+}
+
+.tab[hidden] {
+  display: none;
+}
+
+/* -- panes --------------------------------------------------------------- */
+
+.pane {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--gap);
+  -webkit-overflow-scrolling: touch;
+}
+
+.pane[hidden] {
+  display: none;
+}
+
+.section {
+  border: 1px solid var(--border);
+  margin-bottom: var(--gap);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-faint);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+}
+
+.section-head .grow {
+  flex: 1;
+}
+
+/* -- a solid in the production chain ------------------------------------- */
+
+.solid {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'icon name  amount'
+    'icon rate  buy';
+  align-items: center;
+  gap: 2px 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.solid:last-child {
+  border-bottom: 0;
+}
+
+.solid-icon {
+  grid-area: icon;
+  width: 38px;
+  height: 38px;
+  color: var(--fg-dim);
+}
+
+.solid-name {
+  grid-area: name;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.solid-mult {
+  color: var(--fg-muted);
+  font-size: 0.7rem;
+}
+
+.solid-amount {
+  grid-area: amount;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  min-width: var(--num-w);
+}
+
+.solid-rate {
+  grid-area: rate;
+  font-size: 0.66rem;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.solid-buy {
+  grid-area: buy;
+  min-width: var(--num-w);
+  min-height: 44px;
+  padding: 6px 10px;
+  font-size: 0.68rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one accent in the game: you can afford this and have not bought it. */
+.buyable {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.buyable:hover {
+  background: var(--fill);
+}
+
+/* -- roll by hand, the entire game until the first autobuyer -------------- */
+
+.roll {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin-bottom: var(--gap);
+  padding: 12px;
+  border: 1px solid var(--fg);
+  font-size: 0.95rem;
+  letter-spacing: 0.14em;
+  font-variant-numeric: tabular-nums;
+}
+
+.roll:hover {
+  background: var(--fill);
+  text-shadow: 0 0 6px var(--glow);
+}
+
+.roll:active {
+  background: var(--fill-strong);
+}
+
+/* -- generic wide action button ------------------------------------------ */
+
+.action {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-faint);
+  font-size: 0.75rem;
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.row .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.dim {
+  color: var(--fg-muted);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  padding: 20px 10px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+}
+
+/* -- desktop ------------------------------------------------------------- */
+
+@media (min-width: 820px) {
+  .app {
+    grid-template-columns: var(--nav-w) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .bar {
+    grid-column: 1 / -1;
+    gap: 22px;
+    padding: 6px 16px;
+  }
+
+  .tabs {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: column;
+    align-items: stretch;
+    border-top: 0;
+    border-right: 1px solid var(--border);
+    padding-bottom: 0;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+    text-align: left;
+    padding: 11px 16px;
+    font-size: 0.68rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-faint);
+  }
+
+  .tab[aria-selected='true'] {
+    box-shadow: inset 2px 0 0 var(--fg);
+  }
+
+  .pane {
+    grid-column: 2;
+    grid-row: 2;
+    padding: var(--gap) calc(var(--gap) * 1.4);
+  }
+
+  .pane-inner {
+    max-width: 720px;
+  }
+
+  .solid {
+    grid-template-columns: 48px minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'icon name amount buy'
+      'icon rate amount buy';
+    gap: 2px 14px;
+    padding: 10px 14px;
+  }
+
+  .solid-icon {
+    width: 44px;
+    height: 44px;
+  }
+}

@@ -1,0 +1,53 @@
+/* Built-in themes, one block each.
+ *
+ * Adding a theme means a block here plus an entry in ui/theme.ts. The token
+ * list in that file is a TypeScript type, so a theme missing a token fails the
+ * build rather than rendering something transparent.
+ *
+ * These two are the Modus palettes from pitze.github.io, verbatim. Pure black
+ * on white and white on black, everything else achromatic, and one accent that
+ * flips red in the dark theme and blue in the light one.
+ */
+
+:root,
+[data-theme='modus-vivendi'] {
+  --bg: #000000;
+  --fg: #ffffff;
+  --fg-dim: #c4c4c4;
+  --fg-muted: #aaaaaa;
+  --fill: rgba(255, 255, 255, 0.08);
+  --fill-strong: rgba(255, 255, 255, 0.14);
+  --selection-bg: rgba(152, 152, 152, 0.45);
+  --selection-fg: #ffffff;
+  --glow: rgba(255, 255, 255, 0.35);
+  --accent: #ff0000;
+  --panel: rgba(0, 0, 0, 0.82);
+  --chrome: rgba(0, 0, 0, 0.88);
+  --border: #808080;
+  --border-soft: rgba(255, 255, 255, 0.28);
+  --border-mid: rgba(255, 255, 255, 0.44);
+  --border-faint: rgba(255, 255, 255, 0.18);
+  --scrollbar-track: #1e1e1e;
+  --scanline: rgba(0, 0, 0, 0.18);
+}
+
+[data-theme='modus-operandi'] {
+  --bg: #ffffff;
+  --fg: #000000;
+  --fg-dim: #595959;
+  --fg-muted: #757575;
+  --fill: rgba(0, 0, 0, 0.06);
+  --fill-strong: rgba(0, 0, 0, 0.1);
+  --selection-bg: rgba(89, 89, 89, 0.28);
+  --selection-fg: #000000;
+  --glow: rgba(0, 0, 0, 0.22);
+  --accent: #0000ff;
+  --panel: rgba(255, 255, 255, 0.92);
+  --chrome: rgba(255, 255, 255, 0.94);
+  --border: #9f9f9f;
+  --border-soft: rgba(0, 0, 0, 0.18);
+  --border-mid: rgba(0, 0, 0, 0.32);
+  --border-faint: rgba(0, 0, 0, 0.12);
+  --scrollbar-track: #f2f2f2;
+  --scanline: transparent;
+}

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" data-theme="modus-vivendi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="An incremental dice game about Leonardo, the Platonic solids, and what happened to determinism." />
+    <meta name="theme-color" content="#000000" />
+    <title>Leonardo's Die</title>
+    <script>
+      // Runs before first paint so the theme never flashes. Mirrors the logic
+      // in src/ui/theme.ts; keep the two in step.
+      (function () {
+        var root = document.documentElement
+        var id = 'modus-vivendi'
+        try {
+          id = localStorage.getItem('leonardos-die-theme') || id
+          var raw = localStorage.getItem('leonardos-die-theme-vars')
+          if (raw) {
+            var vars = JSON.parse(raw)
+            for (var k in vars) root.style.setProperty('--' + k, vars[k])
+          }
+        } catch (e) {}
+        root.dataset.theme = id
+        root.style.colorScheme = id === 'modus-operandi' ? 'light' : 'dark'
+      })()
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="scanlines" aria-hidden="true"></div>
+    <div id="app" class="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
