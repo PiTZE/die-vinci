@@ -90,12 +90,17 @@ const inset = await ev(`(() => {
   return { underSelected: Math.round(innerHeight - sel.bottom),
     tabsBottom: Math.round(innerHeight - tabs.bottom),
     tabH: Math.round(sel.height),
+    tabsBarH: Math.round(tabs.height),
     barTextTop: Math.round(first.top) }
 })()`)
 check('the selected tab reaches the bottom edge past the home indicator',
   inset.underSelected === 0 && inset.tabsBottom === 0, JSON.stringify(inset))
 check('and it keeps a 44px target above the indicator',
   inset.tabH >= 44 + 34, JSON.stringify(inset))
+// 44 for the target, 34 for the indicator, and nothing else. Counting the
+// inset on the bar as well as on the buttons made it 90px on an iPhone.
+check('without counting the indicator twice',
+  inset.tabsBarH <= 44 + 34 + 4, JSON.stringify(inset))
 check('the top bar clears the status bar', inset.barTextTop >= 47, JSON.stringify(inset))
 await ev(`document.documentElement.style.removeProperty('--safe-b')`)
 await ev(`document.documentElement.style.removeProperty('--safe-t')`)

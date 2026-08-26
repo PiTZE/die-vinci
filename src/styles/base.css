@@ -57,7 +57,12 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  /* The chrome colour, not the page ground. The app is sized to the measured
+     viewport, and on an installed iPhone that can come up short of the screen
+     by the height of the home indicator. Whatever strip is left sits under the
+     tab bar, so it should be the tab bar's colour rather than a different
+     black nobody asked for. */
+  background: var(--chrome);
   color: var(--fg);
   font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 15px;

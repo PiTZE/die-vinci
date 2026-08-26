@@ -365,7 +365,10 @@ export function tablePane(): Pane {
           const face = s.faces[def.idx - 1]
           setText(r.face, face ? String(face) : '')
         } else {
-          setText(r.face, meanFace(def.faces, faceBias(s)).toFixed(1))
+          // Whole numbers. A die never lands on 10.5, and printing it in the
+          // same column that shows a landed face the rest of the time reads as
+          // a broken number rather than as an average.
+          setText(r.face, String(Math.floor(meanFace(def.faces, faceBias(s)))))
         }
 
         // Averaged over the faces, because that is what the row actually pays

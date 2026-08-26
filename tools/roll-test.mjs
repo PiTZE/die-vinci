@@ -58,9 +58,14 @@ const stillIdle = await ev(`window.LD.state.ink.toString()`)
 check('a d4 alone produces nothing without a roll', idle === stillIdle, `${idle} -> ${stillIdle}`)
 
 // One roll pays out when it lands, not while it is in the air.
-await ev(`${ROLL}.click()`); await sleep(120)
-const mid = await ev(`({ ink: window.LD.state.ink.toString(), spinning: window.LD.state.rollStartedAt > 0 })`)
-check('pressing ROLL starts a spin', mid.spinning === true)
+// Click and read in one synchronous expression. Probing 120ms later raced the
+// 100ms tick: sometimes the roll had already landed, and the check reported a
+// spin that never started rather than a tick that arrived first.
+const mid = await ev(`(() => {
+  ${ROLL}.click()
+  return { ink: window.LD.state.ink.toString(), spinning: window.LD.state.rollStartedAt > 0 }
+})()`)
+check('pressing ROLL starts a spin', mid.spinning === true, JSON.stringify(mid))
 check('and pays nothing mid-air', mid.ink === stillIdle, mid.ink)
 
 await sleep(1200)
@@ -219,8 +224,8 @@ check('and the wireframe stays at full strength',
 await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.rollUpgrades = 60 })()`)
 await sleep(500)
 const blur = await ev(`({ face: document.querySelector('.solid-face').textContent })`)
-check('an unreadable roll rate shows the average instead of blanking',
-  blur.face === '2.5', JSON.stringify(blur))
+check('an unreadable roll rate shows the average, as a whole number',
+  blur.face === '2', JSON.stringify(blur))
 
 // A row you own none of sits the throw out: no face, and its wireframe does
 // not move while the ones with dice on them do.

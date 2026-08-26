@@ -81,7 +81,9 @@
   align-items: stretch;
   border-top: 1px solid var(--border);
   background: var(--chrome);
-  min-height: calc(var(--tabs-h) + var(--safe-b));
+  /* The buttons carry the home indicator's clearance, so adding it here too
+     counted it twice and made the bar 90px on an iPhone for a 44px target. */
+  min-height: var(--tabs-h);
 }
 
 .tab {
@@ -91,8 +93,12 @@
   font-size: 0.6rem;
   letter-spacing: 0.06em;
   color: var(--fg-muted);
-  padding: 8px 2px calc(8px + var(--safe-b));
+  padding: 8px 1px calc(8px + var(--safe-b));
   min-height: calc(44px + var(--safe-b));
+  /* Seven of these on a 390px phone. Without this the longest labels win and
+     the rest are squeezed to nothing. */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .tab:last-child {
