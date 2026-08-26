@@ -3,11 +3,13 @@ import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { applyTheme, currentTheme, themes } from './theme'
 import { installState, manualHint, onInstallChange, promptInstall } from '../install'
-import { CHANNEL_PATHS } from '../game/balance'
+import { CHANNEL_PATHS, OFFLINE_TICK_CHOICES } from '../game/balance'
 
 export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
   let themeBtns: { id: string; btn: HTMLButtonElement }[] = []
+  let tickBtns: { n: number; btn: HTMLButtonElement }[] = []
+  let offlineBtns: { on: boolean; btn: HTMLButtonElement }[] = []
   let io: HTMLTextAreaElement
   let status: HTMLElement
 
@@ -132,6 +134,31 @@ export function optionsPane(): Pane {
       paintInstall()
       onInstallChange(paintInstall)
 
+      const offline = el('div', 'section')
+      const oh = el('div', 'section-head')
+      oh.appendChild(el('span', 'grow', 'AWAY PROGRESS'))
+      offline.appendChild(oh)
+      const onRow = el('div', 'row')
+      const onBtn = el('button', 'action', 'ON')
+      const offBtn = el('button', 'action', 'OFF')
+      for (const [b, on] of [[onBtn, true], [offBtn, false]] as const) {
+        b.type = 'button'
+        b.addEventListener('click', () => actions.setOffline(on))
+        offlineBtns.push({ on, btn: b })
+        onRow.appendChild(b)
+      }
+      offline.appendChild(onRow)
+      const tickRow = el('div', 'row')
+      for (const n of OFFLINE_TICK_CHOICES) {
+        const b = el('button', 'action', `${n}`)
+        b.type = 'button'
+        b.addEventListener('click', () => actions.setOfflineTicks(n))
+        tickBtns.push({ n, btn: b })
+        tickRow.appendChild(b)
+      }
+      offline.appendChild(tickRow)
+      offline.appendChild(el('div', 'empty', 'ticks to simulate a long absence in'))
+
       const channel = el('div', 'section')
       const ch = el('div', 'section-head')
       ch.appendChild(el('span', 'grow', 'CHANNEL'))
@@ -162,7 +189,7 @@ export function optionsPane(): Pane {
       buildRow.appendChild(el('span', 'num dim', __BUILD_ID__))
       about.appendChild(buildRow)
 
-      root.append(theme, notation, install, channel, save, about)
+      root.append(theme, notation, install, offline, channel, save, about)
       paintTheme()
 
       function say(msg: string) {
@@ -178,6 +205,11 @@ export function optionsPane(): Pane {
     update(s: GameState) {
       for (const n of notationBtns) {
         n.btn.classList.toggle('buyable', n.id === s.options.notation)
+      }
+      for (const o of offlineBtns) o.btn.classList.toggle('buyable', o.on === s.options.offline)
+      for (const t of tickBtns) {
+        t.btn.classList.toggle('buyable', t.n === s.options.offlineTicks)
+        t.btn.disabled = !s.options.offline
       }
     },
   }

@@ -4,7 +4,7 @@ import './styles/base.css'
 import './styles/game.css'
 
 import Decimal from 'break_infinity.js'
-import { AUTOSAVE_MS, OFFLINE_CAP_S, TICK_MS } from './game/balance'
+import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, TICK_MS } from './game/balance'
 import {
   buyFolio,
   buyRollRate,
@@ -14,6 +14,7 @@ import {
   maxAll,
   tick,
 } from './game/production'
+import { publishAway, simulateAway } from './game/offline'
 import { exportSave, importSave, loadGame, saveGame, wipeSave } from './save'
 import type { GameState } from './state'
 import { Shell, type Actions } from './ui/shell'
@@ -130,6 +131,12 @@ const actions: Actions = {
   setNotation: (n) => {
     state.options.notation = n
   },
+  setOffline: (on) => {
+    state.options.offline = on
+  },
+  setOfflineTicks: (n) => {
+    state.options.offlineTicks = n
+  },
   exportSave: () => exportSave(state),
   importSave: (blob) => {
     const next = importSave(blob, Date.now())
@@ -149,33 +156,40 @@ const shell = new Shell(root, actions)
 shell.build([tablePane(), optionsPane()], state.options.tab)
 
 /**
- * Offline time runs through the same tick in chunks rather than one huge dt.
- * The chain compounds, so a single step would undercount badly, and a thousand
- * steps costs nothing.
+ * Advances the game by however much wall-clock time has actually passed.
+ *
+ * The previous loop clamped its delta to one second, which quietly threw away
+ * almost everything: a browser throttles a hidden tab's timers to roughly once
+ * a minute, so a backgrounded game kept one second in sixty. Anything past
+ * CATCHUP_AFTER_S is now simulated instead, which covers a background tab, a
+ * sleeping machine and a closed game with the same code.
  */
-function catchUp(now: number): void {
-  const elapsed = Math.min((now - state.lastTick) / 1000, OFFLINE_CAP_S)
+function advance(now: number): void {
+  const elapsed = (now - state.lastTick) / 1000
   state.lastTick = now
-  if (elapsed <= 0) return
-  const steps = Math.min(1000, Math.max(1, Math.ceil(elapsed)))
-  const dt = elapsed / steps
-  for (let i = 0; i < steps; i++) tick(state, dt)
+  if (!Number.isFinite(elapsed) || elapsed <= 0) return
+
+  if (elapsed <= CATCHUP_AFTER_S) {
+    tick(state, elapsed)
+    return
+  }
+
+  // Turning offline progress off means exactly that: time the game was not
+  // running does not count, however it came to not be running.
+  if (!state.options.offline) return
+
+  const summary = simulateAway(state, elapsed, state.options.offlineTicks)
+  if (summary && summary.seconds >= AWAY_NOTICE_S) publishAway(summary)
 }
 
-catchUp(Date.now())
+advance(Date.now())
 
-let lastTick = performance.now()
 let sinceSave = 0
 
 function loop(): void {
-  const now = performance.now()
-  const dt = Math.min((now - lastTick) / 1000, 1)
-  lastTick = now
-  state.lastTick = Date.now()
-
-  tick(state, dt)
-
-  sinceSave += dt * 1000
+  const before = state.lastTick
+  advance(Date.now())
+  sinceSave += state.lastTick - before
   if (sinceSave >= AUTOSAVE_MS) {
     sinceSave = 0
     persist()
@@ -197,8 +211,10 @@ document.addEventListener('visibilitychange', () => {
     persist()
     cancelAnimationFrame(rendering)
     rendering = 0
-  } else if (!rendering) {
-    rendering = requestAnimationFrame(render)
+  } else {
+    // Catch up the moment the tab comes back, rather than on the next timer.
+    advance(Date.now())
+    if (!rendering) rendering = requestAnimationFrame(render)
   }
 })
 

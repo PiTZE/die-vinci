@@ -212,6 +212,25 @@
   background: var(--fill);
 }
 
+/* -- what happened while the game was closed ------------------------------ */
+
+.away {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--gap);
+  padding: 12px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.away:hover {
+  background: var(--fill);
+}
+
 /* -- the action bar, pinned in the thumb's reach -------------------------- */
 
 .action-bar {

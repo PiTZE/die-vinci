@@ -17,8 +17,18 @@ export const THEME_VARS_KEY = 'leonardos-die-theme-vars'
 export const SAVE_VERSION = 1
 export const AUTOSAVE_MS = 10_000
 
-/** Offline progress is granted up to this, then stops accruing. */
+/** Time away is credited up to this, then stops accruing. */
 export const OFFLINE_CAP_S = 8 * 60 * 60
+
+/** Gaps longer than this are simulated rather than run as a single tick. */
+export const CATCHUP_AFTER_S = 1
+
+/** And gaps longer than this are worth telling the player about. */
+export const AWAY_NOTICE_S = 60
+
+/** Tick budgets the player can pick between. More is finer and slower. */
+export const OFFLINE_TICK_CHOICES = [500, 2000, 10000] as const
+export const OFFLINE_TICKS_DEFAULT = 2000
 
 /**
  * The Wager threshold: 2^1024, the largest finite double. Antimatter

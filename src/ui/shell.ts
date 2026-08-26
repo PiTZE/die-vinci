@@ -11,6 +11,8 @@ export interface Actions {
   buyStudy(): void
   buyFolio(): void
   setNotation(n: GameState['options']['notation']): void
+  setOffline(on: boolean): void
+  setOfflineTicks(n: number): void
   exportSave(): string
   importSave(blob: string): boolean
   wipe(): void

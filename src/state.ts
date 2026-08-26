@@ -1,6 +1,12 @@
 import Decimal from 'break_infinity.js'
 import { SOLIDS, SOLID_COUNT } from './game/solids'
-import { SAVE_VERSION, SOLIDS_AT_START, START_INK, STUDIES_THAT_UNLOCK } from './game/balance'
+import {
+  OFFLINE_TICKS_DEFAULT,
+  SAVE_VERSION,
+  SOLIDS_AT_START,
+  START_INK,
+  STUDIES_THAT_UNLOCK,
+} from './game/balance'
 import type { NotationId } from './format'
 
 export interface SolidState {
@@ -35,6 +41,10 @@ export interface GameState {
   options: {
     notation: NotationId
     tab: TabId
+    /** Whether time away from the game is credited at all. */
+    offline: boolean
+    /** How many ticks a long absence is simulated in. */
+    offlineTicks: number
   }
   stats: {
     started: number
@@ -54,7 +64,12 @@ export function newGame(now: number): GameState {
     points: new Decimal(0),
     wagers: 0,
     tarot: {},
-    options: { notation: 'scientific', tab: 'table' },
+    options: {
+      notation: 'scientific',
+      tab: 'table',
+      offline: true,
+      offlineTicks: OFFLINE_TICKS_DEFAULT,
+    },
     stats: { started: now },
   }
 }
