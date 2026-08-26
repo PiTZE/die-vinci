@@ -61,6 +61,18 @@ function edgesByDistance(vs: V3[]): [number, number][] {
   return out
 }
 
+/** Every permutation of a triple, with every sign combination. */
+function allPermutations(a: number, b: number, c: number): V3[] {
+  return dedupe([
+    ...signs([a, b, c]),
+    ...signs([a, c, b]),
+    ...signs([b, a, c]),
+    ...signs([b, c, a]),
+    ...signs([c, a, b]),
+    ...signs([c, b, a]),
+  ])
+}
+
 /** Every cyclic permutation of a triple, with every sign combination. */
 function cyclicSigns(a: number, b: number, c: number): V3[] {
   return dedupe(cyclic(a, b, c).flatMap((v) => signs(v)))
@@ -81,18 +93,18 @@ function uniformVertices(id: SolidId): V3[] {
       return cyclicSigns(1, 0, 0)
     case 'dodeca':
       return dedupe([...signs([1, 1, 1]), ...cyclicSigns(0, 1 / PHI, PHI)])
-    case 'cubocta':
-      return cyclicSigns(1, 1, 0)
+    case 'trunccube':
+      // All permutations of (+-xi, +-1, +-1), where xi is sqrt(2) - 1.
+      return allPermutations(Math.SQRT2 - 1, 1, 1)
     case 'icosa':
       return cyclicSigns(0, 1, PHI)
     case 'rhombi':
       return cyclicSigns(1, 1, SILVER)
-    case 'truncicosa':
-      // The football. Even permutations of three triples, 60 vertices.
+    case 'icosidodeca':
+      // (0, 0, +-PHI) cyclic, plus (+-1/2, +-PHI/2, +-PHI^2/2) cyclic. Thirty.
       return dedupe([
-        ...cyclicSigns(0, 1, 3 * PHI),
-        ...cyclicSigns(1, 2 + PHI, 2 * PHI),
-        ...cyclicSigns(PHI, 2, 2 * PHI + 1),
+        ...cyclicSigns(0, 0, PHI),
+        ...cyclicSigns(0.5, PHI / 2, (PHI * PHI) / 2),
       ])
     default:
       return []

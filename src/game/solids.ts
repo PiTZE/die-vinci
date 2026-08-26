@@ -19,10 +19,10 @@ export type SolidId =
   | 'hexa'
   | 'octa'
   | 'dodeca'
-  | 'cubocta'
+  | 'trunccube'
   | 'icosa'
   | 'rhombi'
-  | 'truncicosa'
+  | 'icosidodeca'
   | 'sphaera'
 
 /** How a solid is drawn. */
@@ -53,10 +53,15 @@ const TABLE: [SolidId, string, string, string, number, SolidShape, number, numbe
   ['hexa', 'd6', 'Hexahedron', 'Exacedron', 6, UNIFORM, 100, 1e4],
   ['octa', 'd8', 'Octahedron', 'Octocedron', 8, UNIFORM, 1e4, 1e5],
   ['dodeca', 'd12', 'Dodecahedron', 'Duodecedron', 12, UNIFORM, 1e6, 1e6],
-  ['cubocta', 'd14', 'Cuboctahedron', 'Exacedron Abscisus', 14, UNIFORM, 1e9, 1e8],
+  ['trunccube', 'd14', 'Truncated Cube', 'Exacedron Abscisus', 14, UNIFORM, 1e9, 1e8],
   ['icosa', 'd20', 'Icosahedron', 'Icocedron', 20, UNIFORM, 1e13, 1e10],
   ['rhombi', 'd26', 'Rhombicuboctahedron', 'Vigintisex Basium', 26, UNIFORM, 1e18, 1e12],
-  ['truncicosa', 'd32', 'Truncated Icosahedron', 'Ycocedron Abscisus', 32, UNIFORM, 1e24, 1e15],
+  // Pacioli's Ycocedron Abscisus, the truncated icosahedron, is also 32 faces
+  // and also in the book, but it has 90 edges and reads as a fuzzy ball at the
+  // 44px this is drawn at. The icosidodecahedron is the same face count, the
+  // same book, and 60 edges. Its Latin name here is a plain Latinisation, not
+  // one I could source from the plates, unlike every other name in this table.
+  ['icosidodeca', 'd32', 'Icosidodecahedron', 'Icosidodecaedron', 32, UNIFORM, 1e24, 1e15],
   [
     'sphaera',
     'd72',
