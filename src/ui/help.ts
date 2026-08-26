@@ -11,7 +11,7 @@ const SECTIONS: Section[] = [
     body: [
       'Nothing happens until you roll. Press ROLL and the dice spin, and when they land each one shows a face: a d4 lands on 1 to 4, a d12 on 1 to 12.',
       'The face is what each of those dice is worth this roll. Four d4 landing on 4 make sixteen. Every multiplier you own stacks on top of that.',
-      'So a die with more faces is worth more by being that die: a d72 averages 36.5 where a d4 averages 2.5. The swing is the same at every size, about 58% either way of that average.',
+      'A die with more faces is worth more for that reason alone. A d72 averages 36.5 a face where a d4 averages 2.5, and the swing either way of that average is about 58% at every size.',
       'You cannot roll faster than the roll rate. Holding the button rolls as fast as it allows, and no faster.',
     ],
   },
@@ -27,7 +27,7 @@ const SECTIONS: Section[] = [
   {
     title: 'ROLL RATE',
     body: [
-      'How long a roll takes. Faster rolls mean more of them, so it multiplies the whole chain at once, which is why it sits above it.',
+      'How long a roll takes. Faster rolls mean more of them, so it multiplies the whole chain at once. That is why it sits above the table rather than beside it.',
       'Each upgrade costs ten times the last, and folios make each one worth more permanently.',
     ],
   },
@@ -35,7 +35,7 @@ const SECTIONS: Section[] = [
     title: 'THE AUTOMATOR',
     body: [
       'One purchase, and the dice roll on their own for good. It appears after your second study.',
-      'It is not optional so much as inevitable: past a few rolls a second no hand can keep up with the roll rate, and until you own it, time away from the game produces nothing.',
+      'Past a few rolls a second no hand can keep up with the roll rate, so this is less a choice than a matter of when. Until you own it, time away from the game produces nothing at all.',
       'You never lose it. Not to a study, not to a folio, not to the Wager.',
     ],
   },
@@ -65,7 +65,7 @@ const SECTIONS: Section[] = [
   {
     title: 'AUTOBUYERS',
     body: [
-      'Each buys one thing on a timer. Points make them faster, halving in interval roughly every upgrade down to a tenth of a second.',
+      'Each buys one thing on a timer. A point spent on one cuts its interval to 0.6 of what it was, down to a floor of a tenth of a second.',
       'The mode button sets what each purchase does: one, a group of ten, or as many as the ink allows.',
     ],
   },
