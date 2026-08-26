@@ -16,6 +16,7 @@ import {
 } from './game/production'
 import { publishAway, simulateAway } from './game/offline'
 import { restoreBackup } from './backup'
+import { devTools } from './dev'
 import { doWager } from './game/wager'
 import { buyUpgrade } from './game/upgrades'
 import type { UpgradeId } from './game/upgrades'
@@ -344,7 +345,9 @@ window.addEventListener('blur', persist)
 window.addEventListener('freeze', persist)
 
 // A hook for balance work in the console. Not referenced by the game itself.
-;(window as unknown as Record<string, unknown>).LD = {
+// The cheats are dev only, so a stable build cannot be trivially skipped past.
+// Switching channel is one tap in OPTIONS.
+const hook: Record<string, unknown> = {
   get state() {
     return state
   },
@@ -353,3 +356,19 @@ window.addEventListener('freeze', persist)
   version: __VERSION__,
   buildId: __BUILD_ID__,
 }
+
+if (__CHANNEL__ === 'dev') {
+  Object.assign(
+    hook,
+    devTools({
+      state: () => state,
+      save: () => persist(),
+      setState: (next) => {
+        state = next
+      },
+    }),
+  )
+  console.info('[die-vinci] dev build. LD.help() lists the cheats.')
+}
+
+;(window as unknown as Record<string, unknown>).LD = hook
