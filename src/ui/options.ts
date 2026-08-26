@@ -78,6 +78,8 @@ export function optionsPane(): Pane {
       save.appendChild(btns)
 
       status = el('div', 'empty', '')
+      // Nothing to say yet, and an empty div still reserves its padding.
+      status.hidden = true
       save.appendChild(status)
 
       const wipeRow = el('div', 'row')
@@ -101,15 +103,20 @@ export function optionsPane(): Pane {
 
       const about = el('div', 'section')
       const ah = el('div', 'section-head')
-      ah.appendChild(el('span', 'grow', 'BUILD'))
-      ah.appendChild(el('span', 'num dim', __BUILD_ID__))
+      ah.appendChild(el('span', 'grow', 'VERSION'))
+      ah.appendChild(el('span', 'num', __VERSION__))
       about.appendChild(ah)
+      const buildRow = el('div', 'row')
+      buildRow.appendChild(el('span', 'grow dim', 'BUILD'))
+      buildRow.appendChild(el('span', 'num dim', __BUILD_ID__))
+      about.appendChild(buildRow)
 
       root.append(theme, notation, save, about)
       paintTheme()
 
       function say(msg: string) {
         status.textContent = msg
+        status.hidden = !msg
       }
       function paintTheme() {
         const now = currentTheme().id

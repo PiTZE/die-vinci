@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// package.json is the one place the version lives. Bump it with `npm run bump`,
+// which carries each segment at nine: 0.0.9 becomes 0.1.0, 0.9.9 becomes 1.0.0.
+const { version: VERSION } = JSON.parse(readFileSync('./package.json', 'utf8'))
 
 // Served at the root of leonard.generis.ir, so assets resolve from '/'.
 // Stamped into the bundle so a player can see which build they are running,
@@ -12,6 +17,7 @@ export default defineConfig({
   base: '/',
   define: {
     __BUILD_ID__: JSON.stringify(BUILD_ID),
+    __VERSION__: JSON.stringify(VERSION),
   },
   build: {
     target: 'es2022',
