@@ -91,17 +91,31 @@ try {
     return s.ink.toString() })()`
   await evaluate(reset)
 
+  // MAX buys the dearest row first, so a single row is no longer a reliable
+  // counter. Count every purchase the game has made instead.
+  const TOTAL = `window.LD.state.solids.reduce((a, d) => a + d.bought, 0) + window.LD.state.rollUpgrades`
+
   check('max button exists', await evaluate(`!!document.querySelector('.max')`))
 
-  const before = await evaluate(`window.LD.state.solids[0].bought`)
+  const before = await evaluate(TOTAL)
   await key('m', 'rawKeyDown'); await sleep(900); await key('m', 'keyUp')
-  const afterHold = await evaluate(`window.LD.state.solids[0].bought`)
+  const afterHold = await evaluate(TOTAL)
   check('holding m repeats', afterHold > before + 10, `bought ${before} -> ${afterHold}`)
-  check('roll rate bought first', (await evaluate(`window.LD.state.rollUpgrades`)) > 0)
 
   await sleep(600)
-  const afterRelease = await evaluate(`window.LD.state.solids[0].bought`)
+  const afterRelease = await evaluate(TOTAL)
   check('keyup stops the repeat', afterRelease === afterHold, `${afterHold} -> ${afterRelease}`)
+
+  // Exactly 10000 ink. Roll rate is 1000, ten d4 is 100, ten d6 is 1000, and
+  // one d8 is 10000. Only the d8 should be bought, and it should spend the lot.
+  await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal;
+    s.ink = new D(10000); s.rollUpgrades = 0;
+    s.solids.forEach(d => { d.bought = 0; d.amount = new D(0) }) })()`)
+  await key('m', 'rawKeyDown'); await sleep(80); await key('m', 'keyUp')
+  const picked = await evaluate(`({ d4: window.LD.state.solids[0].bought,
+    d8: window.LD.state.solids[2].bought, roll: window.LD.state.rollUpgrades })`)
+  check('buys the dearest option first', picked.d8 === 1 && picked.d4 === 0 && picked.roll === 0,
+    `d8=${picked.d8} d4=${picked.d4} roll=${picked.roll}`)
 
   // Shift+1 must buy exactly one, not a group of ten.
   await evaluate(reset)
@@ -113,22 +127,22 @@ try {
 
   // A hold interrupted by the window losing focus must not stay stuck.
   await evaluate(reset)
-  const b2 = await evaluate(`window.LD.state.solids[0].bought`)
+  const b2 = await evaluate(TOTAL)
   await key('m', 'rawKeyDown'); await sleep(700)
   await evaluate(`window.dispatchEvent(new Event('blur'))`)
-  const atBlur = await evaluate(`window.LD.state.solids[0].bought`)
+  const atBlur = await evaluate(TOTAL)
   await sleep(500)
-  check('blur releases a held key', (await evaluate(`window.LD.state.solids[0].bought`)) === atBlur, `${b2} -> ${atBlur} -> steady`)
+  check('blur releases a held key', (await evaluate(TOTAL)) === atBlur, `${b2} -> ${atBlur} -> steady`)
   await key('m', 'keyUp')
 
   if (MOBILE) {
     await evaluate(reset)
-    const t0 = await evaluate(`window.LD.state.solids[0].bought`)
+    const t0 = await evaluate(TOTAL)
     await tap('.max', 900)
-    const t1 = await evaluate(`window.LD.state.solids[0].bought`)
+    const t1 = await evaluate(TOTAL)
     check('touch-hold repeats', t1 > t0 + 10, `bought ${t0} -> ${t1}`)
     await sleep(500)
-    check('touchend stops the repeat', (await evaluate(`window.LD.state.solids[0].bought`)) === t1)
+    check('touchend stops the repeat', (await evaluate(TOTAL)) === t1)
 
     // Sliding off the button before lifting is the classic way to leave a
     // repeat running forever. Pointer capture is what should prevent it.
@@ -141,9 +155,9 @@ try {
     await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(20, 700) })
     await sleep(150)
     await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-    const slid = await evaluate(`window.LD.state.solids[0].bought`)
+    const slid = await evaluate(TOTAL)
     await sleep(700)
-    check('slide off then lift stops it', (await evaluate(`window.LD.state.solids[0].bought`)) === slid, `settled at ${slid}`)
+    check('slide off then lift stops it', (await evaluate(TOTAL)) === slid, `settled at ${slid}`)
   }
 
   const shot = await send('Page.captureScreenshot', { format: 'png' })

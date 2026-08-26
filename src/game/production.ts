@@ -173,16 +173,29 @@ export function canMaxAll(s: GameState): boolean {
 }
 
 /**
- * Antimatter Dimensions' Max All, in its order: max roll rate first, then buy
- * until ten of the shallowest solid as many times as it can afford, then the
- * next, up the chain. Roll rate going first is what makes it win a tie against
- * an equally priced ten, which is AD's documented behaviour.
+ * Buys the most expensive thing you can afford, then re-checks and does it
+ * again, until nothing is affordable.
+ *
+ * This is a deliberate departure from Antimatter Dimensions, which buys max
+ * tickspeed and then walks D1 upward. Cheapest-first spends the ink on the
+ * shallow end of the chain and often leaves nothing for the deep solids, and
+ * the deep solids are the ones that compound all the way down. The cost is
+ * that a press now buys fewer, larger things, so the shallow rows fill in
+ * more slowly right after a reset.
  */
 export function maxAll(s: GameState): void {
-  let steps = 0
-  while (buyRollRate(s) && ++steps < MAX_ALL_STEPS);
-  for (let idx = 1; idx <= unlockedSolids(s); idx++) {
-    while (buySolid(s, idx) && ++steps < MAX_ALL_STEPS);
+  const open = unlockedSolids(s)
+  for (let steps = 0; steps < MAX_ALL_STEPS; steps++) {
+    let best: { price: Decimal; buy: () => boolean } | null = null
+
+    if (canBuyRollRate(s)) best = { price: rollCost(s), buy: () => buyRollRate(s) }
+    for (let idx = 1; idx <= open; idx++) {
+      if (!canBuySolid(s, idx)) continue
+      const price = buyPrice(s, idx)
+      if (!best || price.gt(best.price)) best = { price, buy: () => buySolid(s, idx) }
+    }
+
+    if (!best || !best.buy()) return
   }
 }
 

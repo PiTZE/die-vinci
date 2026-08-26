@@ -58,7 +58,7 @@ export function tablePane(): Pane {
 
       maxBtn = el('button', 'max', 'MAX')
       maxBtn.type = 'button'
-      maxBtn.title = 'Roll rate first, then up the chain  (m)'
+      maxBtn.title = 'Buy the most expensive first, repeatedly  (m)'
       holdable(maxBtn, () => actions.maxAll())
 
       const topRow = el('div', 'roll-row')
@@ -135,7 +135,9 @@ export function tablePane(): Pane {
       fr.appendChild(folioBtn)
       folioSection.appendChild(fr)
 
-      root.append(topRow, chain, roll, study, folioSection)
+      // Last in the DOM and stuck to the bottom of the pane: the two buttons
+      // pressed most often belong in the thumb's reach, not above the fold.
+      root.append(chain, roll, study, folioSection, topRow)
 
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.

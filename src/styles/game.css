@@ -227,7 +227,16 @@
 .roll-row {
   display: flex;
   gap: 8px;
-  margin-bottom: var(--gap);
+  /* Sticks to the bottom of the scrollport while anything is above it, then
+     settles into place at the end of the content. The negative margins pull it
+     out to the pane's edges so it reads as a bar rather than a floating card. */
+  position: sticky;
+  bottom: calc(var(--gap) * -1);
+  z-index: 3;
+  margin: var(--gap) calc(var(--gap) * -1) calc(var(--gap) * -1);
+  padding: 10px var(--gap) calc(10px + var(--gap));
+  background: var(--bg);
+  border-top: 1px solid var(--border);
 }
 
 .roll {
@@ -367,6 +376,13 @@
     grid-column: 2;
     grid-row: 2;
     padding: var(--gap) calc(var(--gap) * 1.4);
+  }
+
+  .roll-row {
+    margin-left: calc(var(--gap) * -1.4);
+    margin-right: calc(var(--gap) * -1.4);
+    padding-left: calc(var(--gap) * 1.4);
+    padding-right: calc(var(--gap) * 1.4);
   }
 
   .pane-inner {
