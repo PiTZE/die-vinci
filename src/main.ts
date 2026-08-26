@@ -187,6 +187,10 @@ advance(Date.now())
 let sinceSave = 0
 
 function loop(): void {
+  // Last line of defence. If the page is visible but nothing has drawn for a
+  // couple of seconds, the render chain died without any event telling us.
+  if (!document.hidden && Date.now() - lastRenderAt > 2000) startRender()
+
   const before = state.lastTick
   advance(Date.now())
   sinceSave += state.lastTick - before
@@ -198,25 +202,52 @@ function loop(): void {
 
 setInterval(loop, TICK_MS)
 
-let rendering = 0
-function render(): void {
-  rendering = requestAnimationFrame(render)
-  state.options.tab = shell.activeTab
-  shell.update(state, inkPerSecond(state))
+/**
+ * The render loop, restartable.
+ *
+ * The old version stored the requestAnimationFrame handle and only restarted
+ * when that handle was zero. A non-zero handle is not proof that a frame is
+ * actually scheduled: a browser that freezes a backgrounded page can discard
+ * the pending callback, and the handle then refers to a frame that will never
+ * arrive. Rendering stopped for good while the game kept ticking underneath,
+ * which is exactly the reported symptom, numbers frozen on screen.
+ *
+ * A generation counter fixes it. Restarting always works, and any older chain
+ * notices it is stale and stops, so restarting twice cannot double the rate.
+ */
+let loopId = 0
+let lastRenderAt = Date.now()
+
+function startRender(): void {
+  const mine = ++loopId
+  const step = (): void => {
+    if (mine !== loopId) return
+    lastRenderAt = Date.now()
+    state.options.tab = shell.activeTab
+    shell.update(state, inkPerSecond(state))
+    requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
 }
-rendering = requestAnimationFrame(render)
+
+startRender()
+
+/** Settle the clock and make sure something is drawing again. */
+function resume(): void {
+  advance(Date.now())
+  startRender()
+}
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    persist()
-    cancelAnimationFrame(rendering)
-    rendering = 0
-  } else {
-    // Catch up the moment the tab comes back, rather than on the next timer.
-    advance(Date.now())
-    if (!rendering) rendering = requestAnimationFrame(render)
-  }
+  if (document.hidden) persist()
+  else resume()
 })
+
+// bfcache restore, page-lifecycle resume, and plain window focus. Which of
+// these a browser actually sends varies; any one of them is enough.
+window.addEventListener('pageshow', resume)
+window.addEventListener('focus', resume)
+window.addEventListener('resume', resume)
 
 window.addEventListener('pagehide', persist)
 

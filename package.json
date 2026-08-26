@@ -15,7 +15,8 @@
     "test:install": "node tools/install-test.mjs",
     "test:channels": "node tools/channel-test.mjs",
     "deploy": "tools/deploy.sh",
-    "test:away": "node tools/away-test.mjs"
+    "test:away": "node tools/away-test.mjs",
+    "test:freeze": "node tools/freeze-test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
