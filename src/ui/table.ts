@@ -29,6 +29,7 @@ interface Row {
   amount: HTMLElement
   rate: HTMLElement
   buy: HTMLButtonElement
+  buyLabel: HTMLElement
 }
 
 function setText(n: HTMLElement, v: string): void {
@@ -68,11 +69,6 @@ export function tablePane(): Pane {
 
         const name = el('div', 'solid-name')
         name.appendChild(el('span', 'solid-name-text', `${def.short} ${def.name.toUpperCase()}`))
-        // Purchases into the current group of ten. Ten of them doubles the
-        // row's multiplier, and without this the doubling arrives unannounced.
-        // It sits outside the name span so a long name still truncates alone.
-        const step = el('span', 'solid-step', '')
-        name.appendChild(step)
         r.appendChild(name)
 
         const amount = el('div', 'solid-amount', '0')
@@ -87,12 +83,18 @@ export function tablePane(): Pane {
         r.appendChild(bar)
         const buy = el('button', 'solid-buy', '')
         buy.type = 'button'
+        // Purchases into the current group of ten, in the corner of the button
+        // that completes it. Ten of them doubles the row's multiplier, and
+        // without this the doubling arrives unannounced.
+        const step = el('span', 'solid-step', '')
+        const buyLabel = el('span', 'solid-buy-label', '')
+        buy.append(step, buyLabel)
         // Shift buys a single die, the way AD's shift+1-8 does.
         holdable(buy, (m) => actions.buySolid(def.idx, m.shift))
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, mult, step, bar, amount, rate: flow, buy })
+        rows.push({ root: r, mult, step, bar, amount, rate: flow, buy, buyLabel })
       }
 
       const roll = el('div', 'section')
@@ -194,7 +196,7 @@ export function tablePane(): Pane {
 
         const count = buyCount(s, def.idx)
         const price = buyPrice(s, def.idx)
-        setText(r.buy, `BUY ${count} / ${format(price, n)}`)
+        setText(r.buyLabel, `BUY ${count} / ${format(price, n)}`)
         const can = canBuySolid(s, def.idx)
         r.buy.disabled = !can
         r.buy.classList.toggle('buyable', can)
