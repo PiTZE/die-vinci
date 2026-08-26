@@ -1,9 +1,9 @@
 {
-  "name": "leonardos-die",
+  "name": "die-vinci",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "An incremental dice game about Leonardo da Vinci, the Platonic solids and the notebooks.",
+  "description": "A game about Leo. An incremental dice game built on the solids Leonardo drew for Pacioli.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

@@ -28,7 +28,7 @@ const probe = `(async () => { const r = await navigator.serviceWorker.getRegistr
     keys: Object.keys(localStorage).filter(k => k.includes('save')) } })()`
 
 // Install the stable worker first, which is the one that could overreach.
-await send('Page.navigate',{url:'https://leonard.generis.ir/'}); await sleep(7000)
+await send('Page.navigate',{url:'https://leo.generis.ir/'}); await sleep(7000)
 const a = await ev(probe)
 check('stable serves the stable build', a.channel === 'stable', JSON.stringify(a))
 
@@ -37,7 +37,7 @@ await ev(`window.dispatchEvent(new Event('pagehide'))`)
 await sleep(400)
 
 // Now cross into dev while the stable worker is active and controlling.
-await send('Page.navigate',{url:'https://leonard.generis.ir/dev/'}); await sleep(7000)
+await send('Page.navigate',{url:'https://leo.generis.ir/dev/'}); await sleep(7000)
 const b = await ev(probe)
 check('dev is not hijacked by the stable worker', b.channel === 'dev', JSON.stringify(b))
 check('dev has its own worker scope', b.scope.endsWith('/dev/'), b.scope)
@@ -46,7 +46,7 @@ const devInk = await ev(`window.LD.state.ink.toString()`)
 check('dev did not inherit the stable save', Number(devInk) < 1e5, `dev ink ${devInk}`)
 
 // And back again.
-await send('Page.navigate',{url:'https://leonard.generis.ir/'}); await sleep(6000)
+await send('Page.navigate',{url:'https://leo.generis.ir/'}); await sleep(6000)
 const c = await ev(probe)
 check('back on stable', c.channel === 'stable', JSON.stringify(c))
 const stableInk = await ev(`window.LD.state.ink.toString()`)

@@ -28,5 +28,5 @@ case "$CHANNEL" in
     ;;
 esac
 
-curl -s "https://leonard.generis.ir/$( [ "$CHANNEL" = dev ] && echo dev/ )version.json"
+curl -s "https://leo.generis.ir/$( [ "$CHANNEL" = dev ] && echo dev/ )version.json"
 echo

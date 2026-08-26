@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 // which carries each segment at nine: 0.0.9 becomes 0.1.0, 0.9.9 becomes 1.0.0.
 const pkg = JSON.parse(readFileSync('./package.json', 'utf8'))
 
-// Served at the root of leonard.generis.ir, so assets resolve from '/'.
+// Served at the root of leo.generis.ir, so assets resolve from '/'.
 // Stamped into the bundle so a player can see which build they are running,
 // which is the only way to answer "did my refresh actually pick up the new
 // version". It also guarantees consecutive builds differ, so the service
@@ -66,10 +66,9 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ['icon-192.png', 'icon-512.png', 'icon-512-maskable.png'],
       manifest: {
-        name: CHANNEL === 'dev' ? "Leonardo's Die (dev)" : "Leonardo's Die",
-        short_name: CHANNEL === 'dev' ? "Die dev" : "Leonardo's Die",
-        description:
-          'An incremental dice game about Leonardo, the Platonic solids, and what happened to determinism.',
+        name: CHANNEL === 'dev' ? 'die Vinci (dev)' : 'die Vinci',
+        short_name: CHANNEL === 'dev' ? 'die Vinci dev' : 'die Vinci',
+        description: 'A game about Leo.',
         start_url: BASE,
         scope: BASE,
         display: 'standalone',
