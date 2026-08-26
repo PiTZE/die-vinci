@@ -131,10 +131,19 @@ function resetTable(s: GameState): void {
   s.ink = new Decimal(START_INK)
 }
 
-/** A study resets the table and the ink, and leaves roll rate and folios. */
+/**
+ * A study resets the table, the ink and the roll rate, and leaves folios.
+ *
+ * The roll rate part is not optional. Antimatter Dimensions' softReset, which
+ * is what a dimension boost calls, does AntimatterDimensions.reset() and then
+ * resetTickspeed(), which zeroes totalTickBought. Its galaxy is the same reset
+ * with the boosts cleared first, which is why both wipe tickspeed there and
+ * both wipe roll rate here.
+ */
 export function buyStudy(s: GameState): boolean {
   if (!canBuyStudy(s)) return false
   s.studies += 1
+  s.rollUpgrades = 0
   resetTable(s)
   return true
 }
@@ -154,8 +163,9 @@ export function canBuyFolio(s: GameState): boolean {
 }
 
 /**
- * A folio resets studies and roll rate as well as the table, exactly as an
- * antimatter galaxy does. What you keep is a permanently better roll power.
+ * A folio is a study that also clears the studies, exactly as an antimatter
+ * galaxy is a dimension boost that clears the boosts. What you keep is a
+ * permanently better roll power.
  */
 export function buyFolio(s: GameState): boolean {
   if (!canBuyFolio(s)) return false

@@ -65,7 +65,7 @@ const TABLE: [SolidId, string, string, string, number, SolidShape, number, numbe
   [
     'sphaera',
     'd72',
-    'Sphere of Seventy-Two',
+    'Sphere',
     'Septuaginta Duarum Basium',
     72,
     { kind: 'sphere', meridians: 12, bands: 6 },
