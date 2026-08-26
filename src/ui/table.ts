@@ -368,11 +368,13 @@ export function tablePane(): Pane {
           setText(r.face, meanFace(def.faces, faceBias(s)).toFixed(1))
         }
 
-        // Averaged over the faces, because that is what the row actually
-        // pays over any run of rolls.
-        const per = st.amount.times(mult).times(meanFace(def.faces)).times(rate)
+        // Averaged over the faces, because that is what the row actually pays
+        // over any run of rolls. Per second only once the automator is rolling:
+        // before it, a rate per second is a claim about how fast you press.
+        const each = st.amount.times(mult).times(meanFace(def.faces, faceBias(s)))
+        const per = s.autoRoll ? each.times(rate) : each
         const unit = def.idx === 1 ? 'ink' : SOLIDS[def.idx - 2].short
-        setText(r.rate, `+${format(per, n)} ${unit}/s`)
+        setText(r.rate, `+${format(per, n)} ${unit}${s.autoRoll ? '/s' : '/roll'}`)
 
         const count = buyCount(s, def.idx)
         const price = buyPrice(s, def.idx)

@@ -75,6 +75,31 @@ await ev(`document.documentElement.style.removeProperty('--app-h')`)
 await sleep(300)
 const noVar = await ev(probe)
 check('and with the measured height removed entirely', fits(noVar), `app ${noVar.appH} of ${noVar.vvh}`)
+// An iPhone's home indicator and status bar, which a headless browser always
+// reports as zero. Both of these were wrong on hardware and invisible here.
+await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:2,mobile:true})
+await sleep(500)
+await ev(`document.documentElement.style.setProperty('--safe-b', '34px')`)
+await ev(`document.documentElement.style.setProperty('--safe-t', '47px')`)
+await sleep(400)
+const inset = await ev(`(() => {
+  const sel = document.querySelector('.tab[aria-selected="true"]').getBoundingClientRect()
+  const bar = document.querySelector('.bar').getBoundingClientRect()
+  const first = document.querySelector('.bar-inner').getBoundingClientRect()
+  const tabs = document.querySelector('.tabs').getBoundingClientRect()
+  return { underSelected: Math.round(innerHeight - sel.bottom),
+    tabsBottom: Math.round(innerHeight - tabs.bottom),
+    tabH: Math.round(sel.height),
+    barTextTop: Math.round(first.top) }
+})()`)
+check('the selected tab reaches the bottom edge past the home indicator',
+  inset.underSelected === 0 && inset.tabsBottom === 0, JSON.stringify(inset))
+check('and it keeps a 44px target above the indicator',
+  inset.tabH >= 44 + 34, JSON.stringify(inset))
+check('the top bar clears the status bar', inset.barTextTop >= 47, JSON.stringify(inset))
+await ev(`document.documentElement.style.removeProperty('--safe-b')`)
+await ev(`document.documentElement.style.removeProperty('--safe-t')`)
+
 // The desktop row grew a column for the face and the override did not, so the
 // number was auto-placed at the end of the row, six pixels wide, under the buy
 // button. Cheap to assert, and invisible in a screenshot at a glance.

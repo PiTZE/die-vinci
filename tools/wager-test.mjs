@@ -76,6 +76,16 @@ check('wager clears layer 0',
   after.ink === '10' && after.studies === 0 && after.folios === 0 && after.roll === 0 && after.bought === 0,
   JSON.stringify(after))
 
+// A phone has no hover, so the note has to be reachable by touch.
+const noteBefore = await ev(`document.querySelector('.upgrade-note').textContent`)
+await ev(`document.querySelector('.upgrade').dispatchEvent(
+  new PointerEvent('pointerdown', { bubbles: true }))`)
+await sleep(300)
+const noteAfter = await ev(`document.querySelector('.upgrade-note').textContent`)
+check('touching an upgrade writes out what it does',
+  noteAfter !== noteBefore && noteAfter.length > 20,
+  JSON.stringify({ before: noteBefore, after: noteAfter }))
+
 // An upgrade has to change the engine, not just light up.
 // Measured from the fifth study, where the requirement is 20. The first four
 // cost 10, and a discount of 9 against 10 floors at 1, which would pass this

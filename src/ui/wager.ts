@@ -25,6 +25,9 @@ export function wagerPane(): Pane {
   let callBar: HTMLElement
   let callLine: HTMLElement
   let pointsLine: HTMLElement
+  let note: HTMLElement
+  /** Which upgrade the note line is describing, or empty for the prompt. */
+  let noteFor = ''
   const cells = new Map<UpgradeId, { btn: HTMLButtonElement; cost: HTMLElement }>()
 
   return {
@@ -78,12 +81,25 @@ export function wagerPane(): Pane {
           const cost = el('span', 'upgrade-cost', String(def.cost))
           btn.appendChild(cost)
           btn.addEventListener('click', () => actions.buyUpgrade(id))
+          // A title attribute is a hover, and a phone has no hover. Touching
+          // one writes it out below the grid instead, which also means an
+          // upgrade you cannot yet afford can be read before you commit to
+          // saving for it.
+          const describe = () => {
+            noteFor = id
+            setText(note, `${def.label}  ${def.note}`)
+          }
+          btn.addEventListener('pointerenter', describe)
+          btn.addEventListener('pointerdown', describe)
+          btn.addEventListener('focus', describe)
           col.appendChild(btn)
           cells.set(id, { btn, cost })
         }
         cols.appendChild(col)
       }
       grid.appendChild(cols)
+      note = el('div', 'upgrade-note', '')
+      grid.appendChild(note)
 
       root.append(call, grid)
 
@@ -94,6 +110,11 @@ export function wagerPane(): Pane {
 
     update(s: GameState) {
       const n = s.options.notation
+
+      // Held until something else is touched, and replaced by the prompt when
+      // nothing has been. An empty line here would collapse the grid's footer
+      // and shift everything under it on the first tap.
+      if (!noteFor) setText(note, 'touch an upgrade to read what it does')
 
       setText(callLine, `${s.wagers}`)
       const pct = `${(wagerProgress(s) * 100).toFixed(1)}%`

@@ -14,6 +14,10 @@
   --gap: 14px;
   --bar-h: 52px;
   --tabs-h: 56px;
+  /* Named so a test can stand in for it. env() cannot be faked, and a bug that
+     only appears on hardware with a home indicator is one nobody can see. */
+  --safe-b: env(safe-area-inset-bottom);
+  --safe-t: env(safe-area-inset-top);
   /* Numbers get their own width so a growing value never reflows a row. */
   --num-w: 9.5rem;
 }

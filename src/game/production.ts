@@ -532,10 +532,19 @@ export function buyAutomator(s: GameState): boolean {
  * which is why the roll rate line reads in rolls per second as well.
  */
 export function inkPerSecond(s: GameState): Decimal {
+  return inkPerRoll(s).times(rollRate(s))
+}
+
+/**
+ * What one roll pays. This is the honest figure before the automator: a rate
+ * per second assumes the dice keep rolling, and until something else is
+ * rolling them that is a claim about how fast you press rather than about the
+ * game. A per-roll number is true either way.
+ */
+export function inkPerRoll(s: GameState): Decimal {
   return s.solids[0].amount
     .times(solidMultiplier(s, 1))
     .times(meanFace(SOLIDS[0].faces, faceBias(s)))
-    .times(rollRate(s))
 }
 
 export function tick(s: GameState, dt: number, now: number): void {

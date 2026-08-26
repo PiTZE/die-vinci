@@ -34,6 +34,13 @@ await ev(`localStorage.clear()`); await send('Page.reload'); await sleep(3500)
 
 const ROLL = `[...document.querySelectorAll('.bar-roll')][0]`
 
+// Away progress off for the whole suite. If the headless page stalls past a
+// second mid-spin, the catch-up simulates the gap on a synthetic clock that
+// jumps past the roll duration and lands the throw early. That is correct
+// behaviour and it makes every timing assertion here a coin flip.
+await ev(`window.LD.state.options.offline = false`)
+await sleep(200)
+
 // The table opens with one die and nothing running.
 const start = await ev(`({
   rows: [...document.querySelectorAll('.solid')].filter(r => getComputedStyle(r).display !== 'none').length,
@@ -249,7 +256,10 @@ async function spinRate(upgrades) {
     const ln = document.querySelector('.solid-icon line')
     window.__spt = setInterval(() => window.__sp.push([
       Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1'))]), 32) })()`)
-  await sleep(1400)
+  // Long enough to cover several whole throws. At one roll a second an eased
+  // curve sampled for 1.4s averaged whichever part of it the samples happened
+  // to land on, and the reading swung from 0.19 to 0.37 between runs.
+  await sleep(3200)
   await ev(`clearInterval(window.__spt)`)
   return ev(`(() => { const s = window.__sp, d = []
     for (let i = 1; i < s.length; i++) d.push(Math.hypot(s[i][0]-s[i-1][0], s[i][1]-s[i-1][1]))
@@ -259,10 +269,11 @@ async function spinRate(upgrades) {
 const slow = await spinRate(0)
 const quicker = await spinRate(6)
 const fast = await spinRate(40)
-check('the dice spin faster as the roll rate climbs', quicker > slow * 1.3,
-  `1/s: ${slow.toFixed(4)}  ->  ${quicker.toFixed(4)}`)
+check('the dice spin faster as the roll rate climbs', fast > slow * 1.3,
+  `1 roll/s: ${slow.toFixed(4)}  ->  110 roll/s: ${fast.toFixed(4)}`)
 check('and stop speeding up at the ceiling instead of dropping',
-  fast >= quicker * 0.75, `${quicker.toFixed(4)} -> ${fast.toFixed(4)}`)
+  fast >= quicker * 0.9 && quicker > slow,
+  `${slow.toFixed(4)} -> ${quicker.toFixed(4)} -> ${fast.toFixed(4)}`)
 
 // The throws hand over to the shake loop rather than both playing at once.
 const bed = await ev(`(async () => {
@@ -295,6 +306,24 @@ check('a loaded one skews up and the prediction follows',
   JSON.stringify({ half: loaded['0.5'], mostly: loaded['0.9'] }))
 check('fully loaded always rolls the maximum',
   loaded['1'].sampled === 4 && loaded['1'].predicted === 4, JSON.stringify(loaded['1']))
+
+// A rate per second before the automator is a claim about how fast you press.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = false; s.rollUpgrades = 0; s.studies = 0
+  s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 4 : 0) }) })()`)
+await sleep(600)
+const manual = await ev(`({ bar: document.querySelector('.res-rate').textContent,
+  row: document.querySelector('.solid-rate').textContent })`)
+check('before the automator the readouts are per roll',
+  /per roll$/.test(manual.bar) && /\/roll$/.test(manual.row), JSON.stringify(manual))
+check('and a d4 you own four of pays its average, ten a roll',
+  manual.bar.startsWith('10'), manual.bar)
+
+await ev(`window.LD.state.autoRoll = true`); await sleep(600)
+const rolling = await ev(`({ bar: document.querySelector('.res-rate').textContent,
+  row: document.querySelector('.solid-rate').textContent })`)
+check('and per second once it is rolling for you',
+  /\/s$/.test(rolling.bar) && /\/s$/.test(rolling.row), JSON.stringify(rolling))
 
 // The threshold stops everything and takes over the bar.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal

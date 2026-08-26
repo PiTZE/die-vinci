@@ -2,7 +2,7 @@ import Decimal from 'break_infinity.js'
 import { format, formatTime } from '../format'
 import { consumeAway } from '../game/offline'
 import { pickThought } from './thoughts'
-import { mustWager } from '../game/production'
+import { inkPerRoll, mustWager } from '../game/production'
 import { checkAchievements, byId as achievementById } from '../game/achievements'
 import type { GameState, TabId } from '../state'
 
@@ -260,7 +260,11 @@ export class Shell {
     }
 
     const n = s.options.notation
-    this.inkOut.set(format(s.ink, n), `${format(inkRate, n)}/s`)
+    // Per second once something is rolling for you, per roll until then.
+    this.inkOut.set(
+      format(s.ink, n),
+      s.autoRoll ? `${format(inkRate, n)}/s` : `${format(inkPerRoll(s), n)} per roll`,
+    )
     const showPoints = s.wagers > 0 || s.points.gt(0)
     this.pointsOut.show(showPoints)
     if (showPoints) this.pointsOut.set(format(s.points, n))
