@@ -3,6 +3,9 @@
    theme cannot be added half-finished. */
 
 :root {
+  /* The shared content width on desktop. The top bar, the panes and the
+     action bar all line up on it. */
+  --col-w: 1180px;
   --nav-w: 232px;
   --gap: 14px;
   --bar-h: 52px;

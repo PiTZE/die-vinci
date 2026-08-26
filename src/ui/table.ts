@@ -55,7 +55,7 @@ export function tablePane(): Pane {
       holdable(maxBtn, () => actions.maxAll())
 
 
-      const chain = el('div', 'section')
+      const chain = el('div', 'section table-chain')
       const head = el('div', 'section-head')
       head.appendChild(el('span', 'grow', 'THE TABLE'))
       chain.appendChild(head)
@@ -126,7 +126,13 @@ export function tablePane(): Pane {
       fr.appendChild(folioBtn)
       folioSection.appendChild(fr)
 
-      root.append(chain, roll, study, folioSection)
+      // Wide screens put the chain and its controls side by side. Stacked, the
+      // controls left most of a desktop empty and pushed the chain off centre.
+      const grid = el('div', 'table-grid')
+      const controls = el('div', 'table-controls')
+      controls.append(roll, study, folioSection)
+      grid.append(chain, controls)
+      root.append(grid)
 
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.

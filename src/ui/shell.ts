@@ -72,6 +72,7 @@ export class Shell {
   private paneEls = new Map<TabId, HTMLElement>()
   private actionEls = new Map<TabId, HTMLElement>()
   private actionBar = el('div', 'action-bar')
+  private actionInner = el('div', 'action-bar-inner')
   private inkOut = new Readout('INK')
   private pointsOut = new Readout('POINTS')
   private themeBtn = el('button', 'theme-toggle')
@@ -86,13 +87,15 @@ export class Shell {
     this.panes = panes
 
     const bar = el('div', 'bar')
-    bar.append(this.inkOut.root, this.pointsOut.root, el('div', 'bar-spacer'))
+    const barInner = el('div', 'bar-inner')
+    barInner.append(this.inkOut.root, this.pointsOut.root, el('div', 'bar-spacer'))
+    bar.appendChild(barInner)
     this.themeBtn.type = 'button'
     this.themeBtn.addEventListener('click', () => {
       nextTheme()
       this.paintThemeButton()
     })
-    bar.appendChild(this.themeBtn)
+    barInner.appendChild(this.themeBtn)
 
     const tabs = el('nav', 'tabs')
     tabs.setAttribute('role', 'tablist')
@@ -119,10 +122,11 @@ export class Shell {
       const act = p.action?.()
       if (act) {
         this.actionEls.set(p.id, act)
-        this.actionBar.appendChild(act)
+        this.actionInner.appendChild(act)
       }
     }
 
+    this.actionBar.appendChild(this.actionInner)
     this.root.append(bar)
     for (const pane of this.paneEls.values()) this.root.appendChild(pane)
     this.root.append(this.actionBar, tabs)

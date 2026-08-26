@@ -14,15 +14,19 @@
 /* -- top bar ------------------------------------------------------------- */
 
 .bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   min-height: var(--bar-h);
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--chrome);
   overflow-x: auto;
   scrollbar-width: none;
+}
+
+.bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
 }
 
 .bar::-webkit-scrollbar {
@@ -225,13 +229,16 @@
 /* -- the action bar, pinned in the thumb's reach -------------------------- */
 
 .action-bar {
+  padding: 8px var(--gap);
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+.action-bar-inner {
   display: flex;
   gap: 8px;
   /* Sits to the right, where a thumb rests. */
   justify-content: flex-end;
-  padding: 8px var(--gap);
-  background: var(--bg);
-  border-top: 1px solid var(--border);
 }
 
 .action-bar[hidden] {
@@ -329,23 +336,38 @@
   letter-spacing: 0.08em;
 }
 
+/* The chain and its controls stack on a phone and sit side by side on a
+   desktop. Grid areas rather than nth-child so the pane can reorder freely. */
+.table-controls {
+  display: flex;
+  flex-direction: column;
+}
+
 /* -- desktop ------------------------------------------------------------- */
 
 @media (min-width: 820px) {
   .app {
     grid-template-columns: var(--nav-w) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    /* A trailing filler row takes the slack, so the action bar follows the
+       content instead of being flung to the bottom of a tall window. */
+    grid-template-rows: auto auto auto minmax(0, 1fr);
   }
 
   .bar {
     grid-column: 1 / -1;
+    grid-row: 1;
+    /* Offset by the nav so the readouts centre on the same column as the
+       content below them rather than on the whole window. */
+    padding: 6px calc(var(--gap) * 1.4) 6px calc(var(--nav-w) + var(--gap) * 1.4);
+  }
+
+  .bar-inner {
     gap: 22px;
-    padding: 6px 16px;
   }
 
   .tabs {
     grid-column: 1;
-    grid-row: 2 / 4;
+    grid-row: 2 / 5;
     flex-direction: column;
     align-items: stretch;
     border-top: 0;
@@ -370,16 +392,51 @@
     grid-column: 2;
     grid-row: 2;
     padding: var(--gap) calc(var(--gap) * 1.4);
+    /* Sized to its content, and only scrolls once it runs out of window. */
+    max-height: calc(100dvh - var(--bar-h) - 74px);
   }
 
   .action-bar {
     grid-column: 2;
     grid-row: 3;
-    padding: 10px calc(var(--gap) * 1.4);
+    padding: 0 calc(var(--gap) * 1.4) var(--gap);
+    /* The rule belongs to the content column. Spanning the window drew a line
+       across the empty space below and made a tidy gap look like a mistake. */
+    border-top: 0;
   }
 
-  .pane-inner {
-    max-width: 720px;
+  .action-bar-inner {
+    padding-top: 10px;
+    border-top: 1px solid var(--border-faint);
+  }
+
+  /* One column width shared by the bar, the panes and the action bar, so the
+     ink readout, the content and MAX all line up instead of drifting to
+     opposite edges of a wide screen. */
+  .pane-inner,
+  .action-bar-inner {
+    max-width: var(--col-w);
+    margin: 0 auto;
+  }
+
+  .bar-inner {
+    max-width: var(--col-w);
+    margin: 0 auto;
+  }
+
+  .table-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: var(--gap);
+    align-items: start;
+  }
+
+  .table-controls {
+    gap: var(--gap);
+  }
+
+  .table-controls > .section {
+    margin-bottom: 0;
   }
 
   .solid {
