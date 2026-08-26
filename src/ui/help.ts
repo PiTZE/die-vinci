@@ -10,7 +10,8 @@ const SECTIONS: Section[] = [
     title: 'ROLLING',
     body: [
       'Nothing happens until you roll. Press ROLL and the dice spin, and when they land each one shows a face: a d4 lands on 1 to 4, a d12 on 1 to 12.',
-      'The face is what that die is worth this roll. Its own average is worth exactly one, so a low face is a bad roll and a high one is a good roll, and every die swings by about the same amount whatever its size.',
+      'The face is what each of those dice is worth this roll. Four d4 landing on 4 make sixteen. Every multiplier you own stacks on top of that.',
+      'So a die with more faces is worth more by being that die: a d72 averages 36.5 where a d4 averages 2.5. The swing is the same at every size, about 58% either way of that average.',
       'You cannot roll faster than the roll rate. Holding the button rolls as fast as it allows, and no faster.',
     ],
   },

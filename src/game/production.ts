@@ -20,6 +20,7 @@ import {
   ROLL_COST_MULT,
   ROLL_INTERVAL_BASE,
   START_INK,
+  WAGER_AT,
   folioRequirement,
   rollIntervalMultiplier,
   studyRequirement,
@@ -298,19 +299,22 @@ export function resetForChallenge(s: GameState): void {
 // -- the roll ------------------------------------------------------------
 
 /**
- * What a face is worth, relative to the average face of that die.
+ * What a face is worth. Four d4 landing on 4 make sixteen, and every
+ * multiplier the game has stacks on top of that.
  *
- * A d4 shows 1 to 4 and the player reads exactly that, but production is
- * scaled by face divided by 2.5, so the mean is exactly 1 and the balance
- * curve is the one already tuned. It has the neat property that every die
- * swings by the same relative amount, about 58%, whether it has four faces or
- * seventy-two: a uniform roll over 1..N has standard deviation N/sqrt(12)
- * against a mean of (N+1)/2. A d72 is not a wilder die than a d4, which is
- * what you want when the deep solids are already worth more by construction.
+ * Taking the face raw rather than against the die's average means a deep solid
+ * carries its own size as a multiplier: a d72 averages 36.5 where a d4
+ * averages 2.5. The spread is the same either way, about 58% of the mean at
+ * every die size, so a d72 is no more erratic than a d4. It is simply worth
+ * more, which is what having seventy-two faces ought to mean.
  */
 export function faceFactor(face: number, faces: number): number {
-  if (!face) return 1
-  return face / ((faces + 1) / 2)
+  return face || meanFace(faces)
+}
+
+/** What a die pays on average, which is what a batch of rolls converges to. */
+export function meanFace(faces: number): number {
+  return (faces + 1) / 2
 }
 
 function rollFace(faces: number): number {
@@ -337,11 +341,32 @@ export function rolling(s: GameState): boolean {
 /** Begins a spin. Refused while one is already in flight, which is the whole
  *  reason a hand cannot out-roll the roll rate: manual and automatic share one
  *  ceiling, and the hand is strictly the slower of the two. */
+/**
+ * The table is full. 1.7976931348623157e308 is where a double stops being able
+ * to count, and Antimatter Dimensions stops there too: production halts and
+ * the only thing left to do is crunch. Nothing here grows past it either. The
+ * run is over and it is waiting on you.
+ */
+export function mustWager(s: GameState): boolean {
+  return s.ink.gte(WAGER_AT)
+}
+
 export function startRoll(s: GameState, now: number): boolean {
+  if (mustWager(s)) return false
   if (s.autoRoll || s.rollStartedAt > 0 || s.haltMs > 0) return false
   s.rollStartedAt = now
+  // The faces go with the throw. A die in the air is not still showing you
+  // what it landed on last time.
+  for (let i = 0; i < s.faces.length; i++) s.faces[i] = 0
   return true
 }
+
+/**
+ * Below this a roll is over before it can be read, so the dice just blur and
+ * the numbers are left off. Roughly the point where a changing digit stops
+ * being information and starts being flicker.
+ */
+export const FACE_READABLE_S = 0.18
 
 /**
  * One roll's worth of production, applied to every open solid at once.
@@ -401,7 +426,10 @@ function resolveManyRolls(s: GameState, rolls: number): void {
   for (let i = 0; i < s.solids.length; i++) {
     s.faces[i] = i < n ? rollFace(SOLIDS[i].faces) : 0
   }
-  produce(s, rolls, s.solids.map(() => 1))
+  // The mean, per die, not a flat one. A d72 averages 36.5 and a d4 averages
+  // 2.5, so a flat factor here would make the automator pay a fraction of what
+  // the same rolls pay by hand.
+  produce(s, rolls, s.solids.map((_, i) => meanFace(SOLIDS[i].faces)))
 }
 
 function applyRolls(s: GameState, rolls: number): void {
@@ -443,7 +471,10 @@ export function buyAutomator(s: GameState): boolean {
  * which is why the roll rate line reads in rolls per second as well.
  */
 export function inkPerSecond(s: GameState): Decimal {
-  return s.solids[0].amount.times(solidMultiplier(s, 1)).times(rollRate(s))
+  return s.solids[0].amount
+    .times(solidMultiplier(s, 1))
+    .times(meanFace(SOLIDS[0].faces))
+    .times(rollRate(s))
 }
 
 export function tick(s: GameState, dt: number, now: number): void {
@@ -452,6 +483,16 @@ export function tick(s: GameState, dt: number, now: number): void {
   // clock the production does, offline catch-up included.
   s.stats.playMs += dt * 1000
   s.stats.wagerMs += dt * 1000
+
+  // Everything stops at the threshold, dice included. Letting the chain run on
+  // past it would only be counting into a number the game has already declared
+  // the end of the run.
+  if (mustWager(s)) {
+    s.ink = WAGER_AT
+    s.rollStartedAt = 0
+    s.rollAccum = 0
+    return
+  }
 
   // A challenge that halts production after a purchase, recovering over three
   // minutes, as AD's second challenge does.

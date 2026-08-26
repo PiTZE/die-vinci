@@ -18,8 +18,12 @@ import {
   solidMultiplier,
   studyReq,
   openSolids,
+  rollInterval,
   rollProgress,
   rolling,
+  mustWager,
+  meanFace,
+  FACE_READABLE_S,
 } from '../game/production'
 import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
@@ -27,9 +31,11 @@ import { el, type Actions, type Pane } from './shell'
 import { bindKey, holdable } from './hold'
 import { Confirmer } from './confirm'
 import { setSpin, wireframe } from './wireframe'
+import { playLand } from './sound'
 
 interface Row {
   root: HTMLElement
+  die: HTMLElement
   face: HTMLElement
   mult: HTMLElement
   step: HTMLElement
@@ -64,6 +70,11 @@ export function tablePane(): Pane {
   let rollFill: HTMLElement
   let autoSection: HTMLElement
   let autoBtn: HTMLButtonElement
+  let wagerNow: HTMLButtonElement
+  let resetGroup: HTMLElement
+  let wasSpinning = false
+  let lastFace = 0
+
 
   return {
     id: 'table',
@@ -110,10 +121,19 @@ export function tablePane(): Pane {
       // The two resets sit at the far left and MAX at the far right. MAX is
       // held constantly and the other two throw a run away, so they should not
       // share a thumb's landing area.
+      // At the threshold the bar has one thing on it, because there is one
+      // thing left to do. Antimatter Dimensions does the same at Infinity.
+      wagerNow = el('button', 'bar-roll wager-now', 'CALL THE WAGER')
+      wagerNow.type = 'button'
+      wagerNow.hidden = true
+      wagerNow.addEventListener('click', () => {
+        if (confirm.request('wager')) actions.wager()
+      })
+
       actionGroup = el('div', 'action-group')
-      const resetGroup = el('div', 'action-side')
+      resetGroup = el('div', 'action-side')
       resetGroup.append(barFolio, barStudy)
-      actionGroup.append(resetGroup, rollNow, maxBtn)
+      actionGroup.append(resetGroup, rollNow, maxBtn, wagerNow)
 
 
       const chain = el('div', 'section table-chain')
@@ -163,7 +183,7 @@ export function tablePane(): Pane {
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, face, mult, step, bar, barCan, amount, rate: flow, buy, buyLabel })
+        rows.push({ root: r, die, face, mult, step, bar, barCan, amount, rate: flow, buy, buyLabel })
       }
 
       const roll = el('div', 'section')
@@ -266,13 +286,31 @@ export function tablePane(): Pane {
 
       // The dice only turn while a roll is in the air. Under the automator
       // that is always, which is exactly the difference the purchase buys.
-      const spinning = rolling(s) && s.haltMs <= 0
+      const full = mustWager(s)
+      const spinning = rolling(s) && s.haltMs <= 0 && !full
       setSpin(spinning)
+
+      // The bar gives itself over to the one remaining move.
+      resetGroup.hidden = full
+      maxBtn.hidden = full
+      wagerNow.hidden = !full
+      wagerNow.textContent = confirm.isArmed('wager') ? 'SURE? THIS RESETS' : 'CALL THE WAGER'
+      // Under a fast roll rate the digit would change every frame, which is
+      // noise rather than a reading. The dice just spin then.
+      const readable = rollInterval(s) >= FACE_READABLE_S
+
+      // The clatter goes with what you can see. Past a few rolls a second the
+      // dice are a blur and the sound would be a machine gun, so both stop.
+      const landedNow = readable && wasSpinning && !spinning
+      const autoLanded = readable && s.autoRoll && s.faces[0] !== lastFace
+      if (s.options.sound && (landedNow || autoLanded)) playLand()
+      wasSpinning = spinning
+      lastFace = s.faces[0]
 
       // Once the automator is in, the button has nothing left to do: it can
       // never beat the roll rate, and the bar is better off giving the space
       // back to MAX.
-      rollNow.hidden = s.autoRoll
+      rollNow.hidden = s.autoRoll || full
       if (!s.autoRoll) {
         const p = rollProgress(s, now)
         const pct = `${Math.round(p * 100)}%`
@@ -306,11 +344,16 @@ export function tablePane(): Pane {
         if (r.barCan.style.left !== pct) r.barCan.style.left = pct
         if (r.barCan.style.width !== canPct) r.barCan.style.width = canPct
         setText(r.amount, formatWhole(st.amount, n))
-        // Blank until this die has actually landed on something, so a fresh
-        // table does not claim every solid rolled a one.
-        setText(r.face, s.faces[def.idx - 1] ? String(s.faces[def.idx - 1]) : '')
+        // The face and the wireframe trade places rather than stacking: a
+        // number printed over live edges was two things at full contrast
+        // fighting for the same 38 pixels.
+        const face = readable ? s.faces[def.idx - 1] : 0
+        setText(r.face, face ? String(face) : '')
+        r.die.classList.toggle('landed', face > 0)
 
-        const per = st.amount.times(mult).times(rate)
+        // Averaged over the faces, because that is what the row actually
+        // pays over any run of rolls.
+        const per = st.amount.times(mult).times(meanFace(def.faces)).times(rate)
         const unit = def.idx === 1 ? 'ink' : SOLIDS[def.idx - 2].short
         setText(r.rate, `+${format(per, n)} ${unit}/s`)
 

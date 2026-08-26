@@ -51,9 +51,10 @@ async function gap(seconds, { offline = true } = {}) {
   }
 }
 
-// Baseline income is 1e10 ink per second, so the expected yields are known.
+// Baseline: 1e10 d4 at one roll a second, three studies for an x8, and a d4
+// averaging 2.5 a face. That is 2e11 ink a second, so five seconds is 1e12.
 const short = await gap(5)
-check('a five second gap is credited', short.ink > 4e10 && short.ink < 1e12, `gained ${short.ink.toExponential(2)}`)
+check('a five second gap is credited', short.ink > 5e11 && short.ink < 2e12, `gained ${short.ink.toExponential(2)}`)
 check('no notice for a short gap', short.notice === null, String(short.notice))
 
 const long = await gap(600)

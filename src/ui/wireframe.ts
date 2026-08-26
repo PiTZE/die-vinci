@@ -203,7 +203,28 @@ class Wire {
   private paths: SVGPathElement[] = []
   private id: SolidId
   private t = Math.random() * Math.PI * 2
+  /** Tumble axis weights, re-picked on every throw. A fixed pair made nine
+   *  dice turn in lockstep like a row of gears, which is the one thing a
+   *  handful of thrown dice never looks like. */
+  private wy = 1
+  private wx = 0.42
+  /** Each die leaves the hand a little differently. */
+  private speed = 1
+  /** Keeps the nine bobs out of phase with each other. */
+  private phase = Math.random() * Math.PI * 2
   visible = true
+
+  /** A new throw. Fresh axis, fresh rate. */
+  throw(): void {
+    // Kept away from zero on both axes, or the solid spins flat about one axis
+    // and reads as a wheel rather than a tumble.
+    const a = Math.random() * Math.PI * 2
+    this.wy = 0.55 + Math.abs(Math.cos(a)) * 0.75
+    this.wx = 0.55 + Math.abs(Math.sin(a)) * 0.75
+    if (Math.random() < 0.5) this.wx = -this.wx
+    this.speed = 0.8 + Math.random() * 0.45
+    this.phase = Math.random() * Math.PI * 2
+  }
 
   constructor(id: SolidId) {
     this.id = id
@@ -239,14 +260,28 @@ class Wire {
   }
 
   step(dt: number, rate: number): void {
-    this.t += dt * rate
+    this.t += dt * rate * this.speed
+    // A solid turning on the spot is a model on a turntable, not a thrown
+    // die. The bob and the wobble are what sell it, and because they scale
+    // with the rate they fall to nothing exactly as the tumble does, so the
+    // die comes to rest square instead of being switched off mid-jitter.
+    const j = Math.min(1, rate / SPIN_ROLLING)
+    if (j > 0.002) {
+      const bob = Math.sin(this.t * 2.1 + this.phase) * 3.4 * j
+      const side = Math.sin(this.t * 1.3 + this.phase * 2) * 1.6 * j
+      const tilt = Math.sin(this.t * 1.7 + this.phase) * 9 * j
+      this.el.style.transform =
+        `translate3d(${side.toFixed(2)}px, ${bob.toFixed(2)}px, 0) rotate(${tilt.toFixed(2)}deg)`
+    } else if (this.el.style.transform) {
+      this.el.style.transform = ''
+    }
     this.draw()
   }
 
   private draw(): void {
     const { vs, es } = geometry(this.id)
-    const ay = this.t
-    const ax = this.t * 0.42
+    const ay = this.t * this.wy
+    const ax = this.t * this.wx
     const cy = Math.cos(ay)
     const sy = Math.sin(ay)
     const cx = Math.cos(ax)
@@ -310,22 +345,41 @@ const byEl = new Map<SVGSVGElement, Wire>()
 // A die at rest is a die showing a face. It only turns while a roll is in the
 // air, which is what makes pressing ROLL feel like anything at all: before
 // this the solids span forever and the button changed nothing you could see.
-let spinRate = 0
+//
+// The throw itself has three parts, because a constant-rate turn does not read
+// as dice at all. It leaves the hand fast, holds, and then stops hard. Nearly
+// all of the deceleration happens in the last fifth of the settle, which is
+// what makes a die look like it caught on a corner and fell flat rather than
+// like an animation being faded out.
+let spinning = false
 let settling = 0
 
-/** 0 stops the dice where they are. 1 is a roll in flight. */
+const SPIN_ROLLING = 11
+const SPIN_LAUNCH = 1.55
+const LAUNCH_S = 0.16
+const SETTLE_S = 0.34
+
+let launching = 0
+
+/** false stops the dice where they are. true is a roll in flight. */
 export function setSpin(on: boolean): void {
-  const want = on ? SPIN_ROLLING : 0
-  if (want === spinRate) return
-  // Coming to rest over a moment rather than in one frame, so a landing reads
-  // as a die slowing down instead of the animation being switched off.
-  if (!on) settling = SETTLE_S
-  spinRate = want
-  if (on) ensureLoop()
+  if (on === spinning) return
+  spinning = on
+  if (on) {
+    launching = LAUNCH_S
+    settling = 0
+    for (const w of live) w.throw()
+    ensureLoop()
+  } else {
+    settling = SETTLE_S
+    launching = 0
+  }
 }
 
-const SPIN_ROLLING = 3.2
-const SETTLE_S = 0.22
+/** Fast, then almost nothing. 1 at the start of the settle, 0 at the end. */
+function settleCurve(p: number): number {
+  return p * p * p
+}
 
 function frame(now: number): void {
   raf = requestAnimationFrame(frame)
@@ -333,11 +387,19 @@ function frame(now: number): void {
   last = now
   if (document.hidden) return
 
-  let rate = spinRate
-  if (!rate && settling > 0) {
+  let rate = 0
+  if (spinning) {
+    // Off the hand faster than it travels, so the throw has a snap to it.
+    rate = SPIN_ROLLING
+    if (launching > 0) {
+      launching = Math.max(0, launching - dt)
+      rate *= 1 + (SPIN_LAUNCH - 1) * (launching / LAUNCH_S)
+    }
+  } else if (settling > 0) {
     settling = Math.max(0, settling - dt)
-    rate = SPIN_ROLLING * (settling / SETTLE_S)
+    rate = SPIN_ROLLING * settleCurve(settling / SETTLE_S)
   }
+
   // Nothing is turning and nothing is coming to rest, so there is nothing to
   // draw. The loop keeps running because a roll can start on the next frame.
   if (rate <= 0) return

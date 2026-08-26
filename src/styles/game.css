@@ -160,22 +160,39 @@
   color: var(--fg-dim);
 }
 
-/* Centred on the solid, and readable against the wireframe behind it. The
-   shadow is the background colour rather than a blur, so it stays a crisp
-   number in both themes instead of a smudge. */
+/* The landed face. It does not sit on top of the wireframe, it replaces it:
+   the solid drops to a ghost of itself and the number takes the cell. Drawn
+   over live edges with a halo behind it, this was a smudge. */
 .solid-face {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 0.82rem;
+  font-size: 1.15rem;
   font-variant-numeric: tabular-nums;
   color: var(--fg);
-  text-shadow:
-    0 0 3px var(--bg),
-    0 0 3px var(--bg),
-    0 0 3px var(--bg);
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 120ms linear;
+}
+
+.solid-die.landed .solid-face {
+  opacity: 1;
+}
+
+.solid-die.landed .solid-icon {
+  opacity: 0.16;
+}
+
+.solid-icon {
+  transition: opacity 120ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .solid-face,
+  .solid-icon {
+    transition: none;
+  }
 }
 
 .solid-name {
@@ -348,6 +365,13 @@
   width: 0;
   background: var(--fill-strong);
   pointer-events: none;
+}
+
+/* At the threshold this is the only control on the bar, so it takes all of it
+   and wears the accent that nothing else does. */
+.wager-now {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .bar-roll-label {

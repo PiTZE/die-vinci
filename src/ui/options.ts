@@ -24,6 +24,7 @@ import { formatTime } from '../format'
 export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
   let thoughtBtns: { id: number; btn: HTMLButtonElement }[] = []
+  let soundBtns: { on: boolean; btn: HTMLButtonElement }[] = []
   let themeBtns: { id: string; btn: HTMLButtonElement }[] = []
   let confirmBtns: { key: string; btn: HTMLButtonElement }[] = []
   let currentConfirms: Record<string, boolean> = {}
@@ -83,6 +84,21 @@ export function optionsPane(): Pane {
         tRow.appendChild(b)
       }
       thoughts.appendChild(tRow)
+
+      const sound = el('div', 'section')
+      const soundHead = el('div', 'section-head')
+      soundHead.appendChild(el('span', 'grow', 'SOUND'))
+      sound.appendChild(soundHead)
+      const soundRow = el('div', 'row')
+      const soundOn = el('button', 'action', 'ON')
+      const soundOff = el('button', 'action', 'OFF')
+      for (const [b, on] of [[soundOn, true], [soundOff, false]] as const) {
+        b.type = 'button'
+        b.addEventListener('click', () => actions.setSound(on))
+        soundBtns.push({ on, btn: b })
+        soundRow.appendChild(b)
+      }
+      sound.appendChild(soundRow)
 
       const save = el('div', 'section')
       const sh = el('div', 'section-head')
@@ -413,6 +429,7 @@ export function optionsPane(): Pane {
         theme,
         notation,
         thoughts,
+        sound,
         install,
         offline,
         confirmSec,
@@ -435,6 +452,9 @@ export function optionsPane(): Pane {
     },
 
     update(s: GameState) {
+      for (const b of soundBtns) {
+        b.btn.classList.toggle('buyable', b.on === s.options.sound)
+      }
       for (const t of thoughtBtns) {
         t.btn.classList.toggle('buyable', t.id === s.options.thoughtSpeed)
       }

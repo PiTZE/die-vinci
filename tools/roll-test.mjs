@@ -54,6 +54,8 @@ const landed = await ev(`({
 })`)
 check('the roll lands and pays', Number(landed.ink) > Number(stillIdle), `${stillIdle} -> ${landed.ink}`)
 check('the d4 shows a face of 1 to 4', landed.face >= 1 && landed.face <= 4, `rolled ${landed.face}`)
+check('and pays count times face', Number(landed.ink) === landed.face,
+  `1 d4 rolled ${landed.face}, paid ${landed.ink}`)
 check('and the number is drawn on the die', landed.shown === String(landed.face), landed.shown)
 check('the dice come to rest', landed.spinning === false)
 
@@ -64,7 +66,8 @@ await ev(`for (let i = 0; i < 20; i++) ${ROLL}.click()`)
 await sleep(1300)
 const afterMash = await ev(`window.LD.state.ink.toString()`)
 const gained = Number(afterMash) - Number(beforeMash)
-const oneRollMax = Number(await ev(`window.LD.state.solids[0].amount.toString()`)) * 1.6 + 0.001
+// One roll of N d4 can pay at most 4N: the die's highest face.
+const oneRollMax = Number(await ev(`window.LD.state.solids[0].amount.toString()`)) * 4 + 0.001
 check('mashing cannot beat the roll rate', gained <= oneRollMax,
   `gained ${gained.toFixed(3)}, one roll caps at ${oneRollMax.toFixed(3)}`)
 
@@ -96,6 +99,69 @@ await sleep(1600)
 const afterAuto = await ev(`window.LD.state.ink.toString()`)
 check('rolls now land on their own', Number(afterAuto) > Number(beforeAuto),
   `${beforeAuto} -> ${afterAuto}`)
+
+// A batch must pay the mean face per die, not a flat one, or automating the
+// roll would quietly be a downgrade.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = true; s.rollUpgrades = 40; s.studies = 0
+  s.ink = new D(0); s.inkThisWager = new D(0)
+  s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 1000 : 0) }) })()`)
+const t0 = Date.now()
+const i0 = Number(await ev(`window.LD.state.ink.toString()`))
+await sleep(2000)
+const i1 = Number(await ev(`window.LD.state.ink.toString()`))
+const secs = (Date.now() - t0) / 1000
+const rate = Number(await ev(`1 / window.LD.rollInterval`))
+// 1000 d4, mean face 2.5, so 2500 ink a roll.
+const want = 1000 * 2.5 * rate * secs
+const got = (i1 - i0) / want
+check('a batch pays the mean face per die', got > 0.75 && got < 1.25,
+  `${(got * 100).toFixed(0)}% of expected`)
+
+// The face and the wireframe trade places rather than stacking.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0 })()`)
+await sleep(400)
+await ev(`${ROLL}.click()`); await sleep(120)
+const air = await ev(`({ cls: document.querySelector('.solid-die').className,
+  face: document.querySelector('.solid-face').textContent })`)
+check('a die in the air shows no face', air.face === '' && !air.cls.includes('landed'),
+  JSON.stringify(air))
+await sleep(1200)
+const rest = await ev(`({ cls: document.querySelector('.solid-die').className,
+  icon: getComputedStyle(document.querySelector('.solid-icon')).opacity })`)
+check('a landed die dims its wireframe for the face',
+  rest.cls.includes('landed') && Number(rest.icon) < 0.3, JSON.stringify(rest))
+
+// Too fast to read means no numbers at all, just a blur.
+await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.rollUpgrades = 60 })()`)
+await sleep(500)
+const blur = await ev(`({ face: document.querySelector('.solid-face').textContent,
+  cls: document.querySelector('.solid-die').className })`)
+check('an unreadable roll rate drops the numbers',
+  blur.face === '' && !blur.cls.includes('landed'), JSON.stringify(blur))
+
+// The threshold stops everything and takes over the bar.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.rollUpgrades = 0; s.ink = new D('1.8e308') })()`)
+await sleep(600)
+const halted = await ev(`({
+  ink: window.LD.state.ink.toString(),
+  roll: getComputedStyle(${ROLL}).display,
+  max: getComputedStyle(document.querySelector('.bar-btn.max')).display,
+  wager: document.querySelector('.wager-now') && getComputedStyle(document.querySelector('.wager-now')).display,
+})`)
+check('the bar gives itself over to the Wager',
+  halted.wager !== 'none' && halted.max === 'none' && halted.roll === 'none',
+  JSON.stringify(halted))
+
+const d1 = await ev(`window.LD.state.solids[0].amount.toString()`)
+await sleep(1200)
+const d2 = await ev(`window.LD.state.solids[0].amount.toString()`)
+check('and nothing grows past it', d1 === d2, `${d1} -> ${d2}`)
+check('ink is pinned at the threshold',
+  (await ev(`window.LD.state.ink.toString()`)) === '1.7976931348623157e+308',
+  await ev(`window.LD.state.ink.toString()`))
 
 ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)

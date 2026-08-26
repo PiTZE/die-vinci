@@ -2,6 +2,7 @@ import Decimal from 'break_infinity.js'
 import { format, formatTime } from '../format'
 import { consumeAway } from '../game/offline'
 import { pickThought } from './thoughts'
+import { mustWager } from '../game/production'
 import { checkAchievements, byId as achievementById } from '../game/achievements'
 import type { GameState, TabId } from '../state'
 
@@ -24,6 +25,7 @@ export interface Actions {
   setNotation(n: GameState['options']['notation']): void
   /** Pixels a second for the thoughts ticker. 0 holds each line still. */
   setThoughtSpeed(px: number): void
+  setSound(on: boolean): void
   setOffline(on: boolean): void
   setOfflineTicks(n: number): void
   setConfirm(key: string, on: boolean): void
@@ -104,6 +106,7 @@ export class Shell {
   private thoughtFrame = 0
   private seenTabs = new Set<TabId>()
   private announced = false
+  private announcedFull = false
   private toastTimer = 0
   private inkOut = new Readout('INK')
   private pointsOut = new Readout('POINTS')
@@ -237,6 +240,11 @@ export class Shell {
   update(s: GameState, inkRate: Decimal): void {
     const now = Date.now()
     this.thoughts(s, now)
+
+    // The run is over and waiting on you. Said once, not every frame.
+    const full = mustWager(s)
+    if (full && !this.announcedFull) this.toast('THE TABLE IS FULL.  CALL THE WAGER.')
+    this.announcedFull = full
 
     for (const id of checkAchievements(s)) {
       const a = achievementById(id)

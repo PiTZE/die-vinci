@@ -14,9 +14,12 @@ import {
   buyStudy,
   inkPerSecond,
   maxAll,
+  openSolids,
+  rollInterval,
   tick,
 } from './game/production'
 import { publishAway, simulateAway } from './game/offline'
+import { playRoll } from './ui/sound'
 import { restoreBackup } from './backup'
 import { devTools } from './dev'
 import { doWager } from './game/wager'
@@ -190,7 +193,10 @@ const actions: Actions = {
   roll: () => {
     // No persistSoon: a spin starting is not worth a write, and the roll it
     // resolves into will trigger one through the autosave anyway.
-    startRoll(state, Date.now())
+    if (!startRoll(state, Date.now())) return
+    // Built on this gesture the first time. An AudioContext cannot start
+    // without one, and a roll is always one.
+    if (state.options.sound) playRoll(openSolids(state))
   },
   buyAutomator: () => {
     buyAutomator(state)
@@ -234,6 +240,10 @@ const actions: Actions = {
   },
   setNotation: (n) => {
     state.options.notation = n
+    persistSoon()
+  },
+  setSound: (on) => {
+    state.options.sound = on
     persistSoon()
   },
   setThoughtSpeed: (px) => {
@@ -441,6 +451,9 @@ const hook: Record<string, unknown> = {
   // The same entry points the buttons use. Nothing here skips a cost check,
   // so it is safe on stable; the cheats below are not and stay dev only.
   actions,
+  get rollInterval() {
+    return rollInterval(state)
+  },
   channel: __CHANNEL__,
   version: __VERSION__,
   buildId: __BUILD_ID__,
