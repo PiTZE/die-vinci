@@ -2,12 +2,15 @@
 //
 //   npm run test:challenge
 import { spawn } from 'node:child_process'
+import { guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 const profile = mkdtempSync(join(tmpdir(), 'ld-cl-'))
-const chrome = spawn('google-chrome',['--headless=new','--no-sandbox','--disable-gpu',
+const chrome = spawn('google-chrome',['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--disk-cache-size=1','--media-cache-size=1',
   '--remote-debugging-port=0',`--user-data-dir=${profile}`,'--window-size=390,844','about:blank'],{stdio:'ignore'})
+guard(chrome, profile, () => ws)
+sweepStale()
 // Chrome picks the port and writes it into the profile. Fixed ports meant a
 // leftover browser from an earlier run answered instead of the one just
 // spawned, and the suite then tested a page it never loaded. That cost three

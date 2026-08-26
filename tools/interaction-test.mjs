@@ -9,6 +9,7 @@
 //
 // The dev server must already be running.
 import { spawn } from 'node:child_process'
+import { guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,9 +19,11 @@ const MOBILE = args.includes('mobile')
 const URL_ = args.find((a) => a.startsWith('http')) ?? 'http://127.0.0.1:5173/'
 const profile = mkdtempSync(join(tmpdir(), 'ld-cdp-'))
 const chrome = spawn('google-chrome', [
-  '--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0',
+  '--headless=new', '--no-sandbox', '--disable-gpu','--disable-dev-shm-usage','--disk-cache-size=1','--media-cache-size=1', '--remote-debugging-port=0',
   `--user-data-dir=${profile}`, `--window-size=${MOBILE ? '390,844' : '1280,800'}`, 'about:blank',
 ], { stdio: 'ignore' })
+guard(chrome, profile, () => ws)
+sweepStale()
 
 // Chrome picks the port and writes it into the profile. Fixed ports meant a
 // leftover browser from an earlier run answered instead of the one just

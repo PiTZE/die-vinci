@@ -7,12 +7,15 @@
 //
 //   npm run test:backup
 import { spawn } from 'node:child_process'
+import { guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 const profile = mkdtempSync(join(tmpdir(), 'ld-bk-'))
-const chrome = spawn('google-chrome',['--headless=new','--no-sandbox','--disable-gpu',
+const chrome = spawn('google-chrome',['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--disk-cache-size=1','--media-cache-size=1',
   '--remote-debugging-port=0',`--user-data-dir=${profile}`,'--window-size=390,844','about:blank'],{stdio:'ignore'})
+guard(chrome, profile, () => ws)
+sweepStale()
 // Chrome picks the port and writes it into the profile. Fixed ports meant a
 // leftover browser from an earlier run answered instead of the one just
 // spawned, and the suite then tested a page it never loaded. That cost three
@@ -86,6 +89,23 @@ check('restoring puts the old save back', restored === '4.2e77', String(restored
 await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(3500)
 const afterRestore = await ev(`window.LD.state.ink.toString()`)
 check('and loading it migrates rather than crashing', afterRestore === '10', afterRestore)
+
+// EXPORT used to call select() on the save box, which focuses it, which on a
+// phone throws the keyboard over half the screen for a box nobody types into.
+await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.includes('OPTIONS')).click()`)
+await sleep(600)
+await ev(`document.querySelector('textarea').blur()`)
+await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent === 'EXPORT').click()`)
+await sleep(500)
+// Focus is the whole test. selectionEnd moves to the end just from assigning
+// value, with or without focus, and a caret in an unfocused box raises nothing.
+const io = await ev(`({
+  focused: document.activeElement === document.querySelector('textarea'),
+  filled: document.querySelector('textarea').value.length > 20,
+  active: document.activeElement.tagName
+})`)
+check('EXPORT fills the box without focusing it',
+  io.filled === true && io.focused === false, JSON.stringify(io))
 
 ws.close();chrome.kill();await sleep(400);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)

@@ -21,6 +21,33 @@ import { SLOT_COUNT, currentSlot, slotSummary } from '../save'
 import { CONFIRM_KEYS } from './confirm'
 import { formatTime } from '../format'
 
+/**
+ * Clipboard, falling back to the box.
+ *
+ * writeText needs a secure context and a gesture; both hold here, and it is
+ * refused often enough on locked-down browsers that the box has to stay.
+ */
+async function copy(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Whatever is in the box, or the clipboard if the box is empty. Reading the
+ *  clipboard prompts for permission on some browsers and is refused outright
+ *  on others, so the box wins when it has something in it. */
+async function paste(inBox: string): Promise<string> {
+  if (inBox.trim()) return inBox
+  try {
+    return await navigator.clipboard.readText()
+  } catch {
+    return ''
+  }
+}
+
 export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
   let thoughtBtns: { id: number; btn: HTMLButtonElement }[] = []
@@ -118,16 +145,23 @@ export function optionsPane(): Pane {
       const btns = el('div', 'row')
       const exp = el('button', 'action', 'EXPORT')
       exp.type = 'button'
+      // The save goes to the clipboard, and to the box as a fallback. It used
+      // to call io.select(), which focuses the textarea, which on a phone
+      // throws the keyboard over half the screen for a box nobody was going
+      // to type into.
       exp.addEventListener('click', () => {
-        io.value = actions.exportSave()
-        io.select()
-        say('copied to the box')
+        const blob = actions.exportSave()
+        io.value = blob
+        void copy(blob).then((ok) => say(ok ? 'copied to the clipboard' : 'copied to the box'))
       })
       const imp = el('button', 'action', 'IMPORT')
       imp.type = 'button'
       imp.addEventListener('click', () => {
-        if (!io.value.trim()) return say('paste a save first')
-        say(actions.importSave(io.value) ? 'imported' : 'that is not a save')
+        void paste(io.value).then((blob) => {
+          if (!blob.trim()) return say('paste a save into the box first')
+          if (blob !== io.value) io.value = blob
+          say(actions.importSave(blob) ? 'imported' : 'that is not a save')
+        })
       })
       btns.append(exp, imp)
       save.appendChild(btns)

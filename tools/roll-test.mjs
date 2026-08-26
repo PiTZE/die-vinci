@@ -1,12 +1,15 @@
 // The roll loop. Nothing produces until a roll lands, a hand cannot out-roll
 // the roll rate, and the automator takes over from the finger.
 import { spawn } from 'node:child_process'
+import { guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 const profile = mkdtempSync(join(tmpdir(), 'ld-rl-'))
-const chrome = spawn('google-chrome',['--headless=new','--no-sandbox','--disable-gpu',
+const chrome = spawn('google-chrome',['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage','--disk-cache-size=1','--media-cache-size=1',
   '--remote-debugging-port=0',`--user-data-dir=${profile}`,'--window-size=390,844','about:blank'],{stdio:'ignore'})
+guard(chrome, profile, () => ws)
+sweepStale()
 // Chrome picks the port and writes it into the profile. Fixed ports meant a
 // leftover browser from an earlier run answered instead of the one just
 // spawned, and the suite then tested a page it never loaded. That cost three
@@ -31,6 +34,17 @@ await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
 await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4000)
 await ev(`localStorage.clear()`); await send('Page.reload'); await sleep(3500)
+
+// The dev server compiles on first request, so a fixed sleep after navigate is
+// a guess. Wait for the app to actually exist instead.
+async function booted() {
+  for (let i = 0; i < 40; i++) {
+    try { if (await ev(`!!(window.LD && window.LD.state)`)) return true } catch {}
+    await sleep(500)
+  }
+  throw new Error('the app never booted')
+}
+await booted()
 
 const ROLL = `[...document.querySelectorAll('.bar-roll')][0]`
 
@@ -329,6 +343,44 @@ const rolling = await ev(`({ bar: document.querySelector('.res-rate').textConten
   row: document.querySelector('.solid-rate').textContent })`)
 check('and per second once it is rolling for you',
   /\/s$/.test(rolling.bar) && /\/s$/.test(rolling.row), JSON.stringify(rolling))
+
+// Audio, the way Safari needs it. A context built outside a gesture never
+// leaves 'suspended' there, and the spin bed runs on every frame, so nothing
+// but a real tap may build one. The first roll cannot be the unlock either:
+// the samples have not downloaded yet, so nothing would start during it.
+await send('Page.addScriptToEvaluateOnNewDocument',{source:`
+  window.__ctxs = []
+  const Real = window.AudioContext
+  window.AudioContext = function (...a) {
+    const c = new Real(...a)
+    window.__ctxs.push(c)
+    return c
+  }
+  window.AudioContext.prototype = Real.prototype
+`})
+await send('Page.reload'); await sleep(1500); await booted()
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.options.offline = false; s.options.sound = true; s.autoRoll = true
+  s.solids.forEach((d, i) => { if (i < 2) { d.bought = 10; d.amount = new D(500) } }) })()`)
+await sleep(1800)
+check('nothing builds an audio context before a gesture',
+  (await ev(`window.__ctxs.length`)) === 0,
+  `contexts: ${await ev(`window.__ctxs.length`)}`)
+
+// A real input event, not a synthesised one. Chrome only treats a trusted
+// gesture as an unlock, which is exactly the rule this is testing, so
+// dispatchEvent would pass on a build that Safari would still play silent.
+await send('Input.dispatchMouseEvent',{type:'mousePressed',x:200,y:400,button:'left',clickCount:1})
+await send('Input.dispatchMouseEvent',{type:'mouseReleased',x:200,y:400,button:'left',clickCount:1})
+await sleep(1200)
+const armed = await ev(`({ n: window.__ctxs.length,
+  state: window.__ctxs[0] ? window.__ctxs[0].state : 'none' })`)
+check('a tap builds exactly one and it is running',
+  armed.n === 1 && armed.state === 'running', JSON.stringify(armed))
+
+await sleep(1500)
+check('and it stays the only one however long the bed runs',
+  (await ev(`window.__ctxs.length`)) === 1, `contexts: ${await ev(`window.__ctxs.length`)}`)
 
 // The threshold stops everything and takes over the bar.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal

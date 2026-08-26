@@ -33,13 +33,35 @@ function base(): string {
   return import.meta.env.BASE_URL
 }
 
-/** Built on the first gesture, because an AudioContext cannot start without
- *  one, and the first roll is always one. */
-function start(): boolean {
-  if (ctx) {
-    if (ctx.state === 'suspended') void ctx.resume()
-    return true
+/**
+ * The iOS unlock, which has to happen inside a real gesture and nowhere else.
+ *
+ * Safari does not accept a context that was merely created during a tap. It
+ * wants a source actually started, so this plays one sample of silence. That
+ * is the whole ritual, and without it every later sound is queued into a
+ * context that never leaves 'suspended'.
+ *
+ * It also has to run before the buffers arrive. The first roll used to be the
+ * unlock, and on the first roll the download has not finished, so playThrow
+ * returned early, nothing started, and iOS stayed locked for the session.
+ */
+function unlock(): boolean {
+  if (!make()) return false
+  if (ctx!.state === 'suspended') void ctx!.resume()
+  try {
+    const blip = ctx!.createBufferSource()
+    blip.buffer = ctx!.createBuffer(1, 1, ctx!.sampleRate)
+    blip.connect(ctx!.destination)
+    blip.start(0)
+  } catch {
+    // Already unlocked, or the context is gone. Neither is worth reporting.
   }
+  void load()
+  return true
+}
+
+function make(): boolean {
+  if (ctx) return true
   try {
     const Ctor =
       window.AudioContext ??
@@ -54,8 +76,38 @@ function start(): boolean {
     ctx = null
     return false
   }
-  void load()
   return true
+}
+
+/**
+ * Anything that makes a sound rather than arming one. It never builds the
+ * context: doing that outside a gesture is what leaves Safari with a
+ * permanently suspended one, and the spin bed runs on every frame.
+ */
+function ready(): boolean {
+  if (!ctx) return false
+  if (ctx.state === 'suspended') void ctx.resume()
+  return true
+}
+
+// The first touch anywhere arms the audio, not the first roll. Registered once
+// and removed as soon as it fires.
+if (typeof window !== 'undefined') {
+  const arm = () => {
+    if (unlock()) {
+      window.removeEventListener('pointerdown', arm)
+      window.removeEventListener('touchend', arm)
+      window.removeEventListener('keydown', arm)
+    }
+  }
+  window.addEventListener('pointerdown', arm, { passive: true })
+  window.addEventListener('touchend', arm, { passive: true })
+  window.addEventListener('keydown', arm, { passive: true })
+  // Safari suspends the context when the tab goes away and does not always
+  // bring it back on its own.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && ctx?.state === 'suspended') void ctx.resume()
+  })
 }
 
 async function grab(name: string): Promise<AudioBuffer> {
@@ -89,7 +141,7 @@ export function playThrow(): void {
   const now = Date.now()
   if (now - lastAt < MIN_GAP_MS) return
   lastAt = now
-  if (!start() || !ctx || !master || !buffers.length) return
+  if (!ready() || !ctx || !master || !buffers.length) return
 
   let i = Math.floor(Math.random() * buffers.length)
   if (buffers.length > 1 && i === lastPick) i = (i + 1) % buffers.length
@@ -155,7 +207,7 @@ export function setSpinBed(interval: number, on: boolean): void {
     stopBed()
     return
   }
-  if (!start() || !ctx || !master || !shakeBuffer) return
+  if (!ready() || !ctx || !master || !shakeBuffer) return
 
   // Position across the band, on a log scale, because roll rate climbs by
   // multiplying and a linear reading would spend the whole band at one end.
@@ -190,9 +242,10 @@ export function setSpinBed(interval: number, on: boolean): void {
 /** Where a single throw is still its own event rather than part of the bed. */
 export const THROW_ABOVE_S = BED_FROM
 
-/** Lets the first press make a sound rather than only starting the download. */
+/** For anywhere that wants to arm the audio from a gesture explicitly. The
+ *  window listener above already covers the ordinary case. */
 export function warmSound(): void {
-  start()
+  unlock()
 }
 
 export function setVolume(v: number): void {
