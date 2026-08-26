@@ -34,6 +34,7 @@ import { automationPane } from './ui/automation'
 import { archivePane } from './ui/archive'
 import { helpPane } from './ui/help'
 import { applyTheme, currentTheme } from './ui/theme'
+import { trackViewport } from './ui/viewport'
 import { registerSW } from 'virtual:pwa-register'
 
 // The plugin's injected registerSW.js only calls navigator.serviceWorker
@@ -123,6 +124,7 @@ let state: GameState = loadGame(Date.now())
 // The head script already set data-theme. This re-applies through the registry
 // so colour-scheme, meta theme-color and any custom tokens agree with it.
 applyTheme(currentTheme().id)
+trackViewport()
 
 /**
  * Wiping clears localStorage and reloads, but the reload fires pagehide, and

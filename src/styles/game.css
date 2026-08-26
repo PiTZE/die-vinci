@@ -6,8 +6,12 @@
   z-index: 2;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto auto;
-  height: 100dvh;
-  max-height: 100dvh;
+  /* svh is the floor: it is the smallest the viewport gets, so it can never be
+     taller than what is on screen. --app-h is the measured height, set by
+     ui/viewport.ts, and is exact when it is available. */
+  height: 100svh;
+  height: var(--app-h, 100svh);
+  max-height: var(--app-h, 100svh);
   overflow: hidden;
 }
 
@@ -282,11 +286,17 @@
 .action-bar-inner {
   display: flex;
   gap: 8px;
-  /* Sits to the right, where a thumb rests. */
-  justify-content: flex-end;
 }
 
 .action-group {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+  /* Resets hard left, MAX hard right, as far apart as the bar allows. */
+  justify-content: space-between;
+}
+
+.action-side {
   display: flex;
   gap: 8px;
 }

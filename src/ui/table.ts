@@ -82,8 +82,13 @@ export function tablePane(): Pane {
       maxBtn.title = 'Buy the most expensive first, repeatedly  (m)'
       holdable(maxBtn, () => actions.maxAll())
 
+      // The two resets sit at the far left and MAX at the far right. MAX is
+      // held constantly and the other two throw a run away, so they should not
+      // share a thumb's landing area.
       actionGroup = el('div', 'action-group')
-      actionGroup.append(barFolio, barStudy, maxBtn)
+      const resetGroup = el('div', 'action-side')
+      resetGroup.append(barFolio, barStudy)
+      actionGroup.append(resetGroup, maxBtn)
 
 
       const chain = el('div', 'section table-chain')
