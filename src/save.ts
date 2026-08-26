@@ -20,7 +20,21 @@ function encode(s: GameState): Raw {
  * is only one version so far, so this is a scaffold, but adding the reversed
  * tarot field later should not cost anyone their save.
  */
-const MIGRATIONS: Record<number, (r: Raw) => Raw> = {}
+const MIGRATIONS: Record<number, (r: Raw) => Raw> = {
+  // 1 -> 2: the chain went from six solids to nine and the solids themselves
+  // changed. Carrying the old amounts over by position would silently hand a
+  // player a pile of d9 they never bought, so layer 0 starts again. Options,
+  // and everything above layer 0, are kept.
+  1: (r) => ({
+    ...r,
+    solids: [],
+    studies: 0,
+    folios: 0,
+    rollUpgrades: 0,
+    ink: '10',
+    inkThisWager: '0',
+  }),
+}
 
 function migrate(raw: Raw): Raw {
   let v = typeof raw.version === 'number' ? raw.version : 1

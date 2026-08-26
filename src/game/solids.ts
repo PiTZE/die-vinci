@@ -1,12 +1,36 @@
 // The production chain. Solid N produces solid N-1, solid 1 produces Ink.
-// Antimatter Dimensions' engine with Leonardo's geometry on top.
+// Antimatter Dimensions' engine with real dice on top.
 //
-// The five Platonic solids he drew for Pacioli's De divina proportione, plus
-// the rhombicuboctahedron, the most reproduced drawing in that book. Six is
-// what the geometry gives, not a number I chose.
+// Nine stages. AD's constants assume eight, and a shorter chain stalls: two
+// fewer stages is two fewer compounding steps, and no amount of retuning the
+// top recovers it. Its cost table is extended by one step following its own
+// progression, where each base cost exponent gap grows by one and each cost
+// multiplier gap grows every third entry.
+//
+//   AD base cost  [10, 100, 1e4, 1e6, 1e9, 1e13, 1e18, 1e24]  -> 1e31
+//   AD cost mult  [1e3, 1e4, 1e5, 1e6, 1e8, 1e10, 1e12, 1e15] -> 1e18
+//
+// The first three are Platonic solids Leonardo drew for Pacioli. The rest are
+// ordinary dice: odd-numbered ones are barrel prisms and even-numbered ones are
+// trapezohedra, which is how a d9 or a d22 exists at all.
 import Decimal from 'break_infinity.js'
 
-export type SolidId = 'tetra' | 'hexa' | 'octa' | 'dodeca' | 'icosa' | 'rhombi'
+export type SolidId =
+  | 'd4'
+  | 'd6'
+  | 'd8'
+  | 'd9'
+  | 'd11'
+  | 'd22'
+  | 'd33'
+  | 'd66'
+  | 'd99'
+
+/** How a solid is drawn. Face count alone does not determine the shape. */
+export type SolidShape =
+  | { kind: 'platonic'; id: 'tetra' | 'hexa' | 'octa' }
+  | { kind: 'prism'; sides: number }
+  | { kind: 'trapezohedron'; sides: number }
 
 export interface SolidDef {
   /** 1-based position in the chain. 1 produces Ink. */
@@ -14,81 +38,36 @@ export interface SolidDef {
   id: SolidId
   short: string
   name: string
-  latin: string
-  element: string
   faces: number
+  shape: SolidShape
   baseCost: Decimal
   /** Cost multiplier applied per ten bought. */
   costMult: Decimal
 }
 
-export const SOLIDS: SolidDef[] = [
-  {
-    idx: 1,
-    id: 'tetra',
-    short: 'd4',
-    name: 'Tetrahedron',
-    latin: 'Tetracedron',
-    element: 'fire',
-    faces: 4,
-    baseCost: new Decimal(10),
-    costMult: new Decimal(1e3),
-  },
-  {
-    idx: 2,
-    id: 'hexa',
-    short: 'd6',
-    name: 'Hexahedron',
-    latin: 'Exacedron',
-    element: 'earth',
-    faces: 6,
-    baseCost: new Decimal(100),
-    costMult: new Decimal(1e4),
-  },
-  {
-    idx: 3,
-    id: 'octa',
-    short: 'd8',
-    name: 'Octahedron',
-    latin: 'Octocedron',
-    element: 'air',
-    faces: 8,
-    baseCost: new Decimal(1e4),
-    costMult: new Decimal(1e5),
-  },
-  {
-    idx: 4,
-    id: 'dodeca',
-    short: 'd12',
-    name: 'Dodecahedron',
-    latin: 'Duodecedron',
-    element: 'aether',
-    faces: 12,
-    baseCost: new Decimal(1e6),
-    costMult: new Decimal(1e6),
-  },
-  {
-    idx: 5,
-    id: 'icosa',
-    short: 'd20',
-    name: 'Icosahedron',
-    latin: 'Icocedron',
-    element: 'water',
-    faces: 20,
-    baseCost: new Decimal(1e9),
-    costMult: new Decimal(1e7),
-  },
-  {
-    idx: 6,
-    id: 'rhombi',
-    short: 'd26',
-    name: 'Rhombicuboctahedron',
-    latin: 'Vigintisex Basium',
-    element: 'proportion',
-    faces: 26,
-    baseCost: new Decimal(1e13),
-    costMult: new Decimal(1e8),
-  },
+const TABLE: [SolidId, string, number, SolidShape, number, number][] = [
+  ['d4', 'Tetrahedron', 4, { kind: 'platonic', id: 'tetra' }, 10, 1e3],
+  ['d6', 'Hexahedron', 6, { kind: 'platonic', id: 'hexa' }, 100, 1e4],
+  ['d8', 'Octahedron', 8, { kind: 'platonic', id: 'octa' }, 1e4, 1e5],
+  ['d9', 'Barrel', 9, { kind: 'prism', sides: 9 }, 1e6, 1e6],
+  ['d11', 'Barrel', 11, { kind: 'prism', sides: 11 }, 1e9, 1e8],
+  ['d22', 'Trapezohedron', 22, { kind: 'trapezohedron', sides: 11 }, 1e13, 1e10],
+  ['d33', 'Barrel', 33, { kind: 'prism', sides: 33 }, 1e18, 1e12],
+  ['d66', 'Trapezohedron', 66, { kind: 'trapezohedron', sides: 33 }, 1e24, 1e15],
+  ['d99', 'Barrel', 99, { kind: 'prism', sides: 99 }, 1e31, 1e18],
 ]
+
+export const SOLIDS: SolidDef[] = TABLE.map(
+  ([id, name, faces, shape, baseCost, costMult], i) => ({
+    idx: i + 1,
+    id,
+    short: id,
+    name,
+    faces,
+    shape,
+    baseCost: new Decimal(baseCost),
+    costMult: new Decimal(costMult),
+  }),
+)
 
 export const SOLID_COUNT = SOLIDS.length

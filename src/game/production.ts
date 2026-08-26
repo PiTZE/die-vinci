@@ -7,28 +7,29 @@ import {
   ROLL_COST_BASE,
   ROLL_COST_MULT,
   ROLL_INTERVAL_BASE,
-  ROLL_POWER_BASE,
-  ROLL_POWER_FLOOR,
-  ROLL_POWER_PER_FOLIO,
-  STUDY_MULT,
+  START_INK,
+  STUDY_POWER,
   folioRequirement,
+  rollIntervalMultiplier,
   studyRequirement,
+  studyTier,
 } from './balance'
 import { unlockedSolids, type GameState } from '../state'
 
 /**
- * Every study multiplies every solid, including the three that also unlock one.
- * An AD dimension boost works the same way, and gating the bonus behind the
- * unlocking studies left the whole middle of the curve flat.
+ * A study's multiplier reaches down the chain rather than across all of it.
+ * With s studies, solid `tier` gets STUDY_POWER^(s + 1 - tier), never below 1,
+ * so the first study doubles only the tetrahedra and the deep solids are the
+ * last to benefit. AD's multiplierToNDTier does exactly this.
  */
-export function studyBonus(s: GameState): Decimal {
-  return STUDY_MULT.pow(s.studies)
+export function studyBonus(studies: number, tier: number): Decimal {
+  return new Decimal(STUDY_POWER).pow(Math.max(0, studies + 1 - tier))
 }
 
-/** idx is 1-based. Doubles every ten bought, times the study bonus. */
+/** idx is 1-based. Doubles every ten bought, times this tier's study bonus. */
 export function solidMultiplier(s: GameState, idx: number): Decimal {
   const st = s.solids[idx - 1]
-  return PER_TEN_MULT.pow(Math.floor(st.bought / 10)).times(studyBonus(s))
+  return PER_TEN_MULT.pow(Math.floor(st.bought / 10)).times(studyBonus(s.studies, idx))
 }
 
 export function solidCost(s: GameState, idx: number): Decimal {
@@ -76,7 +77,7 @@ export function buySolid(s: GameState, idx: number, one = false): boolean {
 
 /** Folios push the per-upgrade interval multiplier down, so each one is worth more. */
 export function rollPower(s: GameState): number {
-  return Math.max(ROLL_POWER_FLOOR, ROLL_POWER_BASE - s.folios * ROLL_POWER_PER_FOLIO)
+  return rollIntervalMultiplier(s.folios)
 }
 
 /** Seconds between rolls. */
@@ -107,8 +108,8 @@ export function buyRollRate(s: GameState): boolean {
 
 /** Studies and folios are both paid in dice, not ink. */
 export function studyReq(s: GameState): { idx: number; need: Decimal } {
-  const idx = unlockedSolids(s)
-  return { idx, need: new Decimal(studyRequirement(s.studies + 1)) }
+  const n = s.studies + 1
+  return { idx: studyTier(n), need: new Decimal(studyRequirement(n)) }
 }
 
 export function canBuyStudy(s: GameState): boolean {
@@ -116,18 +117,25 @@ export function canBuyStudy(s: GameState): boolean {
   return s.solids[idx - 1].amount.gte(need)
 }
 
-function resetSolids(s: GameState): void {
+/**
+ * Both resets clear the ink too, the way an Antimatter Dimensions dimension
+ * boost resets antimatter along with the dimensions. Without it a study was
+ * free: you kept the pile and got the multiplier, so there was never a reason
+ * not to take one the instant it was affordable.
+ */
+function resetTable(s: GameState): void {
   for (const st of s.solids) {
     st.bought = 0
     st.amount = new Decimal(0)
   }
+  s.ink = new Decimal(START_INK)
 }
 
-/** A study resets the table but leaves ink, roll rate and folios alone. */
+/** A study resets the table and the ink, and leaves roll rate and folios. */
 export function buyStudy(s: GameState): boolean {
   if (!canBuyStudy(s)) return false
   s.studies += 1
-  resetSolids(s)
+  resetTable(s)
   return true
 }
 
@@ -154,7 +162,7 @@ export function buyFolio(s: GameState): boolean {
   s.folios += 1
   s.studies = 0
   s.rollUpgrades = 0
-  resetSolids(s)
+  resetTable(s)
   return true
 }
 

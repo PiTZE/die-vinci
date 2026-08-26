@@ -5,12 +5,9 @@
 // strokes in currentColor look like an engraving instead of a shaded asset.
 // The rhombicuboctahedron is not a three.js built-in anyway, so its vertices
 // would have been hand-written either way.
-import type { SolidId } from '../game/solids'
+import { SOLIDS, type SolidId, type SolidShape } from '../game/solids'
 
 type V3 = [number, number, number]
-
-const PHI = (1 + Math.sqrt(5)) / 2
-const SILVER = 1 + Math.sqrt(2)
 
 function cyclic(a: number, b: number, c: number): V3[] {
   return [
@@ -42,45 +39,11 @@ function dedupe(vs: V3[]): V3[] {
   return out
 }
 
-function permutations(a: number, b: number, c: number): V3[] {
-  return dedupe([
-    ...signs([a, b, c]),
-    ...signs([a, c, b]),
-    ...signs([b, a, c]),
-    ...signs([b, c, a]),
-    ...signs([c, a, b]),
-    ...signs([c, b, a]),
-  ])
-}
+type Geo = { vs: V3[]; es: [number, number][] }
 
-function vertices(id: SolidId): V3[] {
-  switch (id) {
-    case 'tetra':
-      return [
-        [1, 1, 1],
-        [1, -1, -1],
-        [-1, 1, -1],
-        [-1, -1, 1],
-      ]
-    case 'hexa':
-      return signs([1, 1, 1])
-    case 'octa':
-      return dedupe([...cyclic(1, 0, 0), ...cyclic(-1, 0, 0)])
-    case 'dodeca':
-      return dedupe([
-        ...signs([1, 1, 1]),
-        ...cyclic(0, 1 / PHI, PHI).flatMap((v) => signs(v)),
-      ])
-    case 'icosa':
-      return dedupe(cyclic(0, 1, PHI).flatMap((v) => signs(v)))
-    case 'rhombi':
-      return permutations(1, 1, SILVER)
-  }
-}
-
-/** Edges are the pairs at the shortest distance in the set, which is true for
- *  every uniform polyhedron here and saves hand-listing six edge tables. */
-function edges(vs: V3[]): [number, number][] {
+/** Edges of a uniform polyhedron are its shortest vertex pairs. True for the
+ *  Platonics, and it saves hand-listing an edge table for each. */
+function edgesByDistance(vs: V3[]): [number, number][] {
   let min = Infinity
   const d = (a: V3, b: V3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
   for (let i = 0; i < vs.length; i++) {
@@ -95,18 +58,96 @@ function edges(vs: V3[]): [number, number][] {
   return out
 }
 
-function normalize(vs: V3[]): V3[] {
-  const r = Math.max(...vs.map((v) => Math.hypot(v[0], v[1], v[2])))
-  return vs.map((v) => [v[0] / r, v[1] / r, v[2] / r] as V3)
+function platonic(id: 'tetra' | 'hexa' | 'octa'): Geo {
+  const vs =
+    id === 'tetra'
+      ? ([
+          [1, 1, 1],
+          [1, -1, -1],
+          [-1, 1, -1],
+          [-1, -1, 1],
+        ] as V3[])
+      : id === 'hexa'
+        ? signs([1, 1, 1])
+        : dedupe([...cyclic(1, 0, 0), ...cyclic(-1, 0, 0)])
+  return { vs, es: edgesByDistance(vs) }
 }
 
-const CACHE = new Map<SolidId, { vs: V3[]; es: [number, number][] }>()
+/**
+ * A barrel die: an n-gonal prism, rolled on its n side faces. Distance-based
+ * edge finding does not work here, because once n is large the polygon side
+ * is shorter than the prism height and the vertical edges vanish.
+ */
+function prism(n: number): Geo {
+  const vs: V3[] = []
+  const h = 1.15
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2
+    vs.push([Math.cos(a), -h, Math.sin(a)], [Math.cos(a), h, Math.sin(a)])
+  }
+  const es: [number, number][] = []
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n
+    es.push([i * 2, j * 2], [i * 2 + 1, j * 2 + 1], [i * 2, i * 2 + 1])
+  }
+  return { vs, es }
+}
 
-function geometry(id: SolidId) {
+/** An n-gonal trapezohedron: two offset rings between two apexes, 2n faces. */
+function trapezohedron(n: number): Geo {
+  const vs: V3[] = []
+  const r = 1
+  const y = 0.42
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2
+    vs.push([r * Math.cos(a), -y, r * Math.sin(a)])
+    const b = a + Math.PI / n
+    vs.push([r * Math.cos(b), y, r * Math.sin(b)])
+  }
+  const top = vs.push([0, 1.5, 0]) - 1
+  const bottom = vs.push([0, -1.5, 0]) - 1
+  const es: [number, number][] = []
+  for (let i = 0; i < n; i++) {
+    const lo = i * 2
+    const hi = i * 2 + 1
+    const nextLo = ((i + 1) % n) * 2
+    es.push([lo, hi], [hi, nextLo], [hi, top], [lo, bottom])
+  }
+  return { vs, es }
+}
+
+/**
+ * Drawn detail is capped. A d99 barrel at 44 pixels is a cylinder whichever
+ * way you slice it, and 297 edges of it would cost more frame time than every
+ * other row put together.
+ */
+const MAX_PRISM_SIDES = 20
+const MAX_TRAPEZO_SIDES = 12
+
+function geometryFor(shape: SolidShape): Geo {
+  switch (shape.kind) {
+    case 'platonic':
+      return platonic(shape.id)
+    case 'prism':
+      return prism(Math.min(shape.sides, MAX_PRISM_SIDES))
+    case 'trapezohedron':
+      return trapezohedron(Math.min(shape.sides, MAX_TRAPEZO_SIDES))
+  }
+}
+
+function normalize(g: Geo): Geo {
+  const r = Math.max(...g.vs.map((v) => Math.hypot(v[0], v[1], v[2])))
+  return { vs: g.vs.map((v) => [v[0] / r, v[1] / r, v[2] / r] as V3), es: g.es }
+}
+
+const CACHE = new Map<SolidId, Geo>()
+
+function geometry(id: SolidId): Geo {
   let g = CACHE.get(id)
   if (!g) {
-    const vs = normalize(vertices(id))
-    g = { vs, es: edges(vs) }
+    const def = SOLIDS.find((d) => d.id === id)
+    if (!def) throw new Error(`no solid named ${id}`)
+    g = normalize(geometryFor(def.shape))
     CACHE.set(id, g)
   }
   return g
@@ -115,9 +156,32 @@ function geometry(id: SolidId) {
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)')
 
+/**
+ * Two drawing modes, chosen by edge count.
+ *
+ * A simple solid gets one line element per edge, with opacity interpolated
+ * continuously from depth. That is the smoothest, and on a tetrahedron any
+ * banding would be obvious.
+ *
+ * A dense one would cost five attribute writes per edge per frame, and nine
+ * rows of that measured as much as 22fps. Those sort their edges into a few
+ * paths by depth instead: one write per bucket rather than per edge. The
+ * banding that reintroduces is invisible once a solid has forty edges, and the
+ * cost stops scaling with edge count.
+ */
+const LINES_UP_TO = 16
+const BUCKETS = 10
+
+/** Front edges bright, back edges falling away. Squared so the front holds. */
+function depthOpacity(f: number): number {
+  const c = Math.min(1, Math.max(0, f))
+  return 0.22 + 0.78 * c * c
+}
+
 class Wire {
   readonly el: SVGSVGElement
-  private lines: SVGLineElement[]
+  private lines: SVGLineElement[] = []
+  private paths: SVGPathElement[] = []
   private id: SolidId
   private t = Math.random() * Math.PI * 2
   visible = true
@@ -128,19 +192,30 @@ class Wire {
     this.el.setAttribute('viewBox', '-1.15 -1.15 2.3 2.3')
     this.el.setAttribute('aria-hidden', 'true')
 
-    // One element per edge, so depth can fade continuously. Two bucketed paths
-    // were cheaper but every edge snapped between two opacities the moment it
-    // crossed the centre plane, which read as flickering rather than rotation.
     const { es } = geometry(id)
-    this.lines = es.map(() => {
-      const ln = document.createElementNS(SVG_NS, 'line')
-      ln.setAttribute('stroke', 'currentColor')
-      ln.setAttribute('stroke-width', '1')
-      ln.setAttribute('stroke-linecap', 'round')
-      ln.setAttribute('vector-effect', 'non-scaling-stroke')
-      this.el.appendChild(ln)
-      return ln
-    })
+    const paint = (n: SVGElement) => {
+      n.setAttribute('stroke', 'currentColor')
+      n.setAttribute('stroke-width', '1')
+      n.setAttribute('stroke-linecap', 'round')
+      n.setAttribute('vector-effect', 'non-scaling-stroke')
+      n.setAttribute('fill', 'none')
+      this.el.appendChild(n)
+    }
+
+    if (es.length <= LINES_UP_TO) {
+      this.lines = es.map(() => {
+        const ln = document.createElementNS(SVG_NS, 'line')
+        paint(ln)
+        return ln
+      })
+    } else {
+      this.paths = Array.from({ length: BUCKETS }, (_, i) => {
+        const p = document.createElementNS(SVG_NS, 'path')
+        paint(p)
+        p.setAttribute('stroke-opacity', depthOpacity((i + 0.5) / BUCKETS).toFixed(3))
+        return p
+      })
+    }
     this.draw()
   }
 
@@ -171,26 +246,32 @@ class Wire {
       pz.push(z2)
     }
 
-    for (let i = 0; i < es.length; i++) {
-      const [a, b] = es[i]
-      const ln = this.lines[i]
-      ln.setAttribute('x1', px[a].toFixed(3))
-      ln.setAttribute('y1', py[a].toFixed(3))
-      ln.setAttribute('x2', px[b].toFixed(3))
-      ln.setAttribute('y2', py[b].toFixed(3))
-      // Midpoint depth runs -1 at the back to 1 at the front. Squaring the
-      // normalised value keeps the front edges bright and lets the back ones
-      // fall away, without any step for the eye to catch.
-      const d = (pz[a] + pz[b]) / 2
-      const f = (d + 1) / 2
-      ln.setAttribute('stroke-opacity', (0.22 + 0.78 * f * f).toFixed(3))
+    if (this.lines.length) {
+      for (let i = 0; i < es.length; i++) {
+        const [a, b] = es[i]
+        const ln = this.lines[i]
+        ln.setAttribute('x1', px[a].toFixed(3))
+        ln.setAttribute('y1', py[a].toFixed(3))
+        ln.setAttribute('x2', px[b].toFixed(3))
+        ln.setAttribute('y2', py[b].toFixed(3))
+        ln.setAttribute('stroke-opacity', depthOpacity((pz[a] + pz[b]) / 4 + 0.5).toFixed(3))
+      }
+      return
     }
+
+    const buckets: string[] = new Array(BUCKETS).fill('')
+    for (const [a, b] of es) {
+      const f = (pz[a] + pz[b]) / 4 + 0.5
+      const slot = Math.min(BUCKETS - 1, Math.max(0, Math.floor(f * BUCKETS)))
+      buckets[slot] +=
+        `M${px[a].toFixed(3)} ${py[a].toFixed(3)}L${px[b].toFixed(3)} ${py[b].toFixed(3)}`
+    }
+    for (let i = 0; i < BUCKETS; i++) this.paths[i].setAttribute('d', buckets[i])
   }
 }
 
-// One loop drives every wireframe on the page, throttled to 20fps. Six solids
-// at ~30 edges each is nothing, but there is no reason to run it while the tab
-// is hidden or the row is scrolled away.
+// One loop drives every wireframe on the page. No reason to run it while the
+// tab is hidden or the row is scrolled out of view.
 const live = new Set<Wire>()
 let raf = 0
 let last = 0

@@ -1,6 +1,7 @@
 // Every tunable constant. Nothing else in the codebase hardcodes a number
 // that a balance pass would want to touch.
 import Decimal from 'break_infinity.js'
+import { SOLID_COUNT } from './solids'
 
 export const TICK_MS = 100
 /**
@@ -14,7 +15,7 @@ export const CHANNEL_PATHS = { stable: '/', dev: '/dev/' } as const
 export const THEME_KEY = 'leonardos-die-theme'
 /** Inline tokens for a theme registered at runtime, so it survives a reload. */
 export const THEME_VARS_KEY = 'leonardos-die-theme-vars'
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 export const AUTOSAVE_MS = 10_000
 
 /** Time away is credited up to this, then stops accruing. */
@@ -47,41 +48,70 @@ export const START_INK = 10
 export const PER_TEN_MULT = new Decimal(2)
 
 // -- roll rate, the tickspeed analogue ------------------------------------
-
-// Tuned against a perfect-play simulation: these reach the Wager in about 57
-// simulated minutes, which lands a real first run somewhere near two hours.
-// The curve is deliberately steep at the top. Layer 0 running out of road at
-// 1e308 is the reason the Wager exists.
+//
+// Antimatter Dimensions' exact law, from getTickSpeedMultiplier() in
+// src/core/tickspeed.js. The returned value multiplies the interval, so lower
+// is faster. Under three galaxies it is a hand-picked base minus 0.02 per
+// galaxy; from three it becomes 0.965 to the power of galaxies minus four,
+// times 0.8. The magic numbers are theirs, and their own comment calls them
+// that: they exist to preserve balance from an older version.
 
 /** Seconds between rolls before any upgrade. */
 export const ROLL_INTERVAL_BASE = 1
-/** Each upgrade multiplies the interval by this. Folios push it lower. */
-export const ROLL_POWER_BASE = 0.85
-export const ROLL_POWER_PER_FOLIO = 0.008
-export const ROLL_POWER_FLOOR = 0.6
+
 /** Ink cost of the first roll-rate upgrade, then x10 each. */
 export const ROLL_COST_BASE = new Decimal(1000)
 export const ROLL_COST_MULT = new Decimal(10)
 
-// -- studies, the dimension shift/boost analogue --------------------------
+export function rollIntervalMultiplier(folios: number): number {
+  if (folios < 3) {
+    const base = folios === 0 ? 1 / 1.1245 : folios === 1 ? 1 / 1.11888888 : 1 / 1.11267177
+    return Math.max(0.01, base - folios * 0.02)
+  }
+  return Math.pow(0.965, folios - 4) * 0.8
+}
+
+// -- studies, the dimension shift and boost analogue ----------------------
+//
+// From bulkRequirement() and multiplierToNDTier() in src/core/dimboost.js.
+// AD starts with four of its eight dimensions and its first five boosts each
+// cost a flat 20 of the highest unlocked one; only once the chain is full does
+// the requirement climb, by 15 each. Six solids with three free gives the same
+// shape with the numbers shifted down by one step.
+
+/** Solids on the table before any study. Studies unlock the rest. */
+export const SOLIDS_AT_START = 4
+export const STUDIES_THAT_UNLOCK = SOLID_COUNT - SOLIDS_AT_START
+
+/** The study at which the chain is full and requirements start climbing. */
+const FIRST_CLIMBING_STUDY = STUDIES_THAT_UNLOCK + 1
+const STUDY_CLIMB = 15
+
+/** Which solid the nth study is measured against. n is 1-based. */
+export function studyTier(n: number): number {
+  return Math.min(SOLIDS_AT_START + n - 1, SOLID_COUNT)
+}
+
+/** How many of that solid the nth study costs. */
+export function studyRequirement(n: number): number {
+  if (n < FIRST_CLIMBING_STUDY) return 20
+  return 20 + (n - FIRST_CLIMBING_STUDY) * STUDY_CLIMB
+}
 
 /**
- * You start with three solids on the table and studies unlock the other three,
- * which is the same half-and-half split AD uses across its eight dimensions.
- * Studies past that hand out flat multipliers instead.
+ * A study's multiplier reaches down the chain, not across all of it. With s
+ * studies, solid `tier` gets 2^(s + 1 - tier), never below 1. So the first
+ * study doubles only the tetrahedra, and the deep solids are the last to
+ * benefit. This is AD's multiplierToNDTier exactly.
  */
-export const SOLIDS_AT_START = 3
-export const STUDIES_THAT_UNLOCK = 3
-
-/** How many of your highest solid the nth study costs. n is 1-based. */
-export function studyRequirement(n: number): number {
-  return 20 + 14 * (n - 1)
-}
-/** Multiplier to every solid, per study owned past the unlocking ones. */
-export const STUDY_MULT = new Decimal(2)
+export const STUDY_POWER = 2
 
 // -- folios, the antimatter galaxy analogue -------------------------------
 
+/** From Galaxy.baseCost and Galaxy.costMult in src/core/galaxy.js. */
+export const FOLIO_BASE = 80
+export const FOLIO_COST_MULT = 60
+
 export function folioRequirement(owned: number): number {
-  return 70 + 45 * owned
+  return FOLIO_BASE + FOLIO_COST_MULT * owned
 }
