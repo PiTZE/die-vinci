@@ -14,9 +14,10 @@ import {
   rollRate,
   solidMultiplier,
   studyReq,
+  openSolids,
 } from '../game/production'
 import { format, formatWhole } from '../format'
-import { unlockedSolids, type GameState } from '../state'
+import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey, holdable } from './hold'
 import { wireframe } from './wireframe'
@@ -191,7 +192,8 @@ export function tablePane(): Pane {
 
     update(s: GameState) {
       const n = s.options.notation
-      const open = unlockedSolids(s)
+      // openSolids, not unlockedSolids: a challenge can cut the chain short.
+      const open = openSolids(s)
       const rate = rollRate(s)
       const canMax = canMaxAll(s)
       maxBtn.disabled = !canMax

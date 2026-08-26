@@ -8,6 +8,7 @@ import {
   STUDIES_THAT_UNLOCK,
 } from './game/balance'
 import type { NotationId } from './format'
+import { newAutobuyers, type AutobuyerState } from './game/autobuyers'
 
 export interface SolidState {
   /** Purchases since the last reset. Drives the doubling every ten. */
@@ -38,6 +39,12 @@ export interface GameState {
   wagers: number
   /** Ids of bought Points upgrades. See game/upgrades.ts. */
   pointUpgrades: string[]
+  /** Which challenge is being run, or 0 for none. */
+  challengeRunning: number
+  challengesDone: number[]
+  autobuyers: Record<string, AutobuyerState>
+  /** Milliseconds of production still halted by a challenge restriction. */
+  haltMs: number
   tarot: Record<string, number>
 
   options: {
@@ -70,6 +77,10 @@ export function newGame(now: number): GameState {
     points: new Decimal(0),
     wagers: 0,
     pointUpgrades: [],
+    challengeRunning: 0,
+    challengesDone: [],
+    autobuyers: newAutobuyers(),
+    haltMs: 0,
     tarot: {},
     options: {
       notation: 'mixed',

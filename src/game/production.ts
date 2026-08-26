@@ -23,6 +23,8 @@ import {
   studyTier,
 } from './balance'
 import { unlockedSolids, type GameState } from '../state'
+import { restrictions } from './challenges'
+import { runAutobuyers } from './autobuyers'
 
 /**
  * A study's multiplier reaches down the chain rather than across all of it.
@@ -31,6 +33,7 @@ import { unlockedSolids, type GameState } from '../state'
  * last to benefit. AD's multiplierToNDTier does exactly this.
  */
 export function studyBonus(s: GameState, tier: number): Decimal {
+  if (restrictions(s).noStudyMultiplier) return new Decimal(1)
   return new Decimal(studyPower(s)).pow(Math.max(0, s.studies + 1 - tier))
 }
 
@@ -42,8 +45,12 @@ export function studyBonus(s: GameState, tier: number): Decimal {
  */
 export function solidMultiplier(s: GameState, idx: number): Decimal {
   const st = s.solids[idx - 1]
-  return perTenMultiplier(s)
+  const r = restrictions(s)
+  const perTen = r.perTen === null ? perTenMultiplier(s) : new Decimal(r.perTen)
+  const weaken = idx === 1 && r.weakenFirst > 1 ? new Decimal(r.weakenFirst) : new Decimal(1)
+  return perTen
     .pow(Math.floor(st.bought / 10))
+    .div(weaken)
     .times(studyBonus(s, idx))
     .times(timeMultiplier(s))
     .times(runMultiplier(s))
@@ -65,7 +72,10 @@ export function solidCost(s: GameState, idx: number): Decimal {
  */
 export function buyCount(s: GameState, idx: number): number {
   const toTen = 10 - (s.solids[idx - 1].bought % 10)
-  const afford = s.ink.div(solidCost(s, idx)).floor().toNumber()
+  const r = restrictions(s)
+  const wallet =
+    r.payWithOffset > 0 ? (s.solids[idx - r.payWithOffset - 1]?.amount ?? new Decimal(0)) : s.ink
+  const afford = wallet.div(solidCost(s, idx)).floor().toNumber()
   if (!Number.isFinite(afford)) return toTen
   return Math.max(1, Math.min(toTen, afford))
 }
@@ -74,21 +84,46 @@ export function buyPrice(s: GameState, idx: number): Decimal {
   return solidCost(s, idx).times(buyCount(s, idx))
 }
 
+/** Unlocked, and not cut off by a challenge that shortens the chain. */
+export function openSolids(s: GameState): number {
+  return Math.min(unlockedSolids(s), restrictions(s).cap)
+}
+
 export function canBuySolid(s: GameState, idx: number): boolean {
-  if (idx > unlockedSolids(s)) return false
+  if (idx > openSolids(s)) return false
+  const r = restrictions(s)
+  if (r.payWithOffset > 0) {
+    const from = idx - r.payWithOffset
+    if (from < 1) return false
+    return s.solids[from - 1].amount.gte(buyPrice(s, idx))
+  }
   return s.ink.gte(buyPrice(s, idx))
 }
 
 /** `one` is the shift-click path: a single die at the current tier price. */
 export function buySolid(s: GameState, idx: number, one = false): boolean {
-  if (idx > unlockedSolids(s)) return false
+  if (idx > openSolids(s)) return false
+  const r = restrictions(s)
   const n = one ? 1 : buyCount(s, idx)
   const price = solidCost(s, idx).times(n)
-  if (s.ink.lt(price)) return false
-  s.ink = s.ink.minus(price)
+
+  if (r.payWithOffset > 0) {
+    const from = idx - r.payWithOffset
+    if (from < 1) return false
+    const wallet = s.solids[from - 1]
+    if (wallet.amount.lt(price)) return false
+    wallet.amount = wallet.amount.minus(price)
+  } else {
+    if (s.ink.lt(price)) return false
+    s.ink = s.ink.minus(price)
+  }
+
   const st = s.solids[idx - 1]
   st.bought += n
   st.amount = st.amount.plus(n)
+
+  if (r.eraseLower) for (let i = 0; i < idx - 1; i++) s.solids[i].amount = new Decimal(0)
+  if (r.haltMs > 0) s.haltMs = r.haltMs
   return true
 }
 
@@ -96,6 +131,8 @@ export function buySolid(s: GameState, idx: number, one = false): boolean {
 
 /** Folios push the per-upgrade interval multiplier down, so each one is worth more. */
 export function rollPower(s: GameState): number {
+  const forced = restrictions(s).rollBase
+  if (forced !== null) return forced
   // A folio upgrade makes each one count double, the way AD's galaxyBoost does.
   return rollIntervalMultiplier(s.folios * folioStrength(s))
 }
@@ -114,6 +151,7 @@ export function rollCost(s: GameState): Decimal {
 }
 
 export function canBuyRollRate(s: GameState): boolean {
+  if (restrictions(s).noRollRate) return false
   return s.ink.gte(rollCost(s))
 }
 
@@ -129,8 +167,9 @@ export function buyRollRate(s: GameState): boolean {
 /** Studies and folios are both paid in dice, not ink. */
 export function studyReq(s: GameState): { idx: number; need: Decimal } {
   const n = s.studies + 1
-  const need = Math.max(1, studyRequirement(n) - requirementDiscount(s))
-  return { idx: studyTier(n), need: new Decimal(need) }
+  const r = restrictions(s)
+  const need = Math.max(1, studyRequirement(n) - requirementDiscount(s)) * r.studyCostFactor
+  return { idx: Math.min(studyTier(n), r.cap), need: new Decimal(need) }
 }
 
 export function canBuyStudy(s: GameState): boolean {
@@ -170,11 +209,13 @@ export function buyStudy(s: GameState): boolean {
 }
 
 export function folioReq(s: GameState): { idx: number; need: Decimal } {
-  const need = Math.max(1, folioRequirement(s.folios) - requirementDiscount(s))
-  return { idx: SOLIDS.length, need: new Decimal(need) }
+  const r = restrictions(s)
+  const need = Math.max(1, folioRequirement(s.folios) - requirementDiscount(s)) * r.folioCostFactor
+  return { idx: Math.min(SOLIDS.length, r.cap), need: new Decimal(need) }
 }
 
 export function folioUnlocked(s: GameState): boolean {
+  if (restrictions(s).noFolios) return false
   return unlockedSolids(s) >= SOLIDS.length
 }
 
@@ -223,7 +264,7 @@ export function canMaxAll(s: GameState): boolean {
  * more slowly right after a reset.
  */
 export function maxAll(s: GameState): void {
-  const open = unlockedSolids(s)
+  const open = openSolids(s)
   for (let steps = 0; steps < MAX_ALL_STEPS; steps++) {
     let best: { price: Decimal; buy: () => boolean } | null = null
 
@@ -236,6 +277,14 @@ export function maxAll(s: GameState): void {
 
     if (!best || !best.buy()) return
   }
+}
+
+/** Entering or leaving a challenge clears layer 0, the way the Wager does. */
+export function resetForChallenge(s: GameState): void {
+  s.studies = 0
+  s.folios = 0
+  s.rollUpgrades = 0
+  resetTable(s)
 }
 
 // -- the tick -------------------------------------------------------------
@@ -255,6 +304,20 @@ export function tick(s: GameState, dt: number): void {
   // clock the production does, offline catch-up included.
   s.stats.playMs += dt * 1000
   s.stats.wagerMs += dt * 1000
+
+  // A challenge that halts production after a purchase, recovering over three
+  // minutes, as AD's second challenge does.
+  if (s.haltMs > 0) {
+    s.haltMs = Math.max(0, s.haltMs - dt * 1000)
+    return
+  }
+
+  runAutobuyers(s, dt * 1000, {
+    buySolid: (idx) => buySolid(s, idx),
+    buyRollRate: () => buyRollRate(s),
+    buyStudy: () => buyStudy(s),
+    buyFolio: () => buyFolio(s),
+  })
   const rate = rollRate(s)
   const n = unlockedSolids(s)
   const before = s.solids.map((d) => d.amount)

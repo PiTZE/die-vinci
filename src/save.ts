@@ -73,6 +73,8 @@ function decode(raw: Raw, now: number): GameState {
     stats: { ...base.stats, ...(m.stats ?? {}) },
     tarot: { ...(m.tarot ?? {}) },
     pointUpgrades: Array.isArray(m.pointUpgrades) ? [...m.pointUpgrades] : [],
+    challengesDone: Array.isArray(m.challengesDone) ? [...m.challengesDone] : [],
+    autobuyers: { ...base.autobuyers, ...(m.autobuyers ?? {}) },
   }
   for (const f of DECIMAL_FIELDS) {
     (s as any)[f] = new Decimal(m[f] ?? 0)

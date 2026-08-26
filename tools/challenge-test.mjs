@@ -1,0 +1,96 @@
+// Challenge and autobuyer tests, against the dev server.
+//
+//   npm run test:challenge
+import { spawn } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+const profile = mkdtempSync(join(tmpdir(), 'ld-cl-'))
+const chrome = spawn('google-chrome',['--headless=new','--no-sandbox','--disable-gpu',
+  '--remote-debugging-port=9364',`--user-data-dir=${profile}`,'--window-size=390,844','about:blank'],{stdio:'ignore'})
+const sleep=ms=>new Promise(r=>setTimeout(r,ms))
+let ws,id=0;const pending=new Map()
+for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch('http://127.0.0.1:9364/json')).json();const p=l.find(t=>t.type==='page')
+ if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
+  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
+const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
+const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true})
+  if(r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description); return r.result?.value}
+await send('Emulation.setFocusEmulationEnabled',{enabled:true})
+await send('Page.enable');await send('Runtime.enable')
+const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
+const tab = (name) => `[...document.querySelectorAll('.tab')].find(t => t.textContent === '${name}')`
+
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4000)
+
+check('challenges hidden before the first wager',
+  await ev(`!${tab('CHALLENGES')} || ${tab('CHALLENGES')}.hidden`))
+
+// Reach the threshold and take the Wager.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.ink = new D('1.8e308') })()`)
+await sleep(400)
+await ev(`${tab('WAGER')}.click()`); await sleep(400)
+await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)
+await sleep(500)
+const first = await ev(`({ done: window.LD.state.challengesDone.slice(),
+  auto: window.LD.state.autobuyers.solid1.unlocked })`)
+check('the first wager clears challenge 1', first.done.includes(1), JSON.stringify(first.done))
+check('and unlocks the first solid autobuyer', first.auto === true)
+check('challenges tab now shows', await ev(`${tab('CHALLENGES')} && !${tab('CHALLENGES')}.hidden`))
+check('automation tab now shows', await ev(`${tab('AUTOMATION')} && !${tab('AUTOMATION')}.hidden`))
+
+// Enter challenge 7, which cuts the chain to six solids.
+await ev(`${tab('CHALLENGES')}.click()`); await sleep(400)
+// The first solid's autobuyer is unlocked by now and would buy during the
+// reset, so it is switched off for this check and back on afterwards.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autobuyers.solid1.on = false
+  s.studies = 5; s.solids.forEach(d => { d.bought = 20; d.amount = new D(500) }) })()`)
+await ev(`[...document.querySelectorAll('.challenge')][6].click()`)
+await sleep(500)
+const inC7 = await ev(`({ running: window.LD.state.challengeRunning,
+  studies: window.LD.state.studies, bought: window.LD.state.solids.reduce((a,d)=>a+d.bought,0) })`)
+check('entering a challenge resets layer 0', inC7.running === 7 && inC7.studies === 0 && inC7.bought === 0,
+  JSON.stringify(inC7))
+
+// Entering reset the studies, so the cap only shows once enough are taken to
+// unlock past six.
+await ev(`(() => { const s = window.LD.state; s.autobuyers.solid1.on = true; s.studies = 5 })()`)
+await ev(`${tab('TABLE')}.click()`); await sleep(700)
+const shown = await ev(`[...document.querySelectorAll('.solid')].filter(r => !r.hidden).length`)
+check('challenge 7 cuts the chain to six solids', shown === 6, `${shown} rows shown`)
+
+// Clear it by reaching the threshold inside it.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.ink = new D('1.8e308') })()`)
+await sleep(400)
+await ev(`${tab('WAGER')}.click()`); await sleep(400)
+await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)
+await sleep(500)
+const cleared = await ev(`({ done: window.LD.state.challengesDone.slice(),
+  running: window.LD.state.challengeRunning, auto: window.LD.state.autobuyers.solid7.unlocked })`)
+check('clearing a challenge inside it awards its autobuyer',
+  cleared.done.includes(7) && cleared.running === 0 && cleared.auto === true, JSON.stringify(cleared))
+
+// An unlocked autobuyer has to actually buy.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.ink = new D('1e30'); s.solids.forEach(d => { d.bought = 0; d.amount = new D(0) }) })()`)
+const boughtBefore = await ev(`window.LD.state.solids[0].bought`)
+await sleep(2500)
+const boughtAfter = await ev(`window.LD.state.solids[0].bought`)
+check('an unlocked autobuyer buys on its own', boughtAfter > boughtBefore,
+  `${boughtBefore} -> ${boughtAfter}`)
+
+// And upgrading it costs points and shortens the interval.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.points = new D(50) })()`)
+await ev(`${tab('AUTOMATION')}.click()`); await sleep(500)
+const beforeUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level, points: Number(window.LD.state.points) })`)
+await ev(`[...document.querySelectorAll('.auto-up')].find(b => !b.disabled).click()`)
+await sleep(400)
+const afterUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level, points: Number(window.LD.state.points) })`)
+check('upgrading an autobuyer spends a point and shortens it',
+  afterUp.level === beforeUp.level + 1 && afterUp.points === beforeUp.points - 1,
+  `${JSON.stringify(beforeUp)} -> ${JSON.stringify(afterUp)}`)
+
+ws.close();chrome.kill();await sleep(400);try{rmSync(profile,{recursive:true,force:true})}catch{}
+console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
+process.exit(res.every(Boolean)?0:1)

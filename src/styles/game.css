@@ -429,6 +429,88 @@
   letter-spacing: 0.08em;
 }
 
+/* -- challenges and autobuyers ------------------------------------------- */
+
+.challenge-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.challenge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--border-faint);
+  text-align: left;
+}
+
+.challenge:last-child {
+  border-bottom: 0;
+}
+
+.challenge-title {
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+}
+
+.challenge-note {
+  color: var(--fg-muted);
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
+.challenge-state {
+  color: var(--fg-dim);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+}
+
+.challenge.bought .challenge-state {
+  color: var(--fg);
+}
+
+.auto-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.auto-row:last-child {
+  border-bottom: 0;
+}
+
+.auto-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.74rem;
+}
+
+.auto-every {
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+}
+
+.auto-toggle {
+  flex: 0 0 auto;
+  min-width: 3.4rem;
+  min-height: 34px;
+  font-size: 0.62rem;
+}
+
+.auto-up {
+  flex: 0 0 auto;
+  min-width: 9rem;
+  min-height: 34px;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* -- generic wide action button ------------------------------------------ */
 
 .action {

@@ -20,7 +20,8 @@
     "sim": "esbuild tools/sim.ts --bundle --platform=node --format=esm --define:__CHANNEL__='\"stable\"' --define:__VERSION__='\"sim\"' --define:__BUILD_ID__='\"sim\"' --outfile=node_modules/.cache/sim.mjs --log-level=error && node node_modules/.cache/sim.mjs",
     "test:save": "node tools/save-test.mjs",
     "test:wager": "node tools/wager-test.mjs",
-    "test:backup": "node tools/backup-test.mjs"
+    "test:backup": "node tools/backup-test.mjs",
+    "test:challenge": "node tools/challenge-test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

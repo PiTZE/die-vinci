@@ -19,6 +19,9 @@ import { restoreBackup } from './backup'
 import { devTools } from './dev'
 import { doWager } from './game/wager'
 import { buyUpgrade } from './game/upgrades'
+import { enterChallenge, exitChallenge } from './game/challenges'
+import { toggle as toggleAuto, upgrade as upgradeAuto } from './game/autobuyers'
+import { resetForChallenge } from './game/production'
 import type { UpgradeId } from './game/upgrades'
 import { exportSave, importSave, loadGame, saveGame, wipeSave } from './save'
 import type { GameState } from './state'
@@ -26,6 +29,8 @@ import { Shell, type Actions } from './ui/shell'
 import { tablePane } from './ui/table'
 import { optionsPane } from './ui/options'
 import { wagerPane } from './ui/wager'
+import { challengesPane } from './ui/challenges'
+import { automationPane } from './ui/automation'
 import { applyTheme, currentTheme } from './ui/theme'
 import { registerSW } from 'virtual:pwa-register'
 
@@ -203,6 +208,22 @@ const actions: Actions = {
     buyUpgrade(state, id as UpgradeId)
     persistSoon()
   },
+  enterChallenge: (id) => {
+    enterChallenge(state, id, resetForChallenge)
+    persistSoon()
+  },
+  exitChallenge: () => {
+    exitChallenge(state, resetForChallenge)
+    persistSoon()
+  },
+  toggleAutobuyer: (id) => {
+    toggleAuto(state, id)
+    persistSoon()
+  },
+  upgradeAutobuyer: (id) => {
+    upgradeAuto(state, id)
+    persistSoon()
+  },
   setNotation: (n) => {
     state.options.notation = n
     persistSoon()
@@ -240,7 +261,10 @@ const actions: Actions = {
 }
 
 const shell = new Shell(root, actions)
-shell.build([tablePane(), wagerPane(), optionsPane()], state.options.tab)
+shell.build(
+  [tablePane(), wagerPane(), challengesPane(), automationPane(), optionsPane()],
+  state.options.tab,
+)
 
 /**
  * Advances the game by however much wall-clock time has actually passed.

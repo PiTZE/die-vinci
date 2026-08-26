@@ -12,6 +12,10 @@ export interface Actions {
   buyFolio(): void
   wager(): void
   buyUpgrade(id: string): void
+  enterChallenge(id: number): void
+  exitChallenge(): void
+  toggleAutobuyer(id: string): void
+  upgradeAutobuyer(id: string): void
   setNotation(n: GameState['options']['notation']): void
   setOffline(on: boolean): void
   setOfflineTicks(n: number): void

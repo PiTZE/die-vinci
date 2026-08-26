@@ -12,6 +12,8 @@
 // upgrade grid is priced for that: seven of its eleven cost a single Point.
 import Decimal from 'break_infinity.js'
 import { START_INK, WAGER_AT } from './balance'
+import { unlock } from './autobuyers'
+import { byId } from './challenges'
 import type { GameState } from '../state'
 
 export function canWager(s: GameState): boolean {
@@ -38,6 +40,19 @@ export function doWager(s: GameState): boolean {
 
   s.points = s.points.plus(pointsFromWager())
   s.wagers += 1
+
+  // Reaching the threshold inside a challenge is what clears it, and clearing
+  // it is what unlocks the autobuyer. AD's first challenge is simply reaching
+  // Infinity once, so it clears on the first Wager whether or not it was
+  // entered deliberately.
+  const cleared = s.challengeRunning || 1
+  if (!s.challengesDone.includes(cleared)) {
+    s.challengesDone.push(cleared)
+    const def = byId(cleared)
+    if (def) unlock(s, def.awards)
+  }
+  s.challengeRunning = 0
+  s.haltMs = 0
 
   s.ink = new Decimal(START_INK)
   s.inkThisWager = new Decimal(0)
