@@ -9,9 +9,13 @@
 //   npm run sim -- 24    twenty-four
 import { newGame } from '../src/state'
 import * as P from '../src/game/production'
+import * as W from '../src/game/wager'
+import { UPGRADES, buyUpgrade, canBuy, type UpgradeId } from '../src/game/upgrades'
 import { format } from '../src/format'
 
 const HOURS = Number(process.argv[2] ?? 8)
+/** How many wagers to play out. The point is whether each is faster. */
+const WAGERS = Number(process.env.WAGERS ?? 1)
 /**
  * Above this the run stops resetting and just accumulates. Studies and folios
  * clear the ink, so near the end a reset costs more than its multiplier is
@@ -29,7 +33,10 @@ let nextReport = 300
 const stamp = () =>
   `${String(Math.floor(t / 3600)).padStart(2)}h${String(Math.floor((t % 3600) / 60)).padStart(2, '0')}m`
 
-while (t < HOURS * 3600 && s.ink.lt(WAGER)) {
+let done = 0
+let lastAt = 0
+
+while (t < HOURS * 3600 && done < WAGERS) {
   P.tick(s, DT)
   t += DT
 
@@ -39,18 +46,31 @@ while (t < HOURS * 3600 && s.ink.lt(WAGER)) {
     else if (P.canBuyStudy(s)) P.buyStudy(s)
   }
 
-  if (t >= nextReport) {
-    nextReport += 300
+  if (W.canWager(s)) {
+    W.doWager(s)
+    done += 1
+    // Cheapest first, so a single Point is never sat on.
+    for (let pass = 0; pass < 12; pass++) {
+      const next = (Object.keys(UPGRADES) as UpgradeId[])
+        .filter((id) => canBuy(s, id))
+        .sort((a, b) => UPGRADES[a].cost - UPGRADES[b].cost)[0]
+      if (!next) break
+      buyUpgrade(s, next)
+    }
+    const took = t - lastAt
+    lastAt = t
     console.log(
-      `${stamp()}  ${format(s.ink, 'scientific').padEnd(11)}  ` +
-        `studies=${String(s.studies).padStart(2)} folios=${String(s.folios).padStart(2)} ` +
-        `roll=${String(s.rollUpgrades).padStart(3)} rate=${P.rollRate(s).toExponential(1)}/s`,
+      `wager ${String(done).padStart(2)}  took ${String(Math.floor(took / 60)).padStart(4)}m` +
+        `${String(Math.floor(took % 60)).padStart(2, '0')}s  points=${s.points}` +
+        `  held=${s.pointUpgrades.length}/${Object.keys(UPGRADES).length}`,
     )
+  }
+
+  if (t >= nextReport) {
+    nextReport += 600
   }
 }
 
-console.log(
-  s.ink.gte(WAGER)
-    ? `\nWAGER REACHED at ${stamp()}  folios=${s.folios} studies=${s.studies}`
-    : `\nstalled at ${format(s.ink, 'scientific')} after ${stamp()}  folios=${s.folios} studies=${s.studies}`,
-)
+if (done < WAGERS) {
+  console.log(`\nstalled at ${format(s.ink, 'scientific')} after ${stamp()}`)
+}

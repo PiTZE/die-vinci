@@ -331,6 +331,78 @@
   padding-left: 10px;
 }
 
+/* -- the wager and its points grid --------------------------------------- */
+
+.wager-bar {
+  height: 3px;
+  margin: 0 10px;
+  background: var(--fill);
+}
+
+.wager-bar-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
+
+.upgrade-grid {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+}
+
+.upgrade-col {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.upgrade {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 54px;
+  padding: 6px 4px;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.upgrade-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.upgrade-cost {
+  color: var(--fg-muted);
+  font-size: 0.58rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Held upgrades stay legible rather than greying out like a dead button: they
+   are the reason the run is faster, so they should read as owned, not spent. */
+.upgrade.bought {
+  color: var(--fg);
+  border-color: var(--border-mid);
+  background: var(--fill);
+}
+
+.upgrade.bought .upgrade-cost {
+  color: var(--fg-dim);
+}
+
+/* Not yet reachable, because the one above it is unbought. */
+.upgrade.locked {
+  opacity: 0.35;
+}
+
 /* -- generic wide action button ------------------------------------------ */
 
 .action {

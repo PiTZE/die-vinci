@@ -15,11 +15,15 @@ import {
   tick,
 } from './game/production'
 import { publishAway, simulateAway } from './game/offline'
+import { doWager } from './game/wager'
+import { buyUpgrade } from './game/upgrades'
+import type { UpgradeId } from './game/upgrades'
 import { exportSave, importSave, loadGame, saveGame, wipeSave } from './save'
 import type { GameState } from './state'
 import { Shell, type Actions } from './ui/shell'
 import { tablePane } from './ui/table'
 import { optionsPane } from './ui/options'
+import { wagerPane } from './ui/wager'
 import { applyTheme, currentTheme } from './ui/theme'
 import { registerSW } from 'virtual:pwa-register'
 
@@ -128,6 +132,8 @@ const actions: Actions = {
   buyRollRate: () => void buyRollRate(state),
   buyStudy: () => void buyStudy(state),
   buyFolio: () => void buyFolio(state),
+  wager: () => void doWager(state),
+  buyUpgrade: (id) => void buyUpgrade(state, id as UpgradeId),
   setNotation: (n) => {
     state.options.notation = n
   },
@@ -153,7 +159,7 @@ const actions: Actions = {
 }
 
 const shell = new Shell(root, actions)
-shell.build([tablePane(), optionsPane()], state.options.tab)
+shell.build([tablePane(), wagerPane(), optionsPane()], state.options.tab)
 
 /**
  * Advances the game by however much wall-clock time has actually passed.

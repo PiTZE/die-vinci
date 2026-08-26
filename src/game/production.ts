@@ -3,12 +3,20 @@
 import Decimal from 'break_infinity.js'
 import { SOLIDS } from './solids'
 import {
-  PER_TEN_MULT,
+  folioStrength,
+  pairMultiplier,
+  perTenMultiplier,
+  requirementDiscount,
+  runMultiplier,
+  studyPower,
+  timeMultiplier,
+  unspentMultiplier,
+} from './upgrades'
+import {
   ROLL_COST_BASE,
   ROLL_COST_MULT,
   ROLL_INTERVAL_BASE,
   START_INK,
-  STUDY_POWER,
   folioRequirement,
   rollIntervalMultiplier,
   studyRequirement,
@@ -22,14 +30,25 @@ import { unlockedSolids, type GameState } from '../state'
  * so the first study doubles only the tetrahedra and the deep solids are the
  * last to benefit. AD's multiplierToNDTier does exactly this.
  */
-export function studyBonus(studies: number, tier: number): Decimal {
-  return new Decimal(STUDY_POWER).pow(Math.max(0, studies + 1 - tier))
+export function studyBonus(s: GameState, tier: number): Decimal {
+  return new Decimal(studyPower(s)).pow(Math.max(0, s.studies + 1 - tier))
 }
 
-/** idx is 1-based. Doubles every ten bought, times this tier's study bonus. */
+/**
+ * Every ten bought, this tier's study bonus, and whatever the Points grid adds:
+ * a global multiplier from time played, one from time in this wager, one from
+ * wagers completed for the solids that upgrade covers, and one on the first
+ * solid from points left unspent.
+ */
 export function solidMultiplier(s: GameState, idx: number): Decimal {
   const st = s.solids[idx - 1]
-  return PER_TEN_MULT.pow(Math.floor(st.bought / 10)).times(studyBonus(s.studies, idx))
+  return perTenMultiplier(s)
+    .pow(Math.floor(st.bought / 10))
+    .times(studyBonus(s, idx))
+    .times(timeMultiplier(s))
+    .times(runMultiplier(s))
+    .times(pairMultiplier(s, idx))
+    .times(unspentMultiplier(s, idx))
 }
 
 export function solidCost(s: GameState, idx: number): Decimal {
@@ -77,7 +96,8 @@ export function buySolid(s: GameState, idx: number, one = false): boolean {
 
 /** Folios push the per-upgrade interval multiplier down, so each one is worth more. */
 export function rollPower(s: GameState): number {
-  return rollIntervalMultiplier(s.folios)
+  // A folio upgrade makes each one count double, the way AD's galaxyBoost does.
+  return rollIntervalMultiplier(s.folios * folioStrength(s))
 }
 
 /** Seconds between rolls. */
@@ -109,7 +129,8 @@ export function buyRollRate(s: GameState): boolean {
 /** Studies and folios are both paid in dice, not ink. */
 export function studyReq(s: GameState): { idx: number; need: Decimal } {
   const n = s.studies + 1
-  return { idx: studyTier(n), need: new Decimal(studyRequirement(n)) }
+  const need = Math.max(1, studyRequirement(n) - requirementDiscount(s))
+  return { idx: studyTier(n), need: new Decimal(need) }
 }
 
 export function canBuyStudy(s: GameState): boolean {
@@ -149,7 +170,8 @@ export function buyStudy(s: GameState): boolean {
 }
 
 export function folioReq(s: GameState): { idx: number; need: Decimal } {
-  return { idx: SOLIDS.length, need: new Decimal(folioRequirement(s.folios)) }
+  const need = Math.max(1, folioRequirement(s.folios) - requirementDiscount(s))
+  return { idx: SOLIDS.length, need: new Decimal(need) }
 }
 
 export function folioUnlocked(s: GameState): boolean {
@@ -229,6 +251,10 @@ export function inkPerSecond(s: GameState): Decimal {
  */
 export function tick(s: GameState, dt: number): void {
   if (dt <= 0) return
+  // Two Points upgrades scale with these, so they have to accrue from the same
+  // clock the production does, offline catch-up included.
+  s.stats.playMs += dt * 1000
+  s.stats.wagerMs += dt * 1000
   const rate = rollRate(s)
   const n = unlockedSolids(s)
   const before = s.solids.map((d) => d.amount)

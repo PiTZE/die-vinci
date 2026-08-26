@@ -10,6 +10,8 @@ export interface Actions {
   buyRollRate(): void
   buyStudy(): void
   buyFolio(): void
+  wager(): void
+  buyUpgrade(id: string): void
   setNotation(n: GameState['options']['notation']): void
   setOffline(on: boolean): void
   setOfflineTicks(n: number): void

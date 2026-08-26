@@ -36,6 +36,8 @@ export interface GameState {
   // when the Wager lands.
   points: Decimal
   wagers: number
+  /** Ids of bought Points upgrades. See game/upgrades.ts. */
+  pointUpgrades: string[]
   tarot: Record<string, number>
 
   options: {
@@ -48,6 +50,10 @@ export interface GameState {
   }
   stats: {
     started: number
+    /** Milliseconds of game time, for the upgrade that scales with it. */
+    playMs: number
+    /** Milliseconds since the last Wager, for the upgrade that scales with it. */
+    wagerMs: number
   }
 }
 
@@ -63,6 +69,7 @@ export function newGame(now: number): GameState {
     folios: 0,
     points: new Decimal(0),
     wagers: 0,
+    pointUpgrades: [],
     tarot: {},
     options: {
       notation: 'mixed',
@@ -70,7 +77,7 @@ export function newGame(now: number): GameState {
       offline: true,
       offlineTicks: OFFLINE_TICKS_DEFAULT,
     },
-    stats: { started: now },
+    stats: { started: now, playMs: 0, wagerMs: 0 },
   }
 }
 
