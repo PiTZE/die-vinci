@@ -13,6 +13,9 @@ import {
   unspentMultiplier,
 } from './upgrades'
 import {
+  AUTOMATOR_AT_STUDIES,
+  AUTOMATOR_COST,
+  ROLLS_DRAWN_INDIVIDUALLY,
   ROLL_COST_BASE,
   ROLL_COST_MULT,
   ROLL_INTERVAL_BASE,
@@ -189,6 +192,11 @@ function resetTable(s: GameState): void {
     st.amount = new Decimal(0)
   }
   s.ink = new Decimal(START_INK)
+  // A spin in the air would otherwise land onto the fresh table and pay out
+  // from the solids that were just cleared.
+  s.rollStartedAt = 0
+  s.rollAccum = 0
+  s.faces = s.faces.map(() => 0)
 }
 
 /**
@@ -287,18 +295,158 @@ export function resetForChallenge(s: GameState): void {
   resetTable(s)
 }
 
+// -- the roll ------------------------------------------------------------
+
+/**
+ * What a face is worth, relative to the average face of that die.
+ *
+ * A d4 shows 1 to 4 and the player reads exactly that, but production is
+ * scaled by face divided by 2.5, so the mean is exactly 1 and the balance
+ * curve is the one already tuned. It has the neat property that every die
+ * swings by the same relative amount, about 58%, whether it has four faces or
+ * seventy-two: a uniform roll over 1..N has standard deviation N/sqrt(12)
+ * against a mean of (N+1)/2. A d72 is not a wilder die than a d4, which is
+ * what you want when the deep solids are already worth more by construction.
+ */
+export function faceFactor(face: number, faces: number): number {
+  if (!face) return 1
+  return face / ((faces + 1) / 2)
+}
+
+function rollFace(faces: number): number {
+  return 1 + Math.floor(Math.random() * faces)
+}
+
+/** Seconds one roll takes. The dice spin for exactly this long. */
+export function rollDuration(s: GameState): number {
+  return rollInterval(s)
+}
+
+/** 0 to 1 through the current spin, or 1 when the dice are at rest. */
+export function rollProgress(s: GameState, now: number): number {
+  if (!s.rollStartedAt) return 1
+  const d = rollDuration(s) * 1000
+  if (d <= 0) return 1
+  return Math.min(1, (now - s.rollStartedAt) / d)
+}
+
+export function rolling(s: GameState): boolean {
+  return s.autoRoll || s.rollStartedAt > 0
+}
+
+/** Begins a spin. Refused while one is already in flight, which is the whole
+ *  reason a hand cannot out-roll the roll rate: manual and automatic share one
+ *  ceiling, and the hand is strictly the slower of the two. */
+export function startRoll(s: GameState, now: number): boolean {
+  if (s.autoRoll || s.rollStartedAt > 0 || s.haltMs > 0) return false
+  s.rollStartedAt = now
+  return true
+}
+
+/**
+ * One roll's worth of production, applied to every open solid at once.
+ *
+ * Deltas are computed from the amounts at the start, then applied. Producing
+ * in place would let a solid spend dice it only received in the same roll,
+ * which quietly inflates the whole chain.
+ *
+ * `rolls` above one is the batched path: many rolls in a single frame, where
+ * the faces average to 1 and applying them separately would cost a Decimal
+ * pass each for no visible difference.
+ */
+function produce(s: GameState, rolls: number, factors: number[]): void {
+  const n = unlockedSolids(s)
+  const before = s.solids.map((d) => d.amount)
+
+  const ink = before[0]
+    .times(solidMultiplier(s, 1))
+    .times(factors[0])
+    .times(rolls)
+  s.ink = s.ink.plus(ink)
+  s.inkThisWager = s.inkThisWager.plus(ink)
+
+  for (let i = 2; i <= n; i++) {
+    const made = before[i - 1]
+      .times(solidMultiplier(s, i))
+      .times(factors[i - 1])
+      .times(rolls)
+    s.solids[i - 2].amount = s.solids[i - 2].amount.plus(made)
+  }
+}
+
+/** Rolls every open die, records the faces, and produces from them. */
+function resolveOneRoll(s: GameState): void {
+  const n = unlockedSolids(s)
+  const factors: number[] = []
+  for (let i = 0; i < s.solids.length; i++) {
+    if (i >= n) {
+      s.faces[i] = 0
+      factors.push(1)
+      continue
+    }
+    const face = rollFace(SOLIDS[i].faces)
+    s.faces[i] = face
+    factors.push(faceFactor(face, SOLIDS[i].faces))
+  }
+  produce(s, 1, factors)
+}
+
+/**
+ * Rolls landing faster than they can be read. The faces still change every
+ * frame so the dice look alive, but production uses the mean, which is what a
+ * thousand independent rolls a second converges to anyway.
+ */
+function resolveManyRolls(s: GameState, rolls: number): void {
+  const n = unlockedSolids(s)
+  for (let i = 0; i < s.solids.length; i++) {
+    s.faces[i] = i < n ? rollFace(SOLIDS[i].faces) : 0
+  }
+  produce(s, rolls, s.solids.map(() => 1))
+}
+
+function applyRolls(s: GameState, rolls: number): void {
+  if (rolls <= 0) return
+  if (rolls <= ROLLS_DRAWN_INDIVIDUALLY) {
+    for (let i = 0; i < rolls; i++) resolveOneRoll(s)
+  } else {
+    resolveManyRolls(s, rolls)
+  }
+}
+
+// -- the automator --------------------------------------------------------
+
+export function automatorUnlocked(s: GameState): boolean {
+  return s.autoRoll || s.studies >= AUTOMATOR_AT_STUDIES
+}
+
+export function automatorCost(): Decimal {
+  return AUTOMATOR_COST
+}
+
+export function canBuyAutomator(s: GameState): boolean {
+  return !s.autoRoll && automatorUnlocked(s) && s.ink.gte(AUTOMATOR_COST)
+}
+
+export function buyAutomator(s: GameState): boolean {
+  if (!canBuyAutomator(s)) return false
+  s.ink = s.ink.minus(AUTOMATOR_COST)
+  s.autoRoll = true
+  s.rollStartedAt = 0
+  return true
+}
+
 // -- the tick -------------------------------------------------------------
 
+/**
+ * What the chain pays per second at the current roll rate, if the dice keep
+ * rolling. Before the automator that is a statement about how fast you press,
+ * which is why the roll rate line reads in rolls per second as well.
+ */
 export function inkPerSecond(s: GameState): Decimal {
   return s.solids[0].amount.times(solidMultiplier(s, 1)).times(rollRate(s))
 }
 
-/**
- * Every delta is computed from the amounts at the start of the tick, then
- * applied. Producing in place would let a solid spend dice it only received
- * this same tick, which quietly inflates the whole chain.
- */
-export function tick(s: GameState, dt: number): void {
+export function tick(s: GameState, dt: number, now: number): void {
   if (dt <= 0) return
   // Two Points upgrades scale with these, so they have to accrue from the same
   // clock the production does, offline catch-up included.
@@ -309,6 +457,7 @@ export function tick(s: GameState, dt: number): void {
   // minutes, as AD's second challenge does.
   if (s.haltMs > 0) {
     s.haltMs = Math.max(0, s.haltMs - dt * 1000)
+    s.rollStartedAt = 0
     return
   }
 
@@ -318,16 +467,26 @@ export function tick(s: GameState, dt: number): void {
     buyStudy: () => buyStudy(s),
     buyFolio: () => buyFolio(s),
   })
-  const rate = rollRate(s)
-  const n = unlockedSolids(s)
-  const before = s.solids.map((d) => d.amount)
 
-  const ink = before[0].times(solidMultiplier(s, 1)).times(rate).times(dt)
-  s.ink = s.ink.plus(ink)
-  s.inkThisWager = s.inkThisWager.plus(ink)
+  const interval = rollInterval(s)
 
-  for (let i = 2; i <= n; i++) {
-    const made = before[i - 1].times(solidMultiplier(s, i)).times(rate).times(dt)
-    s.solids[i - 2].amount = s.solids[i - 2].amount.plus(made)
+  // By hand: nothing happens until a spin finishes, and the dice pay out when
+  // they land rather than while they are in the air.
+  if (!s.autoRoll) {
+    s.rollAccum = 0
+    if (s.rollStartedAt && now - s.rollStartedAt >= interval * 1000) {
+      s.rollStartedAt = 0
+      resolveOneRoll(s)
+    }
+    return
   }
+
+  // Automated: rolls land back to back for as long as the elapsed time covers.
+  s.rollStartedAt = 0
+  s.rollAccum += dt
+  if (interval <= 0) return
+  const rolls = Math.floor(s.rollAccum / interval)
+  if (rolls <= 0) return
+  s.rollAccum -= rolls * interval
+  applyRolls(s, rolls)
 }

@@ -47,7 +47,10 @@ export function simulateAway(
   const dt = seconds / ticks
 
   const before = s.ink
-  for (let i = 0; i < ticks; i++) tick(s, dt)
+  // The simulated clock walks forward with the ticks, so a spin left in the
+  // air when the game closed lands at the moment it would have.
+  const startMs = Date.now() - seconds * 1000
+  for (let i = 0; i < ticks; i++) tick(s, dt, startMs + (i + 1) * dt * 1000)
 
   return { seconds, capped, ticks, ink: s.ink.minus(before) }
 }

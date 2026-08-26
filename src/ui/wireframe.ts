@@ -238,8 +238,8 @@ class Wire {
     this.draw()
   }
 
-  step(dt: number): void {
-    this.t += dt * 0.45
+  step(dt: number, rate: number): void {
+    this.t += dt * rate
     this.draw()
   }
 
@@ -307,15 +307,45 @@ const observer =
 
 const byEl = new Map<SVGSVGElement, Wire>()
 
+// A die at rest is a die showing a face. It only turns while a roll is in the
+// air, which is what makes pressing ROLL feel like anything at all: before
+// this the solids span forever and the button changed nothing you could see.
+let spinRate = 0
+let settling = 0
+
+/** 0 stops the dice where they are. 1 is a roll in flight. */
+export function setSpin(on: boolean): void {
+  const want = on ? SPIN_ROLLING : 0
+  if (want === spinRate) return
+  // Coming to rest over a moment rather than in one frame, so a landing reads
+  // as a die slowing down instead of the animation being switched off.
+  if (!on) settling = SETTLE_S
+  spinRate = want
+  if (on) ensureLoop()
+}
+
+const SPIN_ROLLING = 3.2
+const SETTLE_S = 0.22
+
 function frame(now: number): void {
   raf = requestAnimationFrame(frame)
   const dt = Math.min((now - last) / 1000, 0.25)
   last = now
   if (document.hidden) return
+
+  let rate = spinRate
+  if (!rate && settling > 0) {
+    settling = Math.max(0, settling - dt)
+    rate = SPIN_ROLLING * (settling / SETTLE_S)
+  }
+  // Nothing is turning and nothing is coming to rest, so there is nothing to
+  // draw. The loop keeps running because a roll can start on the next frame.
+  if (rate <= 0) return
+
   // No throttle. It was capped at 20fps to save battery and the result was
   // visibly stepped. Offscreen and hidden solids are skipped instead, which is
   // where the real saving is.
-  for (const w of live) if (w.visible) w.step(dt)
+  for (const w of live) if (w.visible) w.step(dt, rate)
 }
 
 function ensureLoop(): void {

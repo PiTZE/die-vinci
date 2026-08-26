@@ -63,6 +63,11 @@ export function doWager(s: GameState): boolean {
     st.bought = 0
     st.amount = new Decimal(0)
   }
+  // The automator survives, the way an Infinity upgrade does. Handing a
+  // finished run back a button to press is not a prestige, it is a demotion.
+  s.rollStartedAt = 0
+  s.rollAccum = 0
+  s.faces = s.faces.map(() => 0)
   s.stats.wagerMs = 0
   return true
 }

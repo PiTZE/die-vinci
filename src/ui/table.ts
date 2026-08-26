@@ -7,7 +7,10 @@ import {
   canBuyRollRate,
   canBuySolid,
   canBuyStudy,
+  canBuyAutomator,
   canMaxAll,
+  automatorCost,
+  automatorUnlocked,
   folioReq,
   folioUnlocked,
   rollCost,
@@ -15,16 +18,19 @@ import {
   solidMultiplier,
   studyReq,
   openSolids,
+  rollProgress,
+  rolling,
 } from '../game/production'
 import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey, holdable } from './hold'
 import { Confirmer } from './confirm'
-import { wireframe } from './wireframe'
+import { setSpin, wireframe } from './wireframe'
 
 interface Row {
   root: HTMLElement
+  face: HTMLElement
   mult: HTMLElement
   step: HTMLElement
   bar: HTMLElement
@@ -54,6 +60,10 @@ export function tablePane(): Pane {
   let folioLabel: HTMLElement
   let folioBtn: HTMLButtonElement
   let folioLine: HTMLElement
+  let rollNow: HTMLButtonElement
+  let rollFill: HTMLElement
+  let autoSection: HTMLElement
+  let autoBtn: HTMLButtonElement
 
   return {
     id: 'table',
@@ -77,6 +87,21 @@ export function tablePane(): Pane {
         if (confirm.request('study')) actions.buyStudy()
       })
 
+      // The whole opening of the game is this button. It sits in the middle of
+      // the bar because it is pressed more than everything else combined, and
+      // it fills as the dice spin so a roll reads as taking time rather than
+      // as a button that sometimes does nothing.
+      rollNow = el('button', 'bar-roll')
+      rollNow.type = 'button'
+      rollNow.title = 'Roll the dice  (space)'
+      rollFill = el('span', 'bar-roll-fill')
+      const rollText = el('span', 'bar-roll-label', 'ROLL')
+      rollNow.append(rollFill, rollText)
+      // Held rather than clicked, so a fast roll rate does not become a test
+      // of how quickly you can tap. It still cannot beat the roll rate: a roll
+      // refuses to start while one is in the air.
+      holdable(rollNow, () => actions.roll())
+
       maxBtn = el('button', 'bar-btn max', 'M')
       maxBtn.type = 'button'
       maxBtn.title = 'Buy the most expensive first, repeatedly  (m)'
@@ -88,7 +113,7 @@ export function tablePane(): Pane {
       actionGroup = el('div', 'action-group')
       const resetGroup = el('div', 'action-side')
       resetGroup.append(barFolio, barStudy)
-      actionGroup.append(resetGroup, maxBtn)
+      actionGroup.append(resetGroup, rollNow, maxBtn)
 
 
       const chain = el('div', 'section table-chain')
@@ -98,7 +123,14 @@ export function tablePane(): Pane {
 
       for (const def of SOLIDS) {
         const r = el('div', 'solid')
-        r.appendChild(wireframe(def.id))
+        // The face sits on the die rather than in its own column: the row is
+        // already seven columns on a 390px screen, and a number printed over
+        // the solid is what a die actually looks like.
+        const die = el('div', 'solid-die')
+        die.appendChild(wireframe(def.id))
+        const face = el('span', 'solid-face', '')
+        die.appendChild(face)
+        r.appendChild(die)
 
         const name = el('div', 'solid-name')
         name.appendChild(el('span', 'solid-name-text', `${def.short} ${def.name.toUpperCase()}`))
@@ -131,7 +163,7 @@ export function tablePane(): Pane {
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, mult, step, bar, barCan, amount, rate: flow, buy, buyLabel })
+        rows.push({ root: r, face, mult, step, bar, barCan, amount, rate: flow, buy, buyLabel })
       }
 
       const roll = el('div', 'section')
@@ -147,6 +179,19 @@ export function tablePane(): Pane {
       const rr = el('div', 'row')
       rr.appendChild(rollBtn)
       roll.appendChild(rr)
+
+      // The first automator. One purchase, never lost, and the moment the game
+      // stops being a button and starts being an idle game.
+      autoSection = el('div', 'section')
+      const ah = el('div', 'section-head')
+      ah.appendChild(el('span', 'grow', 'THE AUTOMATOR'))
+      autoSection.appendChild(ah)
+      autoBtn = el('button', 'action', '')
+      autoBtn.type = 'button'
+      autoBtn.addEventListener('click', () => actions.buyAutomator())
+      const ar = el('div', 'row')
+      ar.appendChild(autoBtn)
+      autoSection.appendChild(ar)
 
       // Folio and study share one section, folio on the left because it is
       // the deeper reset. Before folios are unlocked, study has it to itself.
@@ -188,13 +233,14 @@ export function tablePane(): Pane {
       // Roll rate multiplies the whole chain, so it sits above the chain
       // rather than beside it.
       const controls = el('div', 'table-controls')
-      controls.append(resets)
+      controls.append(autoSection, resets)
       grid.append(chain, controls)
       root.append(roll, grid)
 
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.
       bindKey('m', () => actions.maxAll())
+      bindKey('space', () => actions.roll())
       bindKey('r', () => actions.buyRollRate())
       bindKey('s', () => {
         if (confirm.request('study')) actions.buyStudy()
@@ -216,6 +262,23 @@ export function tablePane(): Pane {
       // openSolids, not unlockedSolids: a challenge can cut the chain short.
       const open = openSolids(s)
       const rate = rollRate(s)
+      const now = Date.now()
+
+      // The dice only turn while a roll is in the air. Under the automator
+      // that is always, which is exactly the difference the purchase buys.
+      const spinning = rolling(s) && s.haltMs <= 0
+      setSpin(spinning)
+
+      // Once the automator is in, the button has nothing left to do: it can
+      // never beat the roll rate, and the bar is better off giving the space
+      // back to MAX.
+      rollNow.hidden = s.autoRoll
+      if (!s.autoRoll) {
+        const p = rollProgress(s, now)
+        const pct = `${Math.round(p * 100)}%`
+        if (rollFill.style.width !== pct) rollFill.style.width = pct
+        rollNow.classList.toggle('buyable', !s.rollStartedAt && s.haltMs <= 0)
+      }
       const canMax = canMaxAll(s)
       maxBtn.disabled = !canMax
       maxBtn.classList.toggle('buyable', canMax)
@@ -243,6 +306,9 @@ export function tablePane(): Pane {
         if (r.barCan.style.left !== pct) r.barCan.style.left = pct
         if (r.barCan.style.width !== canPct) r.barCan.style.width = canPct
         setText(r.amount, formatWhole(st.amount, n))
+        // Blank until this die has actually landed on something, so a fresh
+        // table does not claim every solid rolled a one.
+        setText(r.face, s.faces[def.idx - 1] ? String(s.faces[def.idx - 1]) : '')
 
         const per = st.amount.times(mult).times(rate)
         const unit = def.idx === 1 ? 'ink' : SOLIDS[def.idx - 2].short
@@ -262,6 +328,21 @@ export function tablePane(): Pane {
       const canRoll = canBuyRollRate(s)
       rollBtn.disabled = !canRoll
       rollBtn.classList.toggle('buyable', canRoll)
+
+      const showAuto = automatorUnlocked(s)
+      autoSection.hidden = !showAuto
+      if (showAuto) {
+        if (s.autoRoll) {
+          setText(autoBtn, 'ROLLING ON ITS OWN')
+          autoBtn.disabled = true
+          autoBtn.classList.remove('buyable')
+        } else {
+          setText(autoBtn, `AUTOMATE THE ROLL / ${format(automatorCost(), n)} INK`)
+          const canAuto = canBuyAutomator(s)
+          autoBtn.disabled = !canAuto
+          autoBtn.classList.toggle('buyable', canAuto)
+        }
+      }
 
       confirmSettings = s.options.confirms
       const studyArmed = confirm.isArmed('study')

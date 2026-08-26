@@ -24,7 +24,8 @@
     "test:challenge": "node tools/challenge-test.mjs",
     "test:confirm": "node tools/confirm-test.mjs",
     "test:layout": "node tools/layout-test.mjs",
-    "test:durability": "node tools/durability-test.mjs"
+    "test:durability": "node tools/durability-test.mjs",
+    "test:roll": "node tools/roll-test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

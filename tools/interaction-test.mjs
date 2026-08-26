@@ -108,8 +108,9 @@ try {
 
   // Exactly 10000 ink. Roll rate is 1000, ten d4 is 100, ten d6 is 1000, and
   // one d8 is 10000. Only the d8 should be bought, and it should spend the lot.
+  // Two studies, so the d8 is on the table at all: the game opens with one die.
   await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal;
-    s.ink = new D(10000); s.rollUpgrades = 0;
+    s.studies = 2; s.ink = new D(10000); s.rollUpgrades = 0;
     s.solids.forEach(d => { d.bought = 0; d.amount = new D(0) }) })()`)
   await key('m', 'rawKeyDown'); await sleep(80); await key('m', 'keyUp')
   const picked = await evaluate(`({ d4: window.LD.state.solids[0].bought,

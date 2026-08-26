@@ -146,11 +146,36 @@
   border-bottom: 0;
 }
 
-.solid-icon {
+/* The wireframe with its landed face printed over it. */
+.solid-die {
   grid-area: icon;
+  position: relative;
+  width: 38px;
+  height: 38px;
+}
+
+.solid-icon {
   width: 38px;
   height: 38px;
   color: var(--fg-dim);
+}
+
+/* Centred on the solid, and readable against the wireframe behind it. The
+   shadow is the background colour rather than a blur, so it stays a crisp
+   number in both themes instead of a smudge. */
+.solid-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  text-shadow:
+    0 0 3px var(--bg),
+    0 0 3px var(--bg),
+    0 0 3px var(--bg);
+  pointer-events: none;
 }
 
 .solid-name {
@@ -299,6 +324,41 @@
 .action-side {
   display: flex;
   gap: 8px;
+}
+
+/* ROLL is the whole early game, so it takes the middle and every pixel the
+   other three do not want. */
+.bar-roll {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The spin, drawn as a fill crossing the button, so a roll reads as taking
+   time. At a fast roll rate it is a flicker, which is the honest picture of
+   what is happening and the argument for buying the automator. */
+.bar-roll-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--fill-strong);
+  pointer-events: none;
+}
+
+.bar-roll-label {
+  position: relative;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+}
+
+.bar-roll:hover:not(:disabled) {
+  background: var(--fill);
+  text-shadow: 0 0 6px var(--glow);
 }
 
 /* Antimatter Dimensions makes Max All an ordinary button, 2.5rem tall against
@@ -530,14 +590,28 @@
 
 /* -- Vinci's Thoughts, the ticker ---------------------------------------- */
 
+/* The line crawls across this, so it clips and never wraps. The height is
+   fixed rather than derived from the text: a line entering from the right
+   would otherwise resize the bar on every change of length. */
 .thought {
-  padding: 5px var(--gap);
+  position: relative;
+  overflow: hidden;
+  padding: 6px 0;
   border-bottom: 1px solid var(--border-faint);
   color: var(--fg-muted);
-  font-size: 0.6rem;
+  font-size: 0.78rem;
   line-height: 1.4;
   letter-spacing: 0.02em;
-  min-height: 1.9em;
+  height: 2.1em;
+  white-space: nowrap;
+}
+
+.thought-line {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  white-space: nowrap;
+  will-change: transform;
 }
 
 /* -- the Conquestion Archive --------------------------------------------- */
@@ -577,6 +651,33 @@
 }
 
 /* -- help ---------------------------------------------------------------- */
+
+/* The whole header is the toggle, so the tap target is the full row rather
+   than a plus sign. It has to be re-flattened because it is a button now. */
+.help-head {
+  width: 100%;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--border-faint);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.help-head[aria-expanded='false'] {
+  border-bottom: 0;
+}
+
+.help-head:hover {
+  background: var(--fill);
+}
+
+.help-mark {
+  flex: 0 0 auto;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
 
 .help-text {
   margin: 0;
@@ -661,7 +762,9 @@
   .thought {
     grid-column: 1 / -1;
     grid-row: 2;
-    padding-left: calc(var(--nav-w) + var(--gap) * 1.4);
+    /* The line is absolutely positioned inside, so the clear for the nav has
+       to be a margin on the clip box, not padding inside it. */
+    margin-left: calc(var(--nav-w) + var(--gap) * 1.4);
   }
 
   .bar {

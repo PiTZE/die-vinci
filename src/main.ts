@@ -7,8 +7,10 @@ import Decimal from 'break_infinity.js'
 import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, START_INK, TICK_MS } from './game/balance'
 import {
   buyFolio,
+  buyAutomator,
   buyRollRate,
   buySolid,
+  startRoll,
   buyStudy,
   inkPerSecond,
   maxAll,
@@ -185,6 +187,15 @@ const actions: Actions = {
     buySolid(state, idx, one)
     persistSoon()
   },
+  roll: () => {
+    // No persistSoon: a spin starting is not worth a write, and the roll it
+    // resolves into will trigger one through the autosave anyway.
+    startRoll(state, Date.now())
+  },
+  buyAutomator: () => {
+    buyAutomator(state)
+    persistSoon()
+  },
   buyRollRate: () => {
     buyRollRate(state)
     persistSoon()
@@ -223,6 +234,10 @@ const actions: Actions = {
   },
   setNotation: (n) => {
     state.options.notation = n
+    persistSoon()
+  },
+  setThoughtSpeed: (px) => {
+    state.options.thoughtSpeed = px
     persistSoon()
   },
   setOffline: (on) => {
@@ -303,7 +318,7 @@ function advance(now: number): void {
   if (!Number.isFinite(elapsed) || elapsed <= 0) return
 
   if (elapsed <= CATCHUP_AFTER_S) {
-    tick(state, elapsed)
+    tick(state, elapsed, now)
     return
   }
 
@@ -312,7 +327,9 @@ function advance(now: number): void {
   if (!state.options.offline) return
 
   const summary = simulateAway(state, elapsed, state.options.offlineTicks)
-  if (summary && summary.seconds >= AWAY_NOTICE_S) publishAway(summary)
+  // Nothing is produced away from the game until the automator exists, so
+  // there is nothing to announce either.
+  if (summary && summary.seconds >= AWAY_NOTICE_S && summary.ink.gt(0)) publishAway(summary)
 }
 
 advance(Date.now())
@@ -421,6 +438,9 @@ const hook: Record<string, unknown> = {
     return state
   },
   Decimal,
+  // The same entry points the buttons use. Nothing here skips a cost check,
+  // so it is safe on stable; the cheats below are not and stay dev only.
+  actions,
   channel: __CHANNEL__,
   version: __VERSION__,
   buildId: __BUILD_ID__,

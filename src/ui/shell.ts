@@ -10,6 +10,9 @@ export interface Actions {
   maxAll(): void
   buySolid(idx: number, one?: boolean): void
   buyRollRate(): void
+  /** Start a spin by hand. Refused while one is already in the air. */
+  roll(): void
+  buyAutomator(): void
   buyStudy(): void
   buyFolio(): void
   wager(): void
@@ -19,6 +22,8 @@ export interface Actions {
   toggleAutobuyer(id: string): void
   upgradeAutobuyer(id: string): void
   setNotation(n: GameState['options']['notation']): void
+  /** Pixels a second for the thoughts ticker. 0 holds each line still. */
+  setThoughtSpeed(px: number): void
   setOffline(on: boolean): void
   setOfflineTicks(n: number): void
   setConfirm(key: string, on: boolean): void
@@ -89,7 +94,14 @@ export class Shell {
   private actionInner = el('div', 'action-bar-inner')
   private toastEl = el('div', 'toast')
   private thoughtEl = el('div', 'thought')
+  private thoughtLine = el('span', 'thought-line')
   private thoughtAt = 0
+  /** Left edge of the line, in pixels from the left of the ticker. */
+  private thoughtX = 0
+  /** Cached on each new line, because reading offsetWidth every frame forces
+   *  a layout and this runs inside the render loop. */
+  private thoughtW = 0
+  private thoughtFrame = 0
   private seenTabs = new Set<TabId>()
   private announced = false
   private toastTimer = 0
@@ -146,6 +158,7 @@ export class Shell {
     this.root.appendChild(this.toastEl)
     this.root.append(bar)
     this.thoughtEl.setAttribute('aria-live', 'off')
+    this.thoughtEl.appendChild(this.thoughtLine)
     this.root.appendChild(this.thoughtEl)
     for (const pane of this.paneEls.values()) this.root.appendChild(pane)
     this.root.append(this.actionBar, tabs)
@@ -178,14 +191,52 @@ export class Shell {
     this.toastTimer = window.setTimeout(() => this.toastEl.classList.remove('show'), 5000)
   }
 
-  update(s: GameState, inkRate: Decimal): void {
-    // Vinci's Thoughts. A new line every twenty seconds, chosen from the ones
-    // that apply to the save as it stands.
-    const now = Date.now()
-    if (now - this.thoughtAt > 20_000) {
-      this.thoughtAt = now
-      this.thoughtEl.textContent = pickThought(s, this.thoughtEl.textContent ?? '')
+  /**
+   * Vinci's Thoughts, crawling right to left the way Antimatter Dimensions'
+   * ticker does. Each line enters at the right edge, leaves at the left, and
+   * the next one is picked as it goes: no gap, no jump, nothing repeated back
+   * to back. At zero speed it holds still and rotates every twenty seconds,
+   * which is what it did before and what someone who finds a moving line
+   * distracting will want.
+   */
+  private nextThought(s: GameState): void {
+    this.thoughtLine.textContent = pickThought(s, this.thoughtLine.textContent ?? '')
+    this.thoughtW = this.thoughtLine.offsetWidth
+  }
+
+  private thoughts(s: GameState, now: number): void {
+    const speed = s.options.thoughtSpeed
+    if (!this.thoughtLine.textContent) {
+      this.nextThought(s)
+      this.thoughtX = this.thoughtEl.clientWidth
     }
+
+    if (speed <= 0) {
+      this.thoughtFrame = 0
+      if (this.thoughtLine.style.transform) this.thoughtLine.style.transform = ''
+      if (now - this.thoughtAt > 20_000) {
+        this.thoughtAt = now
+        this.nextThought(s)
+      }
+      return
+    }
+
+    // A backgrounded tab hands back a gap of minutes on its first frame. The
+    // clamp keeps the line from teleporting across the bar on the way back.
+    const dt = this.thoughtFrame ? Math.min((now - this.thoughtFrame) / 1000, 0.25) : 0
+    this.thoughtFrame = now
+    this.thoughtX -= speed * dt
+    if (this.thoughtX < -this.thoughtW) {
+      this.nextThought(s)
+      this.thoughtX = this.thoughtEl.clientWidth
+      this.thoughtAt = now
+    }
+    this.thoughtLine.style.transform = `translateX(${Math.round(this.thoughtX)}px)`
+  }
+
+  update(s: GameState, inkRate: Decimal): void {
+    const now = Date.now()
+    this.thoughts(s, now)
 
     for (const id of checkAchievements(s)) {
       const a = achievementById(id)

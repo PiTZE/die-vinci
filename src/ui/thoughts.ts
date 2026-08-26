@@ -7,6 +7,22 @@ import { format } from '../format'
 import type { GameState } from '../state'
 import { SOLIDS } from '../game/solids'
 
+/**
+ * How fast the line crawls, in pixels a second. Antimatter Dimensions scrolls
+ * its ticker at a fixed rate and gives you an on/off switch; the rate it picks
+ * is too slow to read comfortably on a phone, where the line is a third the
+ * width, so this is a setting instead. Off keeps the old behaviour: one line
+ * held still, replaced every twenty seconds.
+ */
+export const THOUGHT_SPEEDS = [
+  { id: 0, label: 'STILL' },
+  { id: 40, label: 'SLOW' },
+  { id: 75, label: 'NORMAL' },
+  { id: 140, label: 'FAST' },
+] as const
+
+export const THOUGHT_SPEED_DEFAULT = 75
+
 type Line = string | ((s: GameState) => string | null)
 
 const LINES: Line[] = [

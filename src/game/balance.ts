@@ -15,7 +15,7 @@ export const CHANNEL_PATHS = { stable: '/', dev: '/dev/' } as const
 export const THEME_KEY = 'leonardos-die-theme'
 /** Inline tokens for a theme registered at runtime, so it survives a reload. */
 export const THEME_VARS_KEY = 'leonardos-die-theme-vars'
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 export const AUTOSAVE_MS = 10_000
 
 /** Time away is credited up to this, then stops accruing. */
@@ -60,6 +60,21 @@ export const PER_TEN_MULT = new Decimal(2)
 export const ROLL_INTERVAL_BASE = 1
 
 /** Ink cost of the first roll-rate upgrade, then x10 each. */
+/**
+ * The first automator, which takes the roll off your finger. Priced so it is
+ * the thing the opening is for: reachable a few minutes after the second
+ * study, and worth every ink, because past a few rolls a second no hand can
+ * keep up with the roll rate anyway.
+ */
+export const AUTOMATOR_AT_STUDIES = 2
+export const AUTOMATOR_COST = new Decimal(1e5)
+
+/** A roll resolved by hand or by the automator is the same roll. Below this
+ *  many in one frame the faces are drawn individually; above it they average
+ *  out to 1 and are applied in one step, because nobody can read a thousand
+ *  dice a second and the mean is exact in the limit. */
+export const ROLLS_DRAWN_INDIVIDUALLY = 12
+
 export const ROLL_COST_BASE = new Decimal(1000)
 export const ROLL_COST_MULT = new Decimal(10)
 
@@ -80,7 +95,7 @@ export function rollIntervalMultiplier(folios: number): number {
 // shape with the numbers shifted down by one step.
 
 /** Solids on the table before any study. Studies unlock the rest. */
-export const SOLIDS_AT_START = 4
+export const SOLIDS_AT_START = 1
 export const STUDIES_THAT_UNLOCK = SOLID_COUNT - SOLIDS_AT_START
 
 /** The study at which the chain is full and requirements start climbing. */

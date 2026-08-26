@@ -1,6 +1,6 @@
 import Decimal from 'break_infinity.js'
 import { rollBackups, writeBackup } from './backup'
-import { SAVE_KEY, SAVE_VERSION } from './game/balance'
+import { AUTOMATOR_AT_STUDIES, SAVE_KEY, SAVE_VERSION } from './game/balance'
 
 // Three save slots, as Antimatter Dimensions has. Each is its own key, and the
 // chosen one is remembered separately. A save written before slots existed is
@@ -66,6 +66,23 @@ const MIGRATIONS: Record<number, (r: Raw) => Raw> = {
   // player a pile of d9 they never bought, so layer 0 starts again. Options,
   // and everything above layer 0, are kept.
   // 2 -> 3: same reasoning, the chain changed again.
+  // 3 -> 4: rolling became a thing you do rather than a timer, and the table
+  // now opens with one solid instead of four, so a study unlocks a different
+  // tier than it used to. Layer 0 starts again for the same reason it did
+  // twice before. Anyone already past the point where the automator appears
+  // keeps it, because dropping a finished run back onto a button to press is
+  // not an introduction, it is a punishment.
+  3: (r) => ({
+    ...r,
+    solids: [],
+    studies: 0,
+    folios: 0,
+    rollUpgrades: 0,
+    ink: '10',
+    inkThisWager: '0',
+    autoRoll:
+      (Number(r.studies) || 0) >= AUTOMATOR_AT_STUDIES || (Number(r.wagers) || 0) > 0,
+  }),
   2: (r) => ({
     ...r,
     solids: [],

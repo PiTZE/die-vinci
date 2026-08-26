@@ -10,6 +10,7 @@ import {
 import type { NotationId } from './format'
 import { newAutobuyers, type AutobuyerState } from './game/autobuyers'
 import { defaultConfirms } from './ui/confirm'
+import { THOUGHT_SPEED_DEFAULT } from './ui/thoughts'
 
 export interface SolidState {
   /** Purchases since the last reset. Drives the doubling every ten. */
@@ -38,6 +39,14 @@ export interface GameState {
   inkThisWager: Decimal
 
   solids: SolidState[]
+  /** The last face each solid landed on, 0 before the first roll. */
+  faces: number[]
+  /** ms epoch the current spin began, or 0 when the dice are at rest. */
+  rollStartedAt: number
+  /** Seconds of elapsed time not yet spent on a roll. */
+  rollAccum: number
+  /** The first automator. Once bought it is never lost, not even to a Wager. */
+  autoRoll: boolean
   rollUpgrades: number
   studies: number
   folios: number
@@ -61,6 +70,8 @@ export interface GameState {
   options: {
     notation: NotationId
     tab: TabId
+    /** Pixels a second the thoughts ticker crawls. 0 holds each line still. */
+    thoughtSpeed: number
     /** Whether time away from the game is credited at all. */
     offline: boolean
     /** How many ticks a long absence is simulated in. */
@@ -84,6 +95,10 @@ export function newGame(now: number): GameState {
     ink: new Decimal(START_INK),
     inkThisWager: new Decimal(0),
     solids: SOLIDS.map(() => ({ bought: 0, amount: new Decimal(0) })),
+    faces: SOLIDS.map(() => 0),
+    rollStartedAt: 0,
+    rollAccum: 0,
+    autoRoll: false,
     rollUpgrades: 0,
     studies: 0,
     folios: 0,
@@ -99,6 +114,7 @@ export function newGame(now: number): GameState {
     options: {
       notation: 'mixed',
       tab: 'table',
+      thoughtSpeed: THOUGHT_SPEED_DEFAULT,
       offline: true,
       offlineTicks: OFFLINE_TICKS_DEFAULT,
       confirms: defaultConfirms(),

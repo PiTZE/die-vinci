@@ -46,6 +46,13 @@ if (vis !== 'visible') {
   console.log(`SKIP  page is ${vis} in this browser, so rendering is correctly paused`)
   ws.close(); chrome.kill(); process.exit(0)
 }
+// Nothing produces by hand, so this needs the automator on and a chain to run.
+// The subject here is the render loop surviving a freeze, not the game economy.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = true; s.studies = 2
+  s.solids.forEach((d, i) => { if (i < 3) { d.bought = 10; d.amount = new D(100) } }) })()`)
+await sleep(400)
+
 const a1 = await ev(shown); await sleep(1200); const a2 = await ev(shown)
 check('display updates before freezing', a1 !== a2, `${a1} -> ${a2}`)
 

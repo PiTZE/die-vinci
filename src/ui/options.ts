@@ -5,6 +5,7 @@ import { applyTheme, currentTheme, themes } from './theme'
 import { installState, manualHint, onInstallChange, promptInstall } from '../install'
 import { CHANNEL_PATHS, OFFLINE_TICK_CHOICES } from '../game/balance'
 import { listBackups } from '../backup'
+import { THOUGHT_SPEEDS } from './thoughts'
 import {
   askForNotifications,
   askForPersistence,
@@ -22,6 +23,7 @@ import { formatTime } from '../format'
 
 export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
+  let thoughtBtns: { id: number; btn: HTMLButtonElement }[] = []
   let themeBtns: { id: string; btn: HTMLButtonElement }[] = []
   let confirmBtns: { key: string; btn: HTMLButtonElement }[] = []
   let currentConfirms: Record<string, boolean> = {}
@@ -65,6 +67,22 @@ export function optionsPane(): Pane {
         nRow.appendChild(b)
       }
       notation.appendChild(nRow)
+
+      // How fast Vinci's Thoughts crawls past. Still is the old behaviour,
+      // one line held for twenty seconds.
+      const thoughts = el('div', 'section')
+      const tickerHead = el('div', 'section-head')
+      tickerHead.appendChild(el('span', 'grow', "VINCI'S THOUGHTS"))
+      thoughts.appendChild(tickerHead)
+      const tRow = el('div', 'row')
+      for (const t of THOUGHT_SPEEDS) {
+        const b = el('button', 'action', t.label)
+        b.type = 'button'
+        b.addEventListener('click', () => actions.setThoughtSpeed(t.id))
+        thoughtBtns.push({ id: t.id, btn: b })
+        tRow.appendChild(b)
+      }
+      thoughts.appendChild(tRow)
 
       const save = el('div', 'section')
       const sh = el('div', 'section-head')
@@ -394,6 +412,7 @@ export function optionsPane(): Pane {
       root.append(
         theme,
         notation,
+        thoughts,
         install,
         offline,
         confirmSec,
@@ -416,6 +435,9 @@ export function optionsPane(): Pane {
     },
 
     update(s: GameState) {
+      for (const t of thoughtBtns) {
+        t.btn.classList.toggle('buyable', t.id === s.options.thoughtSpeed)
+      }
       for (const n of notationBtns) {
         n.btn.classList.toggle('buyable', n.id === s.options.notation)
       }
