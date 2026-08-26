@@ -212,7 +212,8 @@ check('and the wireframe stays at full strength',
 await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.rollUpgrades = 60 })()`)
 await sleep(500)
 const blur = await ev(`({ face: document.querySelector('.solid-face').textContent })`)
-check('an unreadable roll rate drops the numbers', blur.face === '', JSON.stringify(blur))
+check('an unreadable roll rate shows the average instead of blanking',
+  blur.face === '2.5', JSON.stringify(blur))
 
 // A row you own none of sits the throw out: no face, and its wireframe does
 // not move while the ones with dice on them do.
@@ -271,6 +272,29 @@ const bed = await ev(`(async () => {
   return b.duration.toFixed(2) + 's ' + b.numberOfChannels + 'ch'
 })()`)
 check('the shake loop is there and decodes', /^1\.[0-9]+s 1ch$/.test(bed), bed)
+
+// A fair die is the b = 0 case of a loaded one, so the maths for the upgrade
+// that is coming has to already hold at both ends and in between.
+const loaded = await ev(`(() => {
+  const p = window.LD
+  const out = {}
+  for (const b of [0, 0.5, 0.9, 1]) {
+    const n = 4
+    let sum = 0
+    for (let i = 0; i < 40000; i++) sum += p.rollFace(n, b)
+    out[b] = { sampled: sum / 40000, predicted: p.meanFace(n, b) }
+  }
+  return out
+})()`)
+const near = (a, b) => Math.abs(a - b) < 0.06
+check('a fair d4 averages 2.5', near(loaded['0'].sampled, 2.5) && near(loaded['0'].predicted, 2.5),
+  JSON.stringify(loaded['0']))
+check('a loaded one skews up and the prediction follows',
+  loaded['0.5'].sampled > 2.9 && near(loaded['0.5'].sampled, loaded['0.5'].predicted) &&
+  loaded['0.9'].sampled > loaded['0.5'].sampled,
+  JSON.stringify({ half: loaded['0.5'], mostly: loaded['0.9'] }))
+check('fully loaded always rolls the maximum',
+  loaded['1'].sampled === 4 && loaded['1'].predicted === 4, JSON.stringify(loaded['1']))
 
 // The threshold stops everything and takes over the bar.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal

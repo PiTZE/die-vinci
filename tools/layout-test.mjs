@@ -75,6 +75,31 @@ await ev(`document.documentElement.style.removeProperty('--app-h')`)
 await sleep(300)
 const noVar = await ev(probe)
 check('and with the measured height removed entirely', fits(noVar), `app ${noVar.appH} of ${noVar.vvh}`)
+// The desktop row grew a column for the face and the override did not, so the
+// number was auto-placed at the end of the row, six pixels wide, under the buy
+// button. Cheap to assert, and invisible in a screenshot at a glance.
+await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false})
+await sleep(600)
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 4; s.autoRoll = true
+  s.solids.forEach((d,i) => { if (i < 4) { d.bought = 12; d.amount = new D(500) } }) })()`)
+await sleep(1400)
+const wide = await ev(`(() => {
+  const row = document.querySelector('.solid')
+  const f = row.querySelector('.solid-face').getBoundingClientRect()
+  const i = row.querySelector('.solid-icon').getBoundingClientRect()
+  const pane = document.querySelector('.pane:not([hidden])').getBoundingClientRect()
+  const inner = document.querySelector('.pane:not([hidden]) .pane-inner').getBoundingClientRect()
+  const act = document.querySelector('.action-bar').getBoundingClientRect()
+  return { faceRight: Math.round(f.right), iconLeft: Math.round(i.left),
+    fill: Math.round((inner.height / pane.height) * 100),
+    actionH: Math.round(act.height), deadBelow: Math.round(innerHeight - act.bottom) }
+})()`)
+check('the face stays left of the solid on a desktop row',
+  wide.faceRight <= wide.iconLeft, JSON.stringify(wide))
+check('the pane fills the window rather than leaving a band under it',
+  wide.fill > 85 && wide.actionH < 110 && wide.deadBelow <= 2, JSON.stringify(wide))
+
 ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

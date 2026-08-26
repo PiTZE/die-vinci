@@ -604,8 +604,10 @@
   overflow: hidden;
   padding: 6px 0;
   border-bottom: 1px solid var(--border-faint);
-  color: var(--fg-muted);
-  font-size: 0.78rem;
+  /* Pure white on black, pure black on white. It was --fg-muted, which is
+     #aaa, and a moving line at low contrast is one you give up on. */
+  color: var(--fg);
+  font-size: 0.85rem;
   line-height: 1.4;
   letter-spacing: 0.02em;
   height: 2.1em;
@@ -760,17 +762,24 @@
 @media (min-width: 820px) {
   .app {
     grid-template-columns: var(--nav-w) minmax(0, 1fr);
-    /* A trailing filler row takes the slack, so the action bar follows the
-       content instead of being flung to the bottom of a tall window. */
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+    /* The pane takes the slack and the action bar sits under it, as it does on
+       a phone. A trailing filler row used to take it instead, which handed the
+       action bar a 184px band to hold one row of 44px buttons and left the
+       pane 490px of a 757px window. */
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
   }
 
   .thought {
     grid-column: 1 / -1;
     grid-row: 2;
-    /* The line is absolutely positioned inside, so the clear for the nav has
-       to be a margin on the clip box, not padding inside it. */
-    margin-left: calc(var(--nav-w) + var(--gap) * 1.4);
+    /* Up against the nav and out to the window edge. The line is absolutely
+       positioned inside, so clearing the nav has to be a margin on the clip
+       box, not padding inside it, or the text vanishes before it gets there.
+       Deliberately not held to the content column: a line of prose crawling
+       past has nothing to line up with, and the wider the run the longer you
+       have to read it. */
+    margin-left: var(--nav-w);
+    font-size: 0.95rem;
   }
 
   .bar {
@@ -811,9 +820,12 @@
   .pane {
     grid-column: 2;
     grid-row: 3;
-    padding: var(--gap) calc(var(--gap) * 1.4);
-    /* Sized to its content, and only scrolls once it runs out of window. */
-    max-height: calc(100dvh - var(--bar-h) - 74px);
+    /* Even on all four sides. It was 14 top and bottom against 20 left and
+       right, which is a frame that does not look like one. */
+    padding: calc(var(--gap) * 1.4);
+    /* The grid row sizes it now, so it fills the window and scrolls only when
+       the content is genuinely taller. */
+    min-height: 0;
   }
 
   .toast {
@@ -823,6 +835,7 @@
   .action-bar {
     grid-column: 2;
     grid-row: 4;
+    align-self: end;
     padding: 0 calc(var(--gap) * 1.4) var(--gap);
     /* The rule belongs to the content column. Spanning the window drew a line
        across the empty space below and made a tidy gap look like a mistake. */
@@ -837,10 +850,46 @@
   /* One column width shared by the bar, the panes and the action bar, so the
      ink readout, the content and MAX all line up instead of drifting to
      opposite edges of a wide screen. */
-  .pane-inner,
+  /* The pane's height has to reach the table, or stretching the rows into it
+     stretches into nothing. Sections in every other pane keep the default
+     flex: 0 1 auto, so they still stack from the top and do not smear
+     themselves down a tall window. */
+  .pane {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pane-inner {
+    max-width: var(--col-w);
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .table-grid {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
   .action-bar-inner {
     max-width: var(--col-w);
     margin: 0 auto;
+  }
+
+  /* Centred as one cluster rather than pushed to the edges. Spread across a
+     1700px row with ROLL hidden, S and M ended up a screen apart with nothing
+     between them. On a phone it still spans the full width, where the point is
+     that the two resets and MAX do not share a thumb's landing area. */
+  .action-group {
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .bar-roll {
+    flex: 0 1 420px;
   }
 
   .bar-inner {
@@ -848,11 +897,48 @@
     margin: 0 auto;
   }
 
+  /* The chain down the left, everything that acts on it down the right. The
+     chain spans both rows so the two columns finish level instead of the
+     shorter one leaving a step. */
   .table-grid {
     display: grid;
     grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    grid-template-areas:
+      'chain roll'
+      'chain controls';
+    grid-template-rows: auto minmax(0, 1fr);
     gap: var(--gap);
     align-items: start;
+  }
+
+  /* The chain takes the height it is given and the rows share it, up to a
+     limit. Six of nine rows left a 250px band of nothing between the table and
+     the action bar; letting them breathe closes most of it, and the cap stops
+     one row becoming a 600px slab early on. */
+  .table-chain {
+    grid-area: chain;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .table-chain > .section-head {
+    flex: 0 0 auto;
+  }
+
+  .table-chain > .solid {
+    flex: 1 1 auto;
+    min-height: 3.2rem;
+    max-height: 4.6rem;
+  }
+
+  .table-roll {
+    grid-area: roll;
+  }
+
+  .table-controls {
+    grid-area: controls;
   }
 
   .table-controls {
@@ -867,8 +953,8 @@
      so the name, the rates and the amount line up down the whole table, at a
      row height that fits nine of them on a laptop without scrolling. */
   .solid {
-    grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.2fr) auto auto;
-    grid-template-areas: 'icon name rate amount buy';
+    grid-template-columns: 26px 40px minmax(0, 1fr) minmax(0, 1.2fr) auto auto;
+    grid-template-areas: 'face icon name rate amount buy';
     align-items: center;
     gap: 14px;
     padding: 6px 14px;

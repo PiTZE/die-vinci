@@ -5,7 +5,11 @@
 :root {
   /* The shared content width on desktop. The top bar, the panes and the
      action bar all line up on it. */
-  --col-w: 1180px;
+  /* The shared content column. 1180 left a wide screen with a third of itself
+     empty on either side, which for rows of numbers buys nothing: there is no
+     line of prose here that gets harder to read as it gets longer. High enough
+     now that only a very large display sees a margin at all. */
+  --col-w: 1720px;
   --nav-w: 232px;
   --gap: 14px;
   --bar-h: 52px;

@@ -312,13 +312,57 @@ export function faceFactor(face: number, faces: number): number {
   return face || meanFace(faces)
 }
 
-/** What a die pays on average, which is what a batch of rolls converges to. */
-export function meanFace(faces: number): number {
-  return (faces + 1) / 2
+/**
+ * What a die pays on average, which is what a batch of rolls converges to and
+ * what the table shows once the dice are turning too fast to read.
+ *
+ * At b = 0 this is the (N+1)/2 every schoolchild knows. Above it, the chance
+ * of landing on face k is (k/N)^p minus ((k-1)/N)^p with p = 1/(1-b), and the
+ * mean is that summed against k. Seventy-two terms at worst, and it is only
+ * called when the bias or the die changes.
+ */
+export function meanFace(faces: number, bias = 0): number {
+  if (bias <= 0) return (faces + 1) / 2
+  if (bias >= 1) return faces
+  const key = `${faces}:${bias}`
+  const held = meanCache.get(key)
+  if (held !== undefined) return held
+  const p = 1 / (1 - bias)
+  let sum = 0
+  let below = 0
+  for (let k = 1; k <= faces; k++) {
+    const upTo = Math.pow(k / faces, p)
+    sum += k * (upTo - below)
+    below = upTo
+  }
+  meanCache.set(key, sum)
+  return sum
 }
 
-function rollFace(faces: number): number {
-  return 1 + Math.floor(Math.random() * faces)
+const meanCache = new Map<string, number>()
+
+/**
+ * How far the dice are loaded, 0 to 1. Zero is a fair die. One always lands on
+ * its highest face.
+ *
+ * Nothing moves this yet. It is here because the upgrade that does is coming,
+ * and a fair die is just the b = 0 case of a loaded one, so the two do not
+ * need separate code paths.
+ */
+export function faceBias(_s: GameState): number {
+  return 0
+}
+
+/**
+ * A uniform draw pushed towards the top by raising it to a power. At b = 0 the
+ * exponent is 1 and every face is equally likely; as b approaches 1 the
+ * exponent goes to zero, the draw is pinned at the top of the range, and the
+ * die always shows its maximum.
+ */
+export function rollFace(faces: number, bias = 0): number {
+  if (bias >= 1) return faces
+  const u = Math.pow(Math.random(), 1 - bias)
+  return Math.min(faces, 1 + Math.floor(u * faces))
 }
 
 /** Seconds one roll takes. The dice spin for exactly this long. */
@@ -426,7 +470,7 @@ function resolveOneRoll(s: GameState): void {
       factors.push(0)
       continue
     }
-    const face = rollFace(SOLIDS[i].faces)
+    const face = rollFace(SOLIDS[i].faces, faceBias(s))
     s.faces[i] = face
     factors.push(faceFactor(face, SOLIDS[i].faces))
   }
@@ -440,12 +484,13 @@ function resolveOneRoll(s: GameState): void {
  */
 function resolveManyRolls(s: GameState, count: number): void {
   for (let i = 0; i < s.solids.length; i++) {
-    s.faces[i] = rolls(s, i) ? rollFace(SOLIDS[i].faces) : 0
+    s.faces[i] = rolls(s, i) ? rollFace(SOLIDS[i].faces, faceBias(s)) : 0
   }
   // The mean, per die, not a flat one. A d72 averages 36.5 and a d4 averages
   // 2.5, so a flat factor here would make the automator pay a fraction of what
   // the same rolls pay by hand.
-  produce(s, count, s.solids.map((_, i) => (rolls(s, i) ? meanFace(SOLIDS[i].faces) : 0)))
+  const bias = faceBias(s)
+  produce(s, count, s.solids.map((_, i) => (rolls(s, i) ? meanFace(SOLIDS[i].faces, bias) : 0)))
 }
 
 function applyRolls(s: GameState, count: number): void {
@@ -489,7 +534,7 @@ export function buyAutomator(s: GameState): boolean {
 export function inkPerSecond(s: GameState): Decimal {
   return s.solids[0].amount
     .times(solidMultiplier(s, 1))
-    .times(meanFace(SOLIDS[0].faces))
+    .times(meanFace(SOLIDS[0].faces, faceBias(s)))
     .times(rollRate(s))
 }
 

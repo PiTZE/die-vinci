@@ -14,6 +14,8 @@ import {
   buyStudy,
   inkPerSecond,
   maxAll,
+  meanFace,
+  rollFace as __rollFace,
   rollInterval,
   tick,
 } from './game/production'
@@ -455,6 +457,10 @@ const hook: Record<string, unknown> = {
   get rollInterval() {
     return rollInterval(state)
   },
+  // Exposed so the die-loading maths can be checked against samples rather
+  // than trusted. Pure functions; neither touches the save.
+  rollFace: __rollFace,
+  meanFace,
   channel: __CHANNEL__,
   version: __VERSION__,
   buildId: __BUILD_ID__,

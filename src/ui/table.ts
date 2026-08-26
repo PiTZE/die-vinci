@@ -23,6 +23,7 @@ import {
   rolling,
   mustWager,
   meanFace,
+  faceBias,
   FACE_READABLE_S,
 } from '../game/production'
 import { format, formatWhole } from '../format'
@@ -183,7 +184,7 @@ export function tablePane(): Pane {
         rows.push({ root: r, icon, face, mult, step, bar, barCan, amount, rate: flow, buy, buyLabel })
       }
 
-      const roll = el('div', 'section')
+      const roll = el('div', 'section table-roll')
       const rh = el('div', 'section-head')
       rh.appendChild(el('span', 'grow', 'ROLL RATE'))
       rollLine = el('span', 'num dim', '')
@@ -244,15 +245,15 @@ export function tablePane(): Pane {
       resetRow.append(folioBtn, studyBtn)
       resets.appendChild(resetRow)
 
-      // Wide screens put the chain and its controls side by side. Stacked, the
-      // controls left most of a desktop empty and pushed the chain off centre.
+      // One container for all three, so the same DOM reads as a stack on a
+      // phone and as two columns on a desktop. Roll rate was a full width band
+      // above the table, which on a wide screen pushed everything down for a
+      // single line of text; beside the chain it costs no height at all.
       const grid = el('div', 'table-grid')
-      // Roll rate multiplies the whole chain, so it sits above the chain
-      // rather than beside it.
       const controls = el('div', 'table-controls')
       controls.append(autoSection, resets)
-      grid.append(chain, controls)
-      root.append(roll, grid)
+      grid.append(roll, chain, controls)
+      root.append(grid)
 
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.
@@ -355,8 +356,17 @@ export function tablePane(): Pane {
         // solid does not tumble and announce a number that pays nothing.
         const rolling = st.amount.gt(0)
         setDieRolling(r.icon, rolling)
-        const face = readable && rolling ? s.faces[def.idx - 1] : 0
-        setText(r.face, face ? String(face) : '')
+        // Slow enough to read, and it is the face this die landed on. Faster
+        // than that, the digit was blanked, so the column emptied exactly when
+        // the table got interesting. It holds the die's average instead, which
+        // is what a run of rolls that fast actually pays.
+        if (!rolling) setText(r.face, '')
+        else if (readable) {
+          const face = s.faces[def.idx - 1]
+          setText(r.face, face ? String(face) : '')
+        } else {
+          setText(r.face, meanFace(def.faces, faceBias(s)).toFixed(1))
+        }
 
         // Averaged over the faces, because that is what the row actually
         // pays over any run of rolls.
