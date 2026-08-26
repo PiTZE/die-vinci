@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // package.json is the one place the version lives. Bump it with `npm run bump`,
 // which carries each segment at nine: 0.0.9 becomes 0.1.0, 0.9.9 becomes 1.0.0.
-const { version: VERSION } = JSON.parse(readFileSync('./package.json', 'utf8'))
+const pkg = JSON.parse(readFileSync('./package.json', 'utf8'))
 
 // Served at the root of leonard.generis.ir, so assets resolve from '/'.
 // Stamped into the bundle so a player can see which build they are running,
@@ -18,6 +18,11 @@ const BUILD_ID = new Date().toISOString().slice(0, 19).replace('T', ' ')
 // CHANNEL=dev.
 const CHANNEL = process.env.CHANNEL === 'dev' ? 'dev' : 'stable'
 const BASE = CHANNEL === 'dev' ? '/dev/' : '/'
+
+// Dev has no version number. A number there would only ever be the last
+// released one wearing a suffix, which says nothing about what you are running.
+// The build timestamp is the honest answer, and dev always serves the newest.
+const VERSION = CHANNEL === 'dev' ? 'dev' : pkg.version
 
 export default defineConfig({
   base: BASE,
