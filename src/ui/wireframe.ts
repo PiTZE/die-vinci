@@ -210,8 +210,10 @@ class Wire {
   private wx = 0.42
   /** Each die leaves the hand a little differently. */
   private speed = 1
-  /** Keeps the nine bobs out of phase with each other. */
+  /** Keeps the nine tumbles out of phase with each other. */
   private phase = Math.random() * Math.PI * 2
+  /** And the nine bounces, so they do not all hit the table together. */
+  private hopPhase = Math.random() * 0.4
   visible = true
 
   /** A new throw. Fresh axis, fresh rate. */
@@ -224,6 +226,7 @@ class Wire {
     if (Math.random() < 0.5) this.wx = -this.wx
     this.speed = 0.8 + Math.random() * 0.45
     this.phase = Math.random() * Math.PI * 2
+    this.hopPhase = Math.random() * 0.4
   }
 
   constructor(id: SolidId) {
@@ -259,23 +262,56 @@ class Wire {
     this.draw()
   }
 
+  /**
+   * `turns` is the absolute rotation this die should be at, in revolutions,
+   * and `shake` is 0 to 1 for how much it is still bouncing.
+   *
+   * Absolute rather than accumulated: a throw is a curve from a start to a
+   * finish, and integrating a rate towards it drifts, so a die that should
+   * land square lands a few degrees off and the last frame snaps.
+   */
+  render(turns: number, progress: number): void {
+    this.t = turns * Math.PI * 2 * this.speed + this.phase
+    this.bounce(progress)
+    this.draw()
+  }
+
   step(dt: number, rate: number): void {
     this.t += dt * rate * this.speed
-    // A solid turning on the spot is a model on a turntable, not a thrown
-    // die. The bob and the wobble are what sell it, and because they scale
-    // with the rate they fall to nothing exactly as the tumble does, so the
-    // die comes to rest square instead of being switched off mid-jitter.
-    const j = Math.min(1, rate / SPIN_ROLLING)
-    if (j > 0.002) {
-      const bob = Math.sin(this.t * 2.1 + this.phase) * 3.4 * j
-      const side = Math.sin(this.t * 1.3 + this.phase * 2) * 1.6 * j
-      const tilt = Math.sin(this.t * 1.7 + this.phase) * 9 * j
-      this.el.style.transform =
-        `translate3d(${side.toFixed(2)}px, ${bob.toFixed(2)}px, 0) rotate(${tilt.toFixed(2)}deg)`
-    } else if (this.el.style.transform) {
-      this.el.style.transform = ''
-    }
+    // Rolling too fast to watch. A light constant wobble, no bounce: there is
+    // no landing to settle onto.
+    const j = Math.min(1, rate / SPIN_BLUR)
+    this.place(
+      Math.sin(this.t * 0.6 + this.phase * 2) * 0.9 * j,
+      Math.sin(this.t * 0.9 + this.phase) * 1.4 * j,
+      Math.sin(this.t * 0.75 + this.phase) * 3.4 * j,
+    )
     this.draw()
+  }
+
+  /**
+   * A die does not vibrate on the spot, it hops and settles. Three diminishing
+   * hops across the throw, driven by progress rather than by the tumble angle,
+   * because tying them together gave a single slow heave over the whole roll
+   * that read as the icon drifting.
+   */
+  private bounce(p: number): void {
+    const fade = Math.pow(1 - p, 1.4)
+    // Negative is up. abs() makes each half-cycle a hop rather than a dip.
+    const hop = -Math.abs(Math.sin((p * BOUNCES + this.hopPhase) * Math.PI)) * 3.1 * fade
+    const side = Math.sin((p * 2 + this.hopPhase) * Math.PI) * 1.5 * (1 - p)
+    const tilt = Math.sin((p * 4 + this.hopPhase) * Math.PI) * 7 * fade
+    this.place(side, hop, tilt)
+  }
+
+  private place(x: number, y: number, deg: number): void {
+    if (Math.abs(x) < 0.02 && Math.abs(y) < 0.02 && Math.abs(deg) < 0.05) {
+      // Square, and cleared rather than left at a hundredth of a degree.
+      if (this.el.style.transform) this.el.style.transform = ''
+      return
+    }
+    this.el.style.transform =
+      `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${deg.toFixed(2)}deg)`
   }
 
   private draw(): void {
@@ -343,42 +379,73 @@ const observer =
 const byEl = new Map<SVGSVGElement, Wire>()
 
 // A die at rest is a die showing a face. It only turns while a roll is in the
-// air, which is what makes pressing ROLL feel like anything at all: before
-// this the solids span forever and the button changed nothing you could see.
+// air, which is what makes pressing ROLL feel like anything at all.
 //
-// The throw itself has three parts, because a constant-rate turn does not read
-// as dice at all. It leaves the hand fast, holds, and then stops hard. Nearly
-// all of the deceleration happens in the last fifth of the settle, which is
-// what makes a die look like it caught on a corner and fell flat rather than
-// like an animation being faded out.
-let spinning = false
-let settling = 0
+// The throw is one curve from start to finish, not a constant spin with a stop
+// bolted on the end. It leaves the hand fast and decelerates the whole way, so
+// it is still slowing as it lands rather than being switched off. Everything
+// written about dice animation says the same thing: one eased motion, a second
+// or so long, arriving at a definite rest. The earlier version ran at a
+// revolution and a half a second flat for the whole roll and then braked in a
+// third of a second, which is why it read as frantic.
+//
+// Revolutions are per throw and per die, so nine solids do not arrive together
+// like a row of gears.
+const TURNS_MIN = 1.15
+const TURNS_SPREAD = 0.7
 
-const SPIN_ROLLING = 11
-const SPIN_LAUNCH = 1.55
-const LAUNCH_S = 0.16
-const SETTLE_S = 0.34
+/** Continuous rotation for when rolls come faster than they can be watched. */
+const SPIN_BLUR = 4.2
 
-let launching = 0
+/** Hops per throw. Three is a die landing; one is a heave. */
+const BOUNCES = 3
 
-/** false stops the dice where they are. true is a roll in flight. */
-export function setSpin(on: boolean): void {
-  if (on === spinning) return
-  spinning = on
-  if (on) {
-    launching = LAUNCH_S
-    settling = 0
-    for (const w of live) w.throw()
-    ensureLoop()
-  } else {
-    settling = SETTLE_S
-    launching = 0
-  }
+type Mode = 'rest' | 'throw' | 'blur'
+let mode: Mode = 'rest'
+let progress = 1
+let lastProgress = 1
+let turns = TURNS_MIN
+
+/** Fast out, slow in. Cubic: gentler than the quartic a die's last bounce
+ *  really has, and a hard brake at this size reads as a dropped frame. */
+function easeOut(p: number): number {
+  return 1 - Math.pow(1 - p, 3)
 }
 
-/** Fast, then almost nothing. 1 at the start of the settle, 0 at the end. */
-function settleCurve(p: number): number {
-  return p * p * p
+/**
+ * Where the current throw is, 0 to 1. Called every frame. Going backwards is
+ * how a new throw announces itself, which covers both a fresh press and the
+ * automator rolling continuously.
+ */
+export function setThrow(p: number): void {
+  const clamped = Math.max(0, Math.min(1, p))
+  if (clamped < lastProgress - 0.02) {
+    turns = TURNS_MIN + Math.random() * TURNS_SPREAD
+    for (const w of live) w.throw()
+  }
+  lastProgress = clamped
+  progress = clamped
+  const next: Mode = clamped >= 1 ? 'rest' : 'throw'
+  if (next === 'rest' && mode !== 'rest') {
+    // Coming to rest stops the loop, so the settled frame has to be drawn
+    // here or the die keeps whatever tilt it happened to be at.
+    for (const w of live) w.render(turns, 1)
+  }
+  mode = next
+  if (mode === 'throw') ensureLoop()
+}
+
+/** Rolls too fast to watch. One smooth continuous turn, no per-roll easing:
+ *  restarting a curve every 30ms is a stutter, not an animation. */
+export function setBlur(on: boolean): void {
+  if (on) {
+    mode = 'blur'
+    ensureLoop()
+  } else if (mode === 'blur') {
+    mode = 'rest'
+    lastProgress = 1
+    progress = 1
+  }
 }
 
 function frame(now: number): void {
@@ -387,27 +454,18 @@ function frame(now: number): void {
   last = now
   if (document.hidden) return
 
-  let rate = 0
-  if (spinning) {
-    // Off the hand faster than it travels, so the throw has a snap to it.
-    rate = SPIN_ROLLING
-    if (launching > 0) {
-      launching = Math.max(0, launching - dt)
-      rate *= 1 + (SPIN_LAUNCH - 1) * (launching / LAUNCH_S)
-    }
-  } else if (settling > 0) {
-    settling = Math.max(0, settling - dt)
-    rate = SPIN_ROLLING * settleCurve(settling / SETTLE_S)
+  if (mode === 'throw') {
+    const e = easeOut(progress)
+    for (const w of live) if (w.visible) w.render(turns * e, progress)
+    return
   }
 
-  // Nothing is turning and nothing is coming to rest, so there is nothing to
-  // draw. The loop keeps running because a roll can start on the next frame.
-  if (rate <= 0) return
+  if (mode === 'blur') {
+    for (const w of live) if (w.visible) w.step(dt, SPIN_BLUR)
+    return
+  }
 
-  // No throttle. It was capped at 20fps to save battery and the result was
-  // visibly stepped. Offscreen and hidden solids are skipped instead, which is
-  // where the real saving is.
-  for (const w of live) if (w.visible) w.step(dt, rate)
+  // At rest. The loop keeps running because a throw can start on any frame.
 }
 
 function ensureLoop(): void {

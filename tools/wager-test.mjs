@@ -5,15 +5,26 @@
 //
 //   npm run test:wager
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 const profile = mkdtempSync(join(tmpdir(), 'ld-wt-'))
 const chrome = spawn('google-chrome',['--headless=new','--no-sandbox','--disable-gpu',
-  '--remote-debugging-port=9360',`--user-data-dir=${profile}`,'--window-size=390,844','about:blank'],{stdio:'ignore'})
+  '--remote-debugging-port=0',`--user-data-dir=${profile}`,'--window-size=390,844','about:blank'],{stdio:'ignore'})
+// Chrome picks the port and writes it into the profile. Fixed ports meant a
+// leftover browser from an earlier run answered instead of the one just
+// spawned, and the suite then tested a page it never loaded. That cost three
+// false failures before anyone noticed the pattern.
+function devtoolsPort(dir) {
+  try {
+    return readFileSync(join(dir, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim()
+  } catch {
+    return '0'
+  }
+}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
-for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch('http://127.0.0.1:9360/json')).json();const p=l.find(t=>t.type==='page')
+for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
   ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
@@ -46,6 +57,13 @@ check('wager tab appears near the threshold',
 
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'WAGER').click()`)
 await sleep(500)
+// The first Wager clears the first challenge, which awards the solid 1
+// autobuyer, which then spends the ten starting ink on a d4 within half a
+// second. That is correct, and it is not what this check is about, so the
+// autobuyers are switched off before the reset is measured.
+await ev(`(() => { const a = window.LD.state.autobuyers
+  for (const k of Object.keys(a)) a[k].on = false })()`)
+await sleep(200)
 const before = await ev(`({ points: Number(window.LD.state.points), wagers: window.LD.state.wagers })`)
 await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)
 await sleep(400)
@@ -55,7 +73,8 @@ const after = await ev(`({ points: Number(window.LD.state.points), wagers: windo
 check('wager pays a point', after.points === before.points + 1, JSON.stringify(after))
 check('wager counts up', after.wagers === before.wagers + 1)
 check('wager clears layer 0',
-  after.ink === '10' && after.studies === 0 && after.folios === 0 && after.roll === 0 && after.bought === 0)
+  after.ink === '10' && after.studies === 0 && after.folios === 0 && after.roll === 0 && after.bought === 0,
+  JSON.stringify(after))
 
 // An upgrade has to change the engine, not just light up.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal

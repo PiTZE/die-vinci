@@ -14,12 +14,11 @@ import {
   buyStudy,
   inkPerSecond,
   maxAll,
-  openSolids,
   rollInterval,
   tick,
 } from './game/production'
 import { publishAway, simulateAway } from './game/offline'
-import { playRoll } from './ui/sound'
+import { playThrow } from './ui/sound'
 import { restoreBackup } from './backup'
 import { devTools } from './dev'
 import { doWager } from './game/wager'
@@ -196,7 +195,7 @@ const actions: Actions = {
     if (!startRoll(state, Date.now())) return
     // Built on this gesture the first time. An AudioContext cannot start
     // without one, and a roll is always one.
-    if (state.options.sound) playRoll(openSolids(state))
+    if (state.options.sound) playThrow()
   },
   buyAutomator: () => {
     buyAutomator(state)

@@ -30,8 +30,8 @@ import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey, holdable } from './hold'
 import { Confirmer } from './confirm'
-import { setSpin, wireframe } from './wireframe'
-import { playLand } from './sound'
+import { setBlur, setThrow, wireframe } from './wireframe'
+import { playThrow } from './sound'
 
 interface Row {
   root: HTMLElement
@@ -72,7 +72,6 @@ export function tablePane(): Pane {
   let autoBtn: HTMLButtonElement
   let wagerNow: HTMLButtonElement
   let resetGroup: HTMLElement
-  let wasSpinning = false
   let lastFace = 0
 
 
@@ -288,7 +287,6 @@ export function tablePane(): Pane {
       // that is always, which is exactly the difference the purchase buys.
       const full = mustWager(s)
       const spinning = rolling(s) && s.haltMs <= 0 && !full
-      setSpin(spinning)
 
       // The bar gives itself over to the one remaining move.
       resetGroup.hidden = full
@@ -299,12 +297,19 @@ export function tablePane(): Pane {
       // noise rather than a reading. The dice just spin then.
       const readable = rollInterval(s) >= FACE_READABLE_S
 
+      // A throw is an eased curve arriving at rest. Rolls too fast to watch
+      // get one continuous turn instead, because restarting that curve every
+      // thirty milliseconds is a stutter rather than an animation.
+      setBlur(spinning && !readable)
+      if (!spinning) setThrow(1)
+      else if (readable) setThrow(rollProgress(s, now))
+
       // The clatter goes with what you can see. Past a few rolls a second the
       // dice are a blur and the sound would be a machine gun, so both stop.
-      const landedNow = readable && wasSpinning && !spinning
+      // Manual throws make their sound on the press, where the gesture is.
+      // Automated ones have no press, so they sound on each landing.
       const autoLanded = readable && s.autoRoll && s.faces[0] !== lastFace
-      if (s.options.sound && (landedNow || autoLanded)) playLand()
-      wasSpinning = spinning
+      if (s.options.sound && autoLanded) playThrow()
       lastFace = s.faces[0]
 
       // Once the automator is in, the button has nothing left to do: it can

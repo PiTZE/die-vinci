@@ -9,7 +9,7 @@
 //
 // The dev server must already be running.
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -18,9 +18,21 @@ const MOBILE = args.includes('mobile')
 const URL_ = args.find((a) => a.startsWith('http')) ?? 'http://127.0.0.1:5173/'
 const profile = mkdtempSync(join(tmpdir(), 'ld-cdp-'))
 const chrome = spawn('google-chrome', [
-  '--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=9333',
+  '--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0',
   `--user-data-dir=${profile}`, `--window-size=${MOBILE ? '390,844' : '1280,800'}`, 'about:blank',
 ], { stdio: 'ignore' })
+
+// Chrome picks the port and writes it into the profile. Fixed ports meant a
+// leftover browser from an earlier run answered instead of the one just
+// spawned, and the suite then tested a page it never loaded. That cost three
+// false failures before anyone noticed the pattern.
+function devtoolsPort(dir) {
+  try {
+    return readFileSync(join(dir, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim()
+  } catch {
+    return '0'
+  }
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let ws, id = 0
@@ -29,7 +41,7 @@ const pending = new Map()
 async function connect() {
   for (let i = 0; i < 60; i++) {
     try {
-      const list = await (await fetch('http://127.0.0.1:9333/json')).json()
+      const list = await (await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json()
       const page = list.find((t) => t.type === 'page')
       if (page) {
         ws = new WebSocket(page.webSocketDebuggerUrl)

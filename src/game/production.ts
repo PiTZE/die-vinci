@@ -326,12 +326,19 @@ export function rollDuration(s: GameState): number {
   return rollInterval(s)
 }
 
-/** 0 to 1 through the current spin, or 1 when the dice are at rest. */
+/**
+ * 0 to 1 through the current roll, or 1 when the dice are at rest.
+ *
+ * Both paths read the same field, because the automator records when its
+ * current roll began too. Deriving it from the leftover accumulator instead
+ * would step at the tick rate, ten times a second against sixty frames, and a
+ * revolution in ten visible steps is not an animation.
+ */
 export function rollProgress(s: GameState, now: number): number {
-  if (!s.rollStartedAt) return 1
+  if (mustWager(s) || !s.rollStartedAt) return 1
   const d = rollDuration(s) * 1000
   if (d <= 0) return 1
-  return Math.min(1, (now - s.rollStartedAt) / d)
+  return Math.max(0, Math.min(1, (now - s.rollStartedAt) / d))
 }
 
 export function rolling(s: GameState): boolean {
@@ -523,11 +530,14 @@ export function tick(s: GameState, dt: number, now: number): void {
   }
 
   // Automated: rolls land back to back for as long as the elapsed time covers.
-  s.rollStartedAt = 0
   s.rollAccum += dt
   if (interval <= 0) return
   const rolls = Math.floor(s.rollAccum / interval)
+  // When the current roll began, so the animation can run off the same clock
+  // the manual one does and stay in phase with the faces it lands on.
+  s.rollStartedAt = now - Math.min(s.rollAccum, interval) * 1000
   if (rolls <= 0) return
   s.rollAccum -= rolls * interval
+  s.rollStartedAt = now - s.rollAccum * 1000
   applyRolls(s, rolls)
 }

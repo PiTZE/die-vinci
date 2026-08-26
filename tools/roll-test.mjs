@@ -1,15 +1,26 @@
 // The roll loop. Nothing produces until a roll lands, a hand cannot out-roll
 // the roll rate, and the automator takes over from the finger.
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 const profile = mkdtempSync(join(tmpdir(), 'ld-rl-'))
 const chrome = spawn('google-chrome',['--headless=new','--no-sandbox','--disable-gpu',
-  '--remote-debugging-port=9376',`--user-data-dir=${profile}`,'--window-size=390,844','about:blank'],{stdio:'ignore'})
+  '--remote-debugging-port=0',`--user-data-dir=${profile}`,'--window-size=390,844','about:blank'],{stdio:'ignore'})
+// Chrome picks the port and writes it into the profile. Fixed ports meant a
+// leftover browser from an earlier run answered instead of the one just
+// spawned, and the suite then tested a page it never loaded. That cost three
+// false failures before anyone noticed the pattern.
+function devtoolsPort(dir) {
+  try {
+    return readFileSync(join(dir, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim()
+  } catch {
+    return '0'
+  }
+}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
-for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch('http://127.0.0.1:9376/json')).json();const p=l.find(t=>t.type==='page')
+for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
   ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
@@ -92,6 +103,9 @@ await sleep(400)
 const auto = await ev(`({ auto: window.LD.state.autoRoll,
   btn: getComputedStyle(${ROLL}).display })`)
 check('the automator can be bought', auto.auto === true)
+check('the dice sounds are cached and decodable',
+  (await ev(`fetch('/sfx/throw-1.mp3').then(r => r.ok && r.headers.get('content-type'))`)) !== false,
+  await ev(`fetch('/sfx/throw-1.mp3').then(r => r.status)`))
 check('and the ROLL button stands down', auto.btn === 'none', auto.btn)
 
 const beforeAuto = await ev(`window.LD.state.ink.toString()`)
@@ -117,6 +131,57 @@ const want = 1000 * 2.5 * rate * secs
 const got = (i1 - i0) / want
 check('a batch pays the mean face per die', got > 0.75 && got < 1.25,
   `${(got * 100).toFixed(0)}% of expected`)
+
+// The throw is one eased curve arriving at rest, not a constant spin that
+// stops. Measured on the wireframe's own geometry rather than on the wobble:
+// the tumble is baked into the line coordinates, so how far a vertex travels
+// between samples is the rotation rate itself.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0
+  s.solids.forEach((d, i) => { d.amount = new D(i === 0 ? 10 : 0) }) })()`)
+await sleep(400)
+await ev(`(() => { window.__s = []
+  const ln = document.querySelector('.solid-icon line')
+  window.__t = setInterval(() => window.__s.push([
+    Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1')),
+    document.querySelector('.solid-icon').style.transform]), 40) })()`)
+await ev(`${ROLL}.click()`)
+await sleep(1400)
+await ev(`clearInterval(window.__t)`)
+const swing = await ev(`(() => {
+  const s = window.__s
+  const d = []
+  for (let i = 1; i < s.length; i++) d.push(Math.hypot(s[i][0] - s[i-1][0], s[i][1] - s[i-1][1]))
+  const moving = d.filter(v => v > 0)
+  const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0
+  const third = Math.max(1, Math.floor(moving.length / 3))
+  return { samples: d.length, moving: moving.length,
+    head: avg(moving.slice(0, third)), tail: avg(moving.slice(-third)),
+    lastTransform: s.length ? s[s.length - 1][2] : null }
+})()`)
+check('the die actually tumbles', swing.moving > 8, JSON.stringify(swing))
+check('and decelerates the whole way rather than stopping dead',
+  swing.head > swing.tail * 2, `head ${swing.head.toFixed(4)} vs tail ${swing.tail.toFixed(4)}`)
+check('and lands square, with no tilt left on it',
+  swing.lastTransform === '', JSON.stringify(swing.lastTransform))
+
+// A die in the air should visibly hop rather than vibrate on the spot.
+await ev(`(() => { window.__h = []
+  const icon = document.querySelector('.solid-icon')
+  window.__ht = setInterval(() => {
+    const m = icon.style.transform
+    const i = m.indexOf(',')
+    const j = m.indexOf('px', i)
+    window.__h.push(i < 0 ? 0 : Number(m.slice(i + 1, j)))
+  }, 30) })()`)
+await ev(`${ROLL}.click()`)
+await sleep(1400)
+await ev(`clearInterval(window.__ht)`)
+const hop = await ev(`(() => {
+  const h = window.__h.filter(v => Number.isFinite(v))
+  return { n: h.length, lowest: Math.min(...h), highest: Math.max(...h) }
+})()`)
+check('the hop is big enough to see', hop.lowest < -1.2, JSON.stringify(hop))
 
 // The face and the wireframe trade places rather than stacking.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal

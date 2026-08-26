@@ -87,7 +87,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,woff2}'],
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,woff2,mp3}'],
         cleanupOutdatedCaches: true,
         // Navigations into the other channel go to the network. Without this
         // the stable worker answers /dev/ with its own precached index.html.
