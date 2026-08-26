@@ -48,8 +48,16 @@ await ev(`window.dispatchEvent(new Event('pagehide'))`)
 await sleep(400)
 
 // Now cross into dev while the stable worker is active and controlling.
-await send('Page.navigate',{url:'https://leo.generis.ir/dev/'}); await sleep(7000)
-const b = await ev(probe)
+// Registering the dev worker is a network round trip on a cold profile, so
+// this waits for it rather than guessing at a sleep. A fixed 7s passed for
+// months and then started failing on a slower deploy, which says nothing about
+// the code and everything about the sleep.
+await send('Page.navigate',{url:'https://leo.generis.ir/dev/'}); await sleep(3000)
+let b = await ev(probe)
+for (let i = 0; i < 20 && !b.scope.endsWith('/dev/'); i++) {
+  await sleep(1000)
+  b = await ev(probe)
+}
 check('dev is not hijacked by the stable worker', b.channel === 'dev', JSON.stringify(b))
 check('dev has its own worker scope', b.scope.endsWith('/dev/'), b.scope)
 check('dev keeps a separate save', b.keys.some(k => k.endsWith('-save-dev')) || b.keys.length >= 1, b.keys.join(','))

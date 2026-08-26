@@ -77,8 +77,11 @@ check('wager clears layer 0',
   JSON.stringify(after))
 
 // An upgrade has to change the engine, not just light up.
+// Measured from the fifth study, where the requirement is 20. The first four
+// cost 10, and a discount of 9 against 10 floors at 1, which would pass this
+// check without proving the discount is actually being subtracted.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.points = new D(20); s.pointUpgrades = [] })()`)
+  s.points = new D(20); s.pointUpgrades = []; s.studies = 5 })()`)
 await sleep(300)
 // Only the active pane updates, so the table has to be on screen to be read.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'TABLE').click()`)

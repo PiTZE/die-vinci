@@ -38,9 +38,8 @@ export const OFFLINE_TICKS_DEFAULT = 2000
 export const WAGER_AT = new Decimal('1.7976931348623157e308')
 
 /**
- * Exactly the price of one tetrahedron. There is no click button, the same as
- * in Antimatter Dimensions, so this is the entire bootstrap: buy the first die
- * and the chain takes over.
+ * Exactly the price of one tetrahedron, and the entire bootstrap: buy the
+ * first die, roll it, and the chain takes over from there.
  */
 export const START_INK = 10
 
@@ -59,7 +58,6 @@ export const PER_TEN_MULT = new Decimal(2)
 /** Seconds between rolls before any upgrade. */
 export const ROLL_INTERVAL_BASE = 1
 
-/** Ink cost of the first roll-rate upgrade, then x10 each. */
 /**
  * The first automator, which takes the roll off your finger. Priced so it is
  * the thing the opening is for: reachable a few minutes after the second
@@ -70,11 +68,12 @@ export const AUTOMATOR_AT_STUDIES = 2
 export const AUTOMATOR_COST = new Decimal(1e5)
 
 /** A roll resolved by hand or by the automator is the same roll. Below this
- *  many in one frame the faces are drawn individually; above it they average
- *  out to 1 and are applied in one step, because nobody can read a thousand
- *  dice a second and the mean is exact in the limit. */
+ *  many in one frame each die rolls its own face; above it they are applied in
+ *  one step at each die's mean face, because nobody can read a thousand dice a
+ *  second and the mean is exact in the limit. */
 export const ROLLS_DRAWN_INDIVIDUALLY = 12
 
+/** Ink cost of the first roll-rate upgrade, then x10 each. */
 export const ROLL_COST_BASE = new Decimal(1000)
 export const ROLL_COST_MULT = new Decimal(10)
 
@@ -91,8 +90,8 @@ export function rollIntervalMultiplier(folios: number): number {
 // From bulkRequirement() and multiplierToNDTier() in src/core/dimboost.js.
 // AD starts with four of its eight dimensions and its first five boosts each
 // cost a flat 20 of the highest unlocked one; only once the chain is full does
-// the requirement climb, by 15 each. Six solids with three free gives the same
-// shape with the numbers shifted down by one step.
+// the requirement climb, by 15 each. Nine solids with one free is the same
+// shape stretched, with the opening four discounted. See EARLY_STUDIES.
 
 /** Solids on the table before any study. Studies unlock the rest. */
 export const SOLIDS_AT_START = 1
@@ -102,6 +101,18 @@ export const STUDIES_THAT_UNLOCK = SOLID_COUNT - SOLIDS_AT_START
 const FIRST_CLIMBING_STUDY = STUDIES_THAT_UNLOCK + 1
 const STUDY_CLIMB = 15
 
+/**
+ * The opening is cheaper than the rest.
+ *
+ * Antimatter Dimensions charges a flat 20 for every dimension shift, but it
+ * hands you four dimensions to start with and its first shift is a long way
+ * in. Here the table opens with one die, so the same flat 20 put four full
+ * resets between the player and a chain worth looking at. These four cost
+ * half that; from the fifth the schedule is AD's again.
+ */
+const EARLY_STUDIES = 4
+const EARLY_STUDY_REQUIREMENT = 10
+
 /** Which solid the nth study is measured against. n is 1-based. */
 export function studyTier(n: number): number {
   return Math.min(SOLIDS_AT_START + n - 1, SOLID_COUNT)
@@ -109,6 +120,7 @@ export function studyTier(n: number): number {
 
 /** How many of that solid the nth study costs. */
 export function studyRequirement(n: number): number {
+  if (n <= EARLY_STUDIES) return EARLY_STUDY_REQUIREMENT
   if (n < FIRST_CLIMBING_STUDY) return 20
   return 20 + (n - FIRST_CLIMBING_STUDY) * STUDY_CLIMB
 }
