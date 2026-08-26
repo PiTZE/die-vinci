@@ -41,8 +41,11 @@ function dedupe(vs: V3[]): V3[] {
 
 type Geo = { vs: V3[]; es: [number, number][] }
 
-/** Edges of a uniform polyhedron are its shortest vertex pairs. True for the
- *  Platonics, and it saves hand-listing an edge table for each. */
+const PHI = (1 + Math.sqrt(5)) / 2
+const SILVER = 1 + Math.sqrt(2)
+
+/** Edges of a uniform polyhedron are its shortest vertex pairs. True for every
+ *  solid here except the sphere, and it saves nine hand-written edge tables. */
 function edgesByDistance(vs: V3[]): [number, number][] {
   let min = Infinity
   const d = (a: V3, b: V3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
@@ -58,81 +61,85 @@ function edgesByDistance(vs: V3[]): [number, number][] {
   return out
 }
 
-function platonic(id: 'tetra' | 'hexa' | 'octa'): Geo {
-  const vs =
-    id === 'tetra'
-      ? ([
-          [1, 1, 1],
-          [1, -1, -1],
-          [-1, 1, -1],
-          [-1, -1, 1],
-        ] as V3[])
-      : id === 'hexa'
-        ? signs([1, 1, 1])
-        : dedupe([...cyclic(1, 0, 0), ...cyclic(-1, 0, 0)])
+/** Every cyclic permutation of a triple, with every sign combination. */
+function cyclicSigns(a: number, b: number, c: number): V3[] {
+  return dedupe(cyclic(a, b, c).flatMap((v) => signs(v)))
+}
+
+function uniformVertices(id: SolidId): V3[] {
+  switch (id) {
+    case 'tetra':
+      return [
+        [1, 1, 1],
+        [1, -1, -1],
+        [-1, 1, -1],
+        [-1, -1, 1],
+      ]
+    case 'hexa':
+      return signs([1, 1, 1])
+    case 'octa':
+      return cyclicSigns(1, 0, 0)
+    case 'dodeca':
+      return dedupe([...signs([1, 1, 1]), ...cyclicSigns(0, 1 / PHI, PHI)])
+    case 'cubocta':
+      return cyclicSigns(1, 1, 0)
+    case 'icosa':
+      return cyclicSigns(0, 1, PHI)
+    case 'rhombi':
+      return cyclicSigns(1, 1, SILVER)
+    case 'truncicosa':
+      // The football. Even permutations of three triples, 60 vertices.
+      return dedupe([
+        ...cyclicSigns(0, 1, 3 * PHI),
+        ...cyclicSigns(1, 2 + PHI, 2 * PHI),
+        ...cyclicSigns(PHI, 2, 2 * PHI + 1),
+      ])
+    default:
+      return []
+  }
+}
+
+/**
+ * A latitude and longitude sphere, meridians by bands. Pacioli's plate is
+ * called a sphere of seventy-two bases and twelve meridians across six bands
+ * is exactly seventy-two quadrilaterals. His actual construction is not
+ * something I could source, so this matches the face count and the description
+ * rather than claiming to reproduce the drawing.
+ */
+function sphere(meridians: number, bands: number): Geo {
+  const vs: V3[] = []
+  const ring: number[][] = []
+  for (let b = 1; b < bands; b++) {
+    const phi = (b / bands) * Math.PI
+    const y = Math.cos(phi)
+    const r = Math.sin(phi)
+    const row: number[] = []
+    for (let m = 0; m < meridians; m++) {
+      const th = (m / meridians) * Math.PI * 2
+      row.push(vs.push([r * Math.cos(th), y, r * Math.sin(th)]) - 1)
+    }
+    ring.push(row)
+  }
+  const north = vs.push([0, 1, 0]) - 1
+  const south = vs.push([0, -1, 0]) - 1
+
+  const es: [number, number][] = []
+  for (const row of ring) {
+    for (let m = 0; m < meridians; m++) es.push([row[m], row[(m + 1) % meridians]])
+  }
+  for (let b = 0; b + 1 < ring.length; b++) {
+    for (let m = 0; m < meridians; m++) es.push([ring[b][m], ring[b + 1][m]])
+  }
+  for (let m = 0; m < meridians; m++) {
+    es.push([north, ring[0][m]], [south, ring[ring.length - 1][m]])
+  }
+  return { vs, es }
+}
+
+function geometryFor(def: { id: SolidId; shape: SolidShape }): Geo {
+  if (def.shape.kind === 'sphere') return sphere(def.shape.meridians, def.shape.bands)
+  const vs = uniformVertices(def.id)
   return { vs, es: edgesByDistance(vs) }
-}
-
-/**
- * A barrel die: an n-gonal prism, rolled on its n side faces. Distance-based
- * edge finding does not work here, because once n is large the polygon side
- * is shorter than the prism height and the vertical edges vanish.
- */
-function prism(n: number): Geo {
-  const vs: V3[] = []
-  const h = 1.15
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2
-    vs.push([Math.cos(a), -h, Math.sin(a)], [Math.cos(a), h, Math.sin(a)])
-  }
-  const es: [number, number][] = []
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n
-    es.push([i * 2, j * 2], [i * 2 + 1, j * 2 + 1], [i * 2, i * 2 + 1])
-  }
-  return { vs, es }
-}
-
-/** An n-gonal trapezohedron: two offset rings between two apexes, 2n faces. */
-function trapezohedron(n: number): Geo {
-  const vs: V3[] = []
-  const r = 1
-  const y = 0.42
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2
-    vs.push([r * Math.cos(a), -y, r * Math.sin(a)])
-    const b = a + Math.PI / n
-    vs.push([r * Math.cos(b), y, r * Math.sin(b)])
-  }
-  const top = vs.push([0, 1.5, 0]) - 1
-  const bottom = vs.push([0, -1.5, 0]) - 1
-  const es: [number, number][] = []
-  for (let i = 0; i < n; i++) {
-    const lo = i * 2
-    const hi = i * 2 + 1
-    const nextLo = ((i + 1) % n) * 2
-    es.push([lo, hi], [hi, nextLo], [hi, top], [lo, bottom])
-  }
-  return { vs, es }
-}
-
-/**
- * Drawn detail is capped. A d99 barrel at 44 pixels is a cylinder whichever
- * way you slice it, and 297 edges of it would cost more frame time than every
- * other row put together.
- */
-const MAX_PRISM_SIDES = 20
-const MAX_TRAPEZO_SIDES = 12
-
-function geometryFor(shape: SolidShape): Geo {
-  switch (shape.kind) {
-    case 'platonic':
-      return platonic(shape.id)
-    case 'prism':
-      return prism(Math.min(shape.sides, MAX_PRISM_SIDES))
-    case 'trapezohedron':
-      return trapezohedron(Math.min(shape.sides, MAX_TRAPEZO_SIDES))
-  }
 }
 
 function normalize(g: Geo): Geo {
@@ -147,7 +154,7 @@ function geometry(id: SolidId): Geo {
   if (!g) {
     const def = SOLIDS.find((d) => d.id === id)
     if (!def) throw new Error(`no solid named ${id}`)
-    g = normalize(geometryFor(def.shape))
+    g = normalize(geometryFor(def))
     CACHE.set(id, g)
   }
   return g

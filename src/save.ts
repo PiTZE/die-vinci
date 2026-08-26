@@ -25,6 +25,16 @@ const MIGRATIONS: Record<number, (r: Raw) => Raw> = {
   // changed. Carrying the old amounts over by position would silently hand a
   // player a pile of d9 they never bought, so layer 0 starts again. Options,
   // and everything above layer 0, are kept.
+  // 2 -> 3: same reasoning, the chain changed again.
+  2: (r) => ({
+    ...r,
+    solids: [],
+    studies: 0,
+    folios: 0,
+    rollUpgrades: 0,
+    ink: '10',
+    inkThisWager: '0',
+  }),
   1: (r) => ({
     ...r,
     solids: [],

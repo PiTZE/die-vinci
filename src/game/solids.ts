@@ -1,36 +1,35 @@
 // The production chain. Solid N produces solid N-1, solid 1 produces Ink.
-// Antimatter Dimensions' engine with real dice on top.
+// Antimatter Dimensions' engine with Leonardo's geometry on top.
 //
-// Nine stages. AD's constants assume eight, and a shorter chain stalls: two
-// fewer stages is two fewer compounding steps, and no amount of retuning the
-// top recovers it. Its cost table is extended by one step following its own
-// progression, where each base cost exponent gap grows by one and each cost
-// multiplier gap grows every third entry.
+// Every one of these is a plate in Pacioli's De divina proportione, drawn by
+// Leonardo in 1497. He made about fifty-nine, most of them each solid twice:
+// solidus filled, and vacuus with the faces removed so the back shows through
+// the front. Those skeletal drawings are what the game renders.
+//
+// Nine stages, because AD's constants assume that depth. Its cost table is
+// extended by one entry along its own pattern, where the base cost exponent
+// gaps grow by one and the cost multiplier gaps grow every third entry:
 //
 //   AD base cost  [10, 100, 1e4, 1e6, 1e9, 1e13, 1e18, 1e24]  -> 1e31
 //   AD cost mult  [1e3, 1e4, 1e5, 1e6, 1e8, 1e10, 1e12, 1e15] -> 1e18
-//
-// The first three are Platonic solids Leonardo drew for Pacioli. The rest are
-// ordinary dice: odd-numbered ones are barrel prisms and even-numbered ones are
-// trapezohedra, which is how a d9 or a d22 exists at all.
 import Decimal from 'break_infinity.js'
 
 export type SolidId =
-  | 'd4'
-  | 'd6'
-  | 'd8'
-  | 'd9'
-  | 'd11'
-  | 'd22'
-  | 'd33'
-  | 'd66'
-  | 'd99'
+  | 'tetra'
+  | 'hexa'
+  | 'octa'
+  | 'dodeca'
+  | 'cubocta'
+  | 'icosa'
+  | 'rhombi'
+  | 'truncicosa'
+  | 'sphaera'
 
-/** How a solid is drawn. Face count alone does not determine the shape. */
+/** How a solid is drawn. */
 export type SolidShape =
-  | { kind: 'platonic'; id: 'tetra' | 'hexa' | 'octa' }
-  | { kind: 'prism'; sides: number }
-  | { kind: 'trapezohedron'; sides: number }
+  | { kind: 'uniform' }
+  /** The 72-sided sphere. Pacioli calls it a sphere, so it is drawn as one. */
+  | { kind: 'sphere'; meridians: number; bands: number }
 
 export interface SolidDef {
   /** 1-based position in the chain. 1 produces Ink. */
@@ -38,6 +37,8 @@ export interface SolidDef {
   id: SolidId
   short: string
   name: string
+  /** Pacioli's own Latin, where the book gives it. */
+  latin: string
   faces: number
   shape: SolidShape
   baseCost: Decimal
@@ -45,24 +46,36 @@ export interface SolidDef {
   costMult: Decimal
 }
 
-const TABLE: [SolidId, string, number, SolidShape, number, number][] = [
-  ['d4', 'Tetrahedron', 4, { kind: 'platonic', id: 'tetra' }, 10, 1e3],
-  ['d6', 'Hexahedron', 6, { kind: 'platonic', id: 'hexa' }, 100, 1e4],
-  ['d8', 'Octahedron', 8, { kind: 'platonic', id: 'octa' }, 1e4, 1e5],
-  ['d9', 'Barrel', 9, { kind: 'prism', sides: 9 }, 1e6, 1e6],
-  ['d11', 'Barrel', 11, { kind: 'prism', sides: 11 }, 1e9, 1e8],
-  ['d22', 'Trapezohedron', 22, { kind: 'trapezohedron', sides: 11 }, 1e13, 1e10],
-  ['d33', 'Barrel', 33, { kind: 'prism', sides: 33 }, 1e18, 1e12],
-  ['d66', 'Trapezohedron', 66, { kind: 'trapezohedron', sides: 33 }, 1e24, 1e15],
-  ['d99', 'Barrel', 99, { kind: 'prism', sides: 99 }, 1e31, 1e18],
+const UNIFORM: SolidShape = { kind: 'uniform' }
+
+const TABLE: [SolidId, string, string, string, number, SolidShape, number, number][] = [
+  ['tetra', 'd4', 'Tetrahedron', 'Tetracedron', 4, UNIFORM, 10, 1e3],
+  ['hexa', 'd6', 'Hexahedron', 'Exacedron', 6, UNIFORM, 100, 1e4],
+  ['octa', 'd8', 'Octahedron', 'Octocedron', 8, UNIFORM, 1e4, 1e5],
+  ['dodeca', 'd12', 'Dodecahedron', 'Duodecedron', 12, UNIFORM, 1e6, 1e6],
+  ['cubocta', 'd14', 'Cuboctahedron', 'Exacedron Abscisus', 14, UNIFORM, 1e9, 1e8],
+  ['icosa', 'd20', 'Icosahedron', 'Icocedron', 20, UNIFORM, 1e13, 1e10],
+  ['rhombi', 'd26', 'Rhombicuboctahedron', 'Vigintisex Basium', 26, UNIFORM, 1e18, 1e12],
+  ['truncicosa', 'd32', 'Truncated Icosahedron', 'Ycocedron Abscisus', 32, UNIFORM, 1e24, 1e15],
+  [
+    'sphaera',
+    'd72',
+    'Sphere of Seventy-Two',
+    'Septuaginta Duarum Basium',
+    72,
+    { kind: 'sphere', meridians: 12, bands: 6 },
+    1e31,
+    1e18,
+  ],
 ]
 
 export const SOLIDS: SolidDef[] = TABLE.map(
-  ([id, name, faces, shape, baseCost, costMult], i) => ({
+  ([id, short, name, latin, faces, shape, baseCost, costMult], i) => ({
     idx: i + 1,
     id,
-    short: id,
+    short,
     name,
+    latin,
     faces,
     shape,
     baseCost: new Decimal(baseCost),

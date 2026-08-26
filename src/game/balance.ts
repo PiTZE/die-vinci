@@ -15,7 +15,7 @@ export const CHANNEL_PATHS = { stable: '/', dev: '/dev/' } as const
 export const THEME_KEY = 'leonardos-die-theme'
 /** Inline tokens for a theme registered at runtime, so it survives a reload. */
 export const THEME_VARS_KEY = 'leonardos-die-theme-vars'
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 export const AUTOSAVE_MS = 10_000
 
 /** Time away is credited up to this, then stops accruing. */
