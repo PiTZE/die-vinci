@@ -33,12 +33,6 @@
   display: none;
 }
 
-.res[hidden],
-.solid[hidden],
-.section[hidden] {
-  display: none;
-}
-
 .res {
   display: flex;
   flex-direction: column;
@@ -117,10 +111,6 @@
   box-shadow: inset 0 2px 0 var(--fg);
 }
 
-.tab[hidden] {
-  display: none;
-}
-
 /* -- panes --------------------------------------------------------------- */
 
 .pane {
@@ -128,10 +118,6 @@
   overflow-x: hidden;
   padding: var(--gap);
   -webkit-overflow-scrolling: touch;
-}
-
-.pane[hidden] {
-  display: none;
 }
 
 .section {
@@ -239,10 +225,6 @@
   gap: 8px;
   /* Sits to the right, where a thumb rests. */
   justify-content: flex-end;
-}
-
-.action-bar[hidden] {
-  display: none;
 }
 
 .max {

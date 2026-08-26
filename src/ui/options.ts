@@ -2,6 +2,7 @@ import { NOTATIONS } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { applyTheme, currentTheme, themes } from './theme'
+import { installState, manualHint, onInstallChange, promptInstall } from '../install'
 
 export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
@@ -101,6 +102,35 @@ export function optionsPane(): Pane {
       wipeRow.appendChild(wipe)
       save.appendChild(wipeRow)
 
+      const install = el('div', 'section')
+      const ih = el('div', 'section-head')
+      ih.appendChild(el('span', 'grow', 'INSTALL'))
+      install.appendChild(ih)
+      const iRow = el('div', 'row')
+      const installBtn = el('button', 'action', 'INSTALL')
+      installBtn.type = 'button'
+      installBtn.addEventListener('click', async () => {
+        installBtn.disabled = true
+        await promptInstall()
+        paintInstall()
+      })
+      const installNote = el('div', 'empty', '')
+      iRow.appendChild(installBtn)
+      install.append(iRow, installNote)
+
+      function paintInstall() {
+        const state = installState()
+        installBtn.hidden = state !== 'ready'
+        // The row keeps its padding even when the only thing in it is hidden.
+        iRow.hidden = state !== 'ready'
+        installBtn.disabled = false
+        installBtn.classList.toggle('buyable', state === 'ready')
+        installNote.hidden = state === 'ready'
+        installNote.textContent = state === 'installed' ? 'installed' : manualHint()
+      }
+      paintInstall()
+      onInstallChange(paintInstall)
+
       const about = el('div', 'section')
       const ah = el('div', 'section-head')
       ah.appendChild(el('span', 'grow', 'VERSION'))
@@ -111,7 +141,7 @@ export function optionsPane(): Pane {
       buildRow.appendChild(el('span', 'num dim', __BUILD_ID__))
       about.appendChild(buildRow)
 
-      root.append(theme, notation, save, about)
+      root.append(theme, notation, install, save, about)
       paintTheme()
 
       function say(msg: string) {

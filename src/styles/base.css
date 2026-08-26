@@ -28,6 +28,13 @@
   box-sizing: border-box;
 }
 
+/* Any display rule on a class beats the hidden attribute, and this codebase
+   has been caught by that three times: solid rows, resource readouts, and the
+   install button, each patched with its own [hidden] rule. Fixed once here. */
+[hidden] {
+  display: none !important;
+}
+
 html {
   overflow-x: hidden;
   /* iOS bumps font sizes on rotate without this. */
