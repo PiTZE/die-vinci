@@ -39,6 +39,9 @@ function setText(n: HTMLElement, v: string): void {
 export function tablePane(): Pane {
   const rows: Row[] = []
   let maxBtn: HTMLButtonElement
+  let barFolio: HTMLButtonElement
+  let barStudy: HTMLButtonElement
+  let actionGroup: HTMLElement
   let rollLine: HTMLElement
   let rollBtn: HTMLButtonElement
   let studyBtn: HTMLButtonElement
@@ -52,10 +55,25 @@ export function tablePane(): Pane {
     label: 'TABLE',
 
     mount(root, actions: Actions) {
-      maxBtn = el('button', 'max', 'MAX')
+      // The same three actions as the panes below, in the thumb's reach. Folio
+      // sits left of study to match the section, and both sit left of max.
+      barFolio = el('button', 'bar-btn', 'F')
+      barFolio.type = 'button'
+      barFolio.title = 'Bind a folio  (f)'
+      holdable(barFolio, () => actions.buyFolio())
+
+      barStudy = el('button', 'bar-btn', 'S')
+      barStudy.type = 'button'
+      barStudy.title = 'Take a study  (s)'
+      holdable(barStudy, () => actions.buyStudy())
+
+      maxBtn = el('button', 'bar-btn max', 'M')
       maxBtn.type = 'button'
       maxBtn.title = 'Buy the most expensive first, repeatedly  (m)'
       holdable(maxBtn, () => actions.maxAll())
+
+      actionGroup = el('div', 'action-group')
+      actionGroup.append(barFolio, barStudy, maxBtn)
 
 
       const chain = el('div', 'section table-chain')
@@ -163,7 +181,7 @@ export function tablePane(): Pane {
     },
 
     action() {
-      return maxBtn
+      return actionGroup
     },
 
     update(s: GameState) {
@@ -173,6 +191,10 @@ export function tablePane(): Pane {
       const canMax = canMaxAll(s)
       maxBtn.disabled = !canMax
       maxBtn.classList.toggle('buyable', canMax)
+
+      const canStudyNow = canBuyStudy(s)
+      barStudy.disabled = !canStudyNow
+      barStudy.classList.toggle('buyable', canStudyNow)
 
       for (const def of SOLIDS) {
         const r = rows[def.idx - 1]
@@ -219,6 +241,12 @@ export function tablePane(): Pane {
       const showFolio = folioUnlocked(s)
       folioLabel.hidden = !showFolio
       folioBtn.hidden = !showFolio
+      barFolio.hidden = !showFolio
+      if (showFolio) {
+        const canFolioNow = canBuyFolio(s)
+        barFolio.disabled = !canFolioNow
+        barFolio.classList.toggle('buyable', canFolioNow)
+      }
       if (showFolio) {
         const { idx, need } = folioReq(s)
         setText(folioLine, `${s.folios}`)

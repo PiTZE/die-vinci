@@ -269,21 +269,28 @@
   justify-content: flex-end;
 }
 
-.max {
-  /* Antimatter Dimensions makes Max All an ordinary button, 2.5rem tall
-     against a 10px root, and saves its big 5.5rem slabs for Dimension Boost
-     and Galaxy. Study and Folio are the equivalents here, so they keep the
-     slab and this shrinks to match. 44px is the floor for a touch target,
-     which AD's 25px would fail; their web build has no mobile styles at all. */
-  flex: 0 0 auto;
-  min-width: 7rem;
-  min-height: 44px;
-  padding: 0 18px;
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
+.action-group {
+  display: flex;
+  gap: 8px;
 }
 
-.max:hover:not(:disabled) {
+/* Antimatter Dimensions makes Max All an ordinary button, 2.5rem tall against
+   a 10px root, and saves its big slabs for Dimension Boost and Galaxy. These
+   are the compact shortcuts to the slabs in the panes below. 44px is the floor
+   for a touch target, which AD's 25px would fail. */
+.bar-btn {
+  flex: 0 0 auto;
+  min-width: 3.4rem;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bar-btn:hover:not(:disabled) {
   background: var(--fill);
   text-shadow: 0 0 6px var(--glow);
 }
@@ -304,14 +311,7 @@
   -webkit-user-select: none;
 }
 
-.max {
-  /* The action bar does not scroll, so nothing here needs to yield a drag to
-     the browser. `manipulation` would let it claim the gesture as a pan and
-     fire pointercancel, which killed the hold the moment a finger moved. */
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-}
+
 
 /* Folio and study sit side by side once both exist, and each header half
    lines up with the button under it. */

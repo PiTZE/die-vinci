@@ -24,12 +24,28 @@ const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByV
 await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
 
-const shown = `document.querySelector('.res-value').textContent`
+// The ink readout specifically. Indexing blindly into .res-value once picked
+// up the points readout, which never changes and made the test read a frozen
+// display where there was none.
+const shown = `(() => { const r = [...document.querySelectorAll('.res')]
+  .find(n => n.querySelector('.res-label')?.textContent === 'INK')
+  return r ? r.querySelector('.res-value').textContent : 'NO INK READOUT' })()`
 const stateInk = `window.LD.state.ink.toString()`
 
-await send('Page.navigate',{url:URL_}); await sleep(4500)
+// A headless page can start hidden, and a hidden page correctly does not run
+// requestAnimationFrame. Without this the test reads a display that never
+// updated and calls it a freeze.
+await send('Emulation.setFocusEmulationEnabled', { enabled: true })
+await send('Page.navigate',{url:URL_})
+await send('Page.bringToFront')
+await sleep(4500)
 
 // Baseline: the display should be moving.
+const vis = await ev(`document.visibilityState`)
+if (vis !== 'visible') {
+  console.log(`SKIP  page is ${vis} in this browser, so rendering is correctly paused`)
+  ws.close(); chrome.kill(); process.exit(0)
+}
 const a1 = await ev(shown); await sleep(1200); const a2 = await ev(shown)
 check('display updates before freezing', a1 !== a2, `${a1} -> ${a2}`)
 
