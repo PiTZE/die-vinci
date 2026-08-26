@@ -5,7 +5,7 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
@@ -222,46 +222,22 @@
   background: var(--fill);
 }
 
-/* -- roll by hand, the entire game until the first autobuyer -------------- */
+/* -- the action bar, pinned in the thumb's reach -------------------------- */
 
-.roll-row {
+.action-bar {
   display: flex;
   gap: 8px;
-  /* Sticks to the bottom of the scrollport while anything is above it, then
-     settles into place at the end of the content. The negative margins pull it
-     out to the pane's edges so it reads as a bar rather than a floating card. */
-  position: sticky;
-  bottom: calc(var(--gap) * -1);
-  z-index: 3;
-  margin: var(--gap) calc(var(--gap) * -1) calc(var(--gap) * -1);
-  padding: 10px var(--gap) calc(10px + var(--gap));
+  padding: 10px var(--gap);
   background: var(--bg);
   border-top: 1px solid var(--border);
 }
 
-.roll {
-  flex: 1;
-  min-width: 0;
-  min-height: 64px;
-  padding: 12px;
-  border: 1px solid var(--fg);
-  font-size: 0.95rem;
-  letter-spacing: 0.14em;
-  font-variant-numeric: tabular-nums;
-}
-
-.roll:hover {
-  background: var(--fill);
-  text-shadow: 0 0 6px var(--glow);
-}
-
-.roll:active,
-.roll.held {
-  background: var(--fill-strong);
+.action-bar[hidden] {
+  display: none;
 }
 
 .max {
-  flex: 0 0 5.5rem;
+  flex: 1;
   min-height: 64px;
   font-size: 0.8rem;
   letter-spacing: 0.14em;
@@ -279,11 +255,20 @@
 
 /* Held buttons must not also pan the page, select their own label, or wait on
    a double-tap-zoom timer. */
-.roll,
-.max,
 .action,
 .solid-buy {
+  /* These sit inside the scrolling pane, so a drag that starts on one still
+     has to be allowed to scroll it. */
   touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.max {
+  /* The action bar does not scroll, so nothing here needs to yield a drag to
+     the browser. `manipulation` would let it claim the gesture as a pan and
+     fire pointercancel, which killed the hold the moment a finger moved. */
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -340,7 +325,7 @@
 @media (min-width: 820px) {
   .app {
     grid-template-columns: var(--nav-w) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .bar {
@@ -351,7 +336,7 @@
 
   .tabs {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 2 / 4;
     flex-direction: column;
     align-items: stretch;
     border-top: 0;
@@ -378,11 +363,10 @@
     padding: var(--gap) calc(var(--gap) * 1.4);
   }
 
-  .roll-row {
-    margin-left: calc(var(--gap) * -1.4);
-    margin-right: calc(var(--gap) * -1.4);
-    padding-left: calc(var(--gap) * 1.4);
-    padding-right: calc(var(--gap) * 1.4);
+  .action-bar {
+    grid-column: 2;
+    grid-row: 3;
+    padding: 10px calc(var(--gap) * 1.4);
   }
 
   .pane-inner {

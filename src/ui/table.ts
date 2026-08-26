@@ -10,7 +10,6 @@ import {
   canMaxAll,
   folioReq,
   folioUnlocked,
-  manualRollYield,
   rollCost,
   rollRate,
   solidMultiplier,
@@ -36,7 +35,6 @@ function setText(n: HTMLElement, v: string): void {
 
 export function tablePane(): Pane {
   const rows: Row[] = []
-  let handBtn: HTMLButtonElement
   let maxBtn: HTMLButtonElement
   let rollLine: HTMLElement
   let rollBtn: HTMLButtonElement
@@ -51,18 +49,11 @@ export function tablePane(): Pane {
     label: 'TABLE',
 
     mount(root, actions: Actions) {
-      handBtn = el('button', 'roll', 'ROLL')
-      handBtn.type = 'button'
-      handBtn.title = 'Roll by hand  (space)'
-      holdable(handBtn, () => actions.roll())
-
       maxBtn = el('button', 'max', 'MAX')
       maxBtn.type = 'button'
       maxBtn.title = 'Buy the most expensive first, repeatedly  (m)'
       holdable(maxBtn, () => actions.maxAll())
 
-      const topRow = el('div', 'roll-row')
-      topRow.append(handBtn, maxBtn)
 
       const chain = el('div', 'section')
       const head = el('div', 'section-head')
@@ -135,13 +126,10 @@ export function tablePane(): Pane {
       fr.appendChild(folioBtn)
       folioSection.appendChild(fr)
 
-      // Last in the DOM and stuck to the bottom of the pane: the two buttons
-      // pressed most often belong in the thumb's reach, not above the fold.
-      root.append(chain, roll, study, folioSection, topRow)
+      root.append(chain, roll, study, folioSection)
 
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.
-      bindKey('space', () => actions.roll())
       bindKey('m', () => actions.maxAll())
       bindKey('r', () => actions.buyRollRate())
       bindKey('s', () => actions.buyStudy())
@@ -151,10 +139,13 @@ export function tablePane(): Pane {
       }
     },
 
+    action() {
+      return maxBtn
+    },
+
     update(s: GameState) {
       const n = s.options.notation
       const open = unlockedSolids(s)
-      setText(handBtn, `ROLL  +${format(manualRollYield(s), n)}`)
       const canMax = canMaxAll(s)
       maxBtn.disabled = !canMax
       maxBtn.classList.toggle('buyable', canMax)

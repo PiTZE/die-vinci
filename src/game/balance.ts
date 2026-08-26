@@ -19,12 +19,12 @@ export const OFFLINE_CAP_S = 8 * 60 * 60
  */
 export const WAGER_AT = new Decimal('1.7976931348623157e308')
 
-/** Enough to buy the first tetrahedron, so the game opens on a real choice. */
+/**
+ * Exactly the price of one tetrahedron. There is no click button, the same as
+ * in Antimatter Dimensions, so this is the entire bootstrap: buy the first die
+ * and the chain takes over.
+ */
 export const START_INK = 10
-
-/** A hand roll pays this many seconds of current production, floored at 1 ink,
- *  so it bootstraps the game and then stops mattering on its own. */
-export const MANUAL_ROLL_SECONDS = 2
 
 /** Every ten of a solid you buy doubles its multiplier. Straight from AD. */
 export const PER_TEN_MULT = new Decimal(2)

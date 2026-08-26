@@ -11,7 +11,6 @@ import {
   buySolid,
   buyStudy,
   inkPerSecond,
-  manualRoll,
   maxAll,
   tick,
 } from './game/production'
@@ -32,7 +31,6 @@ let state: GameState = loadGame(Date.now())
 applyTheme(currentTheme().id)
 
 const actions: Actions = {
-  roll: () => void manualRoll(state),
   maxAll: () => maxAll(state),
   buySolid: (idx, one) => void buySolid(state, idx, one),
   buyRollRate: () => void buyRollRate(state),

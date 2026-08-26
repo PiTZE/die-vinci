@@ -144,20 +144,36 @@ try {
     await sleep(500)
     check('touchend stops the repeat', (await evaluate(TOTAL)) === t1)
 
-    // Sliding off the button before lifting is the classic way to leave a
-    // repeat running forever. Pointer capture is what should prevent it.
-    await evaluate(reset)
+    // MAX exhausts whatever it can afford on the first press, so testing a
+    // sustained hold needs income that outruns spending. A vast pile of d4
+    // gives prices something to keep climbing against.
+    const flowing = `(() => { const s = window.LD.state, D = window.LD.Decimal;
+      s.rollUpgrades = 0; s.ink = new D(0);
+      s.solids.forEach(d => { d.bought = 0; d.amount = new D(0) });
+      s.solids[0].amount = new D('1e200') })()`
+
     const box = await evaluate(`(() => { const r = document.querySelector('.max').getBoundingClientRect();
       return { x: r.left + r.width/2, y: r.top + r.height/2 } })()`)
     const pt = (x, y) => [{ x, y, radiusX: 8, radiusY: 8, force: 1, id: 1 }]
+
+    // Dragging off the button must not end the hold. Only lifting should.
+    await evaluate(flowing)
+    // MAX disables itself at zero ink, and a disabled button does not start a
+    // hold. Let production put something in the pile first.
+    await sleep(250)
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(box.x, box.y) })
-    await sleep(600)
-    await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(20, 700) })
-    await sleep(150)
-    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
-    const slid = await evaluate(TOTAL)
+    await sleep(500)
+    await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(20, 200) })
+    const atMove = await evaluate(TOTAL)
     await sleep(700)
-    check('slide off then lift stops it', (await evaluate(TOTAL)) === slid, `settled at ${slid}`)
+    const whileOff = await evaluate(TOTAL)
+    check('keeps firing with the finger off it', whileOff > atMove, `${atMove} -> ${whileOff} while away`)
+
+    await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    await sleep(120)
+    const atLift = await evaluate(TOTAL)
+    await sleep(700)
+    check('lifting away from the button stops it', (await evaluate(TOTAL)) === atLift, `settled at ${atLift}`)
   }
 
   const shot = await send('Page.captureScreenshot', { format: 'png' })

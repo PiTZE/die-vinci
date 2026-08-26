@@ -38,7 +38,6 @@ export interface GameState {
   }
   stats: {
     started: number
-    manualRolls: number
   }
 }
 
@@ -56,7 +55,7 @@ export function newGame(now: number): GameState {
     wagers: 0,
     tarot: {},
     options: { notation: 'scientific', tab: 'table' },
-    stats: { started: now, manualRolls: 0 },
+    stats: { started: now },
   }
 }
 

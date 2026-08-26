@@ -49,6 +49,8 @@ export function holdable(el: HTMLElement, action: (mods: Mods) => void): void {
     active?.stop()
     active = null
     el.classList.remove('held')
+    window.removeEventListener('pointerup', stop)
+    window.removeEventListener('pointercancel', stop)
   }
 
   el.addEventListener('pointerdown', (e) => {
@@ -63,12 +65,18 @@ export function holdable(el: HTMLElement, action: (mods: Mods) => void): void {
       // Capture is a nicety; the window-level fallbacks still cover release.
     }
     el.classList.add('held')
+    // A release anywhere ends the hold, including on an element that is not
+    // this one. Dragging the finger off the button must not.
+    window.addEventListener('pointerup', stop)
+    window.addEventListener('pointercancel', stop)
     active = repeat(() => action({ shift: e.shiftKey }))
   })
 
-  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) {
-    el.addEventListener(ev, stop)
-  }
+  // Deliberately not listening for pointerleave, pointerout or
+  // lostpointercapture. All three fire while the finger is still down, and
+  // stopping on them is what made the button quit the moment you slid off it.
+  el.addEventListener('pointerup', stop)
+  el.addEventListener('pointercancel', stop)
 
   el.addEventListener('click', (e) => {
     // The pointer path already fired this press.

@@ -5,7 +5,6 @@ import { currentTheme, nextTheme, themes } from './theme'
 
 /** What a pane is allowed to do to the game. Implemented in main.ts. */
 export interface Actions {
-  roll(): void
   maxAll(): void
   buySolid(idx: number, one?: boolean): void
   buyRollRate(): void
@@ -22,6 +21,11 @@ export interface Pane {
   label: string
   mount(el: HTMLElement, actions: Actions): void
   update(s: GameState): void
+  /**
+   * Controls that belong in the bar above the tabs rather than in the scrolling
+   * pane. Called once after mount. Returning null means this pane has none.
+   */
+  action?(): HTMLElement | null
   /** Tabs stay hidden until the game has something to put in them. */
   visible?(s: GameState): boolean
 }
@@ -65,6 +69,8 @@ export class Shell {
   private panes: Pane[] = []
   private tabButtons = new Map<TabId, HTMLButtonElement>()
   private paneEls = new Map<TabId, HTMLElement>()
+  private actionEls = new Map<TabId, HTMLElement>()
+  private actionBar = el('div', 'action-bar')
   private inkOut = new Readout('INK')
   private pointsOut = new Readout('POINTS')
   private themeBtn = el('button', 'theme-toggle')
@@ -104,11 +110,21 @@ export class Shell {
       pane.appendChild(inner)
       this.paneEls.set(p.id, pane)
       p.mount(inner, this.actions)
+
+      // The action bar lives in the shell grid, not inside the pane. A sticky
+      // element only pins while the content overflows, so early on, with three
+      // solids and no folio section, it fell back into the flow and sat under
+      // the last section instead of staying in the thumb's reach.
+      const act = p.action?.()
+      if (act) {
+        this.actionEls.set(p.id, act)
+        this.actionBar.appendChild(act)
+      }
     }
 
     this.root.append(bar)
     for (const pane of this.paneEls.values()) this.root.appendChild(pane)
-    this.root.appendChild(tabs)
+    this.root.append(this.actionBar, tabs)
 
     this.paintThemeButton()
     this.select(initial)
@@ -130,7 +146,10 @@ export class Shell {
       btn.setAttribute('aria-selected', String(on))
       const pane = this.paneEls.get(tab)
       if (pane) pane.hidden = !on
+      const act = this.actionEls.get(tab)
+      if (act) act.hidden = !on
     }
+    this.actionBar.hidden = !this.actionEls.has(id)
   }
 
   get activeTab(): TabId {

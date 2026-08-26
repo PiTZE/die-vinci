@@ -3,7 +3,6 @@
 import Decimal from 'break_infinity.js'
 import { SOLIDS } from './solids'
 import {
-  MANUAL_ROLL_SECONDS,
   PER_TEN_MULT,
   ROLL_COST_BASE,
   ROLL_COST_MULT,
@@ -197,25 +196,6 @@ export function maxAll(s: GameState): void {
 
     if (!best || !best.buy()) return
   }
-}
-
-// -- rolling by hand ------------------------------------------------------
-
-/**
- * The whole game before the first autobuyer. It pays a couple of seconds of
- * production, so it starts the game moving and becomes irrelevant without ever
- * needing to be taken away.
- */
-export function manualRollYield(s: GameState): Decimal {
-  return inkPerSecond(s).times(MANUAL_ROLL_SECONDS).max(1)
-}
-
-export function manualRoll(s: GameState): Decimal {
-  const got = manualRollYield(s)
-  s.ink = s.ink.plus(got)
-  s.inkThisWager = s.inkThisWager.plus(got)
-  s.stats.manualRolls += 1
-  return got
 }
 
 // -- the tick -------------------------------------------------------------
