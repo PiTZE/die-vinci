@@ -25,6 +25,11 @@ const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FA
 
 await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4000)
 
+// These exercise the mechanics, not the confirm-once in front of them, which
+// has its own suite. Without this every reset here would need two clicks.
+await ev(`window.LD.state.options.confirmResets = false`)
+await sleep(300)
+
 const atThreshold = `(() => { const s = window.LD.state, D = window.LD.Decimal
   s.ink = new D('1.8e308'); s.studies = 3; s.folios = 2; s.rollUpgrades = 40
   s.solids.forEach(d => { d.bought = 30; d.amount = new D(1000) }) })()`

@@ -21,7 +21,18 @@ await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
 const tab = (name) => `[...document.querySelectorAll('.tab')].find(t => t.textContent === '${name}')`
 
+// Start from nothing. A run interrupted part way leaves its browser alive and
+// holding this port, and the next run then attaches to it and inherits a save
+// it never made, which is how this suite reported a challenge cleared before
+// it had done anything.
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(2500)
+await ev(`(() => { localStorage.clear(); localStorage.setItem = () => {} })()`)
 await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4000)
+
+// These exercise the mechanics, not the confirm-once in front of them, which
+// has its own suite. Without this every reset here would need two clicks.
+await ev(`window.LD.state.options.confirmResets = false`)
+await sleep(300)
 
 check('challenges hidden before the first wager',
   await ev(`!${tab('CHALLENGES')} || ${tab('CHALLENGES')}.hidden`))
@@ -83,13 +94,17 @@ check('an unlocked autobuyer buys on its own', boughtAfter > boughtBefore,
 // And upgrading it costs points and shortens the interval.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.points = new D(50) })()`)
 await ev(`${tab('AUTOMATION')}.click()`); await sleep(500)
-const beforeUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level, points: Number(window.LD.state.points) })`)
+const beforeUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level,
+  points: Number(window.LD.state.points),
+  every: window.LD.state.autobuyers.solid1.level })`)
+// Cost doubles per level, so it is derived rather than assumed to be 1.
+const expectCost = Math.pow(2, beforeUp.level)
 await ev(`[...document.querySelectorAll('.auto-up')].find(b => !b.disabled).click()`)
 await sleep(400)
 const afterUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level, points: Number(window.LD.state.points) })`)
-check('upgrading an autobuyer spends a point and shortens it',
-  afterUp.level === beforeUp.level + 1 && afterUp.points === beforeUp.points - 1,
-  `${JSON.stringify(beforeUp)} -> ${JSON.stringify(afterUp)}`)
+check('upgrading an autobuyer spends the doubling cost and shortens it',
+  afterUp.level === beforeUp.level + 1 && afterUp.points === beforeUp.points - expectCost,
+  `${JSON.stringify(beforeUp)} -> ${JSON.stringify(afterUp)}, cost ${expectCost}`)
 
 ws.close();chrome.kill();await sleep(400);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
