@@ -6,7 +6,8 @@ import { currentTheme, nextTheme, themes } from './theme'
 /** What a pane is allowed to do to the game. Implemented in main.ts. */
 export interface Actions {
   roll(): void
-  buySolid(idx: number): void
+  maxAll(): void
+  buySolid(idx: number, one?: boolean): void
   buyRollRate(): void
   buyStudy(): void
   buyFolio(): void

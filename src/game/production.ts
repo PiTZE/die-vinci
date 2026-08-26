@@ -60,10 +60,13 @@ export function canBuySolid(s: GameState, idx: number): boolean {
   return s.ink.gte(buyPrice(s, idx))
 }
 
-export function buySolid(s: GameState, idx: number): boolean {
-  if (!canBuySolid(s, idx)) return false
-  const n = buyCount(s, idx)
-  s.ink = s.ink.minus(buyPrice(s, idx))
+/** `one` is the shift-click path: a single die at the current tier price. */
+export function buySolid(s: GameState, idx: number, one = false): boolean {
+  if (idx > unlockedSolids(s)) return false
+  const n = one ? 1 : buyCount(s, idx)
+  const price = solidCost(s, idx).times(n)
+  if (s.ink.lt(price)) return false
+  s.ink = s.ink.minus(price)
   const st = s.solids[idx - 1]
   st.bought += n
   st.amount = st.amount.plus(n)
@@ -154,6 +157,33 @@ export function buyFolio(s: GameState): boolean {
   s.rollUpgrades = 0
   resetSolids(s)
   return true
+}
+
+// -- max all --------------------------------------------------------------
+
+/** A bound so a corrupt or infinite ink value cannot lock the main thread. */
+const MAX_ALL_STEPS = 5000
+
+export function canMaxAll(s: GameState): boolean {
+  if (canBuyRollRate(s)) return true
+  for (let idx = 1; idx <= unlockedSolids(s); idx++) {
+    if (canBuySolid(s, idx)) return true
+  }
+  return false
+}
+
+/**
+ * Antimatter Dimensions' Max All, in its order: max roll rate first, then buy
+ * until ten of the shallowest solid as many times as it can afford, then the
+ * next, up the chain. Roll rate going first is what makes it win a tie against
+ * an equally priced ten, which is AD's documented behaviour.
+ */
+export function maxAll(s: GameState): void {
+  let steps = 0
+  while (buyRollRate(s) && ++steps < MAX_ALL_STEPS);
+  for (let idx = 1; idx <= unlockedSolids(s); idx++) {
+    while (buySolid(s, idx) && ++steps < MAX_ALL_STEPS);
+  }
 }
 
 // -- rolling by hand ------------------------------------------------------

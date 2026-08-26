@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "test:ui": "node tools/interaction-test.mjs",
+    "icons": "node tools/make-icons.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

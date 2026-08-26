@@ -224,11 +224,16 @@
 
 /* -- roll by hand, the entire game until the first autobuyer -------------- */
 
-.roll {
-  display: block;
-  width: 100%;
-  min-height: 64px;
+.roll-row {
+  display: flex;
+  gap: 8px;
   margin-bottom: var(--gap);
+}
+
+.roll {
+  flex: 1;
+  min-width: 0;
+  min-height: 64px;
   padding: 12px;
   border: 1px solid var(--fg);
   font-size: 0.95rem;
@@ -241,8 +246,37 @@
   text-shadow: 0 0 6px var(--glow);
 }
 
-.roll:active {
+.roll:active,
+.roll.held {
   background: var(--fill-strong);
+}
+
+.max {
+  flex: 0 0 5.5rem;
+  min-height: 64px;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+}
+
+.max:hover:not(:disabled) {
+  background: var(--fill);
+  text-shadow: 0 0 6px var(--glow);
+}
+
+/* Anything held repeats, so it needs to look held. */
+.held:not(:disabled) {
+  background: var(--fill-strong);
+}
+
+/* Held buttons must not also pan the page, select their own label, or wait on
+   a double-tap-zoom timer. */
+.roll,
+.max,
+.action,
+.solid-buy {
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* -- generic wide action button ------------------------------------------ */

@@ -12,6 +12,7 @@ import {
   buyStudy,
   inkPerSecond,
   manualRoll,
+  maxAll,
   tick,
 } from './game/production'
 import { exportSave, importSave, loadGame, saveGame, wipeSave } from './save'
@@ -32,7 +33,8 @@ applyTheme(currentTheme().id)
 
 const actions: Actions = {
   roll: () => void manualRoll(state),
-  buySolid: (idx) => buySolid(state, idx),
+  maxAll: () => maxAll(state),
+  buySolid: (idx, one) => void buySolid(state, idx, one),
   buyRollRate: () => void buyRollRate(state),
   buyStudy: () => void buyStudy(state),
   buyFolio: () => void buyFolio(state),

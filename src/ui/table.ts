@@ -7,6 +7,7 @@ import {
   canBuyRollRate,
   canBuySolid,
   canBuyStudy,
+  canMaxAll,
   folioReq,
   folioUnlocked,
   manualRollYield,
@@ -18,6 +19,7 @@ import {
 import { format, formatWhole } from '../format'
 import { unlockedSolids, type GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
+import { bindKey, holdable } from './hold'
 import { wireframe } from './wireframe'
 
 interface Row {
@@ -35,6 +37,7 @@ function setText(n: HTMLElement, v: string): void {
 export function tablePane(): Pane {
   const rows: Row[] = []
   let handBtn: HTMLButtonElement
+  let maxBtn: HTMLButtonElement
   let rollLine: HTMLElement
   let rollBtn: HTMLButtonElement
   let studyBtn: HTMLButtonElement
@@ -50,7 +53,16 @@ export function tablePane(): Pane {
     mount(root, actions: Actions) {
       handBtn = el('button', 'roll', 'ROLL')
       handBtn.type = 'button'
-      handBtn.addEventListener('click', () => actions.roll())
+      handBtn.title = 'Roll by hand  (space)'
+      holdable(handBtn, () => actions.roll())
+
+      maxBtn = el('button', 'max', 'MAX')
+      maxBtn.type = 'button'
+      maxBtn.title = 'Roll rate first, then up the chain  (m)'
+      holdable(maxBtn, () => actions.maxAll())
+
+      const topRow = el('div', 'roll-row')
+      topRow.append(handBtn, maxBtn)
 
       const chain = el('div', 'section')
       const head = el('div', 'section-head')
@@ -73,7 +85,8 @@ export function tablePane(): Pane {
         rate.append(mult, ' ', flow)
         const buy = el('button', 'solid-buy', '')
         buy.type = 'button'
-        buy.addEventListener('click', () => actions.buySolid(def.idx))
+        // Shift buys a single die, the way AD's shift+1-8 does.
+        holdable(buy, (m) => actions.buySolid(def.idx, m.shift))
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
@@ -88,7 +101,8 @@ export function tablePane(): Pane {
       roll.appendChild(rh)
       rollBtn = el('button', 'action', '')
       rollBtn.type = 'button'
-      rollBtn.addEventListener('click', () => actions.buyRollRate())
+      rollBtn.title = 'Buy roll rate  (r)'
+      holdable(rollBtn, () => actions.buyRollRate())
       const rr = el('div', 'row')
       rr.appendChild(rollBtn)
       roll.appendChild(rr)
@@ -101,7 +115,8 @@ export function tablePane(): Pane {
       study.appendChild(sh)
       studyBtn = el('button', 'action', '')
       studyBtn.type = 'button'
-      studyBtn.addEventListener('click', () => actions.buyStudy())
+      studyBtn.title = 'Take a study  (s)'
+      holdable(studyBtn, () => actions.buyStudy())
       const sr = el('div', 'row')
       sr.appendChild(studyBtn)
       study.appendChild(sr)
@@ -114,18 +129,33 @@ export function tablePane(): Pane {
       folioSection.appendChild(fh)
       folioBtn = el('button', 'action', '')
       folioBtn.type = 'button'
-      folioBtn.addEventListener('click', () => actions.buyFolio())
+      folioBtn.title = 'Bind a folio  (f)'
+      holdable(folioBtn, () => actions.buyFolio())
       const fr = el('div', 'row')
       fr.appendChild(folioBtn)
       folioSection.appendChild(fr)
 
-      root.append(handBtn, chain, roll, study, folioSection)
+      root.append(topRow, chain, roll, study, folioSection)
+
+      // Same actions from the keyboard, held or tapped. Digits are read from
+      // the physical key so shift+1 still means the first solid.
+      bindKey('space', () => actions.roll())
+      bindKey('m', () => actions.maxAll())
+      bindKey('r', () => actions.buyRollRate())
+      bindKey('s', () => actions.buyStudy())
+      bindKey('f', () => actions.buyFolio())
+      for (const def of SOLIDS) {
+        bindKey(String(def.idx), (mods) => actions.buySolid(def.idx, mods.shift))
+      }
     },
 
     update(s: GameState) {
       const n = s.options.notation
       const open = unlockedSolids(s)
       setText(handBtn, `ROLL  +${format(manualRollYield(s), n)}`)
+      const canMax = canMaxAll(s)
+      maxBtn.disabled = !canMax
+      maxBtn.classList.toggle('buyable', canMax)
       const rate = rollRate(s)
 
       for (const def of SOLIDS) {
