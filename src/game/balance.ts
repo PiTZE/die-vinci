@@ -3,7 +3,14 @@
 import Decimal from 'break_infinity.js'
 
 export const TICK_MS = 100
-export const SAVE_KEY = 'leonardos-die-save'
+/**
+ * Dev keeps its own save. Both channels share one origin, so without this a dev
+ * build experimenting with the save format would eat the real one.
+ */
+export const SAVE_KEY = __CHANNEL__ === 'dev' ? 'leonardos-die-save-dev' : 'leonardos-die-save'
+
+/** Where each channel lives. The switcher navigates between them. */
+export const CHANNEL_PATHS = { stable: '/', dev: '/dev/' } as const
 export const THEME_KEY = 'leonardos-die-theme'
 /** Inline tokens for a theme registered at runtime, so it survives a reload. */
 export const THEME_VARS_KEY = 'leonardos-die-theme-vars'

@@ -3,6 +3,7 @@ import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { applyTheme, currentTheme, themes } from './theme'
 import { installState, manualHint, onInstallChange, promptInstall } from '../install'
+import { CHANNEL_PATHS } from '../game/balance'
 
 export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
@@ -131,17 +132,37 @@ export function optionsPane(): Pane {
       paintInstall()
       onInstallChange(paintInstall)
 
+      const channel = el('div', 'section')
+      const ch = el('div', 'section-head')
+      ch.appendChild(el('span', 'grow', 'CHANNEL'))
+      channel.appendChild(ch)
+      const chRow = el('div', 'row')
+      for (const [name, path] of Object.entries(CHANNEL_PATHS)) {
+        const b = el('button', 'action', name.toUpperCase())
+        b.type = 'button'
+        b.classList.toggle('buyable', name === __CHANNEL__)
+        b.addEventListener('click', () => {
+          if (name === __CHANNEL__) return
+          location.href = path
+        })
+        chRow.appendChild(b)
+      }
+      channel.appendChild(chRow)
+      channel.appendChild(
+        el('div', 'empty', 'each channel keeps its own save'),
+      )
+
       const about = el('div', 'section')
       const ah = el('div', 'section-head')
       ah.appendChild(el('span', 'grow', 'VERSION'))
-      ah.appendChild(el('span', 'num', __VERSION__))
+      ah.appendChild(el('span', 'num', __CHANNEL__ === 'dev' ? `${__VERSION__} dev` : __VERSION__))
       about.appendChild(ah)
       const buildRow = el('div', 'row')
       buildRow.appendChild(el('span', 'grow dim', 'BUILD'))
       buildRow.appendChild(el('span', 'num dim', __BUILD_ID__))
       about.appendChild(buildRow)
 
-      root.append(theme, notation, install, save, about)
+      root.append(theme, notation, install, channel, save, about)
       paintTheme()
 
       function say(msg: string) {

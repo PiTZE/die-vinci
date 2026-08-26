@@ -13,13 +13,21 @@ const { version: VERSION } = JSON.parse(readFileSync('./package.json', 'utf8'))
 // worker always has something to update to.
 const BUILD_ID = new Date().toISOString().slice(0, 19).replace('T', ' ')
 
+// Two channels off one origin. Stable lives at / and dev at /dev/, which keeps
+// them on the same host without a second certificate. Build the dev one with
+// CHANNEL=dev.
+const CHANNEL = process.env.CHANNEL === 'dev' ? 'dev' : 'stable'
+const BASE = CHANNEL === 'dev' ? '/dev/' : '/'
+
 export default defineConfig({
-  base: '/',
+  base: BASE,
   define: {
     __BUILD_ID__: JSON.stringify(BUILD_ID),
     __VERSION__: JSON.stringify(VERSION),
+    __CHANNEL__: JSON.stringify(CHANNEL),
   },
   build: {
+    outDir: CHANNEL === 'dev' ? 'dist-dev' : 'dist',
     target: 'es2022',
     // One page, one bundle. Splitting buys nothing here and costs a round trip.
     cssCodeSplit: false,
@@ -34,7 +42,7 @@ export default defineConfig({
         this.emitFile({
           type: 'asset',
           fileName: 'version.json',
-          source: JSON.stringify({ version: VERSION, buildId: BUILD_ID }),
+          source: JSON.stringify({ version: VERSION, buildId: BUILD_ID, channel: CHANNEL }),
         })
       },
     },
@@ -42,6 +50,10 @@ export default defineConfig({
       // The service worker takes a new build on the next load and activates it
       // without asking. That is the self-updating part.
       registerType: 'autoUpdate',
+      base: BASE,
+      // The worker must not reach outside its own channel. Without an explicit
+      // scope the stable worker at / would also control every page under /dev/.
+      scope: BASE,
       // main.ts imports virtual:pwa-register and registers the worker itself.
       // Leaving this on would register it a second time from an injected
       // script, and that plain registration is the one that cannot reload the
@@ -49,21 +61,21 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ['icon-192.png', 'icon-512.png', 'icon-512-maskable.png'],
       manifest: {
-        name: "Leonardo's Die",
-        short_name: "Leonardo's Die",
+        name: CHANNEL === 'dev' ? "Leonardo's Die (dev)" : "Leonardo's Die",
+        short_name: CHANNEL === 'dev' ? "Die dev" : "Leonardo's Die",
         description:
           'An incremental dice game about Leonardo, the Platonic solids, and what happened to determinism.',
-        start_url: '/',
-        scope: '/',
+        start_url: BASE,
+        scope: BASE,
         display: 'standalone',
         orientation: 'any',
         background_color: '#000000',
         theme_color: '#000000',
         icons: [
-          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+          { src: `${BASE}icon-192.png`, sizes: '192x192', type: 'image/png' },
+          { src: `${BASE}icon-512.png`, sizes: '512x512', type: 'image/png' },
           {
-            src: '/icon-512-maskable.png',
+            src: `${BASE}icon-512-maskable.png`,
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',
@@ -73,6 +85,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,woff2}'],
         cleanupOutdatedCaches: true,
+        // Navigations into the other channel go to the network. Without this
+        // the stable worker answers /dev/ with its own precached index.html.
+        navigateFallbackDenylist: CHANNEL === 'stable' ? [/^\/dev\//] : [],
       },
     }),
   ],

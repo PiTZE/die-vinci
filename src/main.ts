@@ -46,7 +46,8 @@ const TRIES_KEY = 'leonardos-die-refresh-tries'
 async function ensureLatest(registration?: ServiceWorkerRegistration): Promise<void> {
   let remote: { buildId?: string }
   try {
-    const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' })
+    const base = __CHANNEL__ === 'dev' ? '/dev/' : '/'
+    const res = await fetch(`${base}version.json?t=${Date.now()}`, { cache: 'no-store' })
     if (!res.ok) return
     remote = await res.json()
   } catch {
@@ -209,4 +210,7 @@ window.addEventListener('pagehide', persist)
     return state
   },
   Decimal,
+  channel: __CHANNEL__,
+  version: __VERSION__,
+  buildId: __BUILD_ID__,
 }

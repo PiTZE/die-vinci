@@ -5,3 +5,5 @@
 declare const __VERSION__: string
 /** Build timestamp, injected by vite. See vite.config.ts. */
 declare const __BUILD_ID__: string
+/** Release channel this build belongs to. See vite.config.ts. */
+declare const __CHANNEL__: 'stable' | 'dev'
