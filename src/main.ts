@@ -52,6 +52,17 @@ let state: GameState = loadGame(Date.now())
 // so colour-scheme, meta theme-color and any custom tokens agree with it.
 applyTheme(currentTheme().id)
 
+/**
+ * Wiping clears localStorage and reloads, but the reload fires pagehide, and
+ * that handler wrote the in-memory state straight back over the wipe. Every
+ * save goes through persist() so a wipe can switch them all off first.
+ */
+let savingEnabled = true
+
+function persist(): void {
+  if (savingEnabled) saveGame(state)
+}
+
 const actions: Actions = {
   maxAll: () => maxAll(state),
   buySolid: (idx, one) => void buySolid(state, idx, one),
@@ -66,10 +77,11 @@ const actions: Actions = {
     const next = importSave(blob, Date.now())
     if (!next) return false
     state = next
-    saveGame(state)
+    persist()
     return true
   },
   wipe: () => {
+    savingEnabled = false
     wipeSave()
     location.reload()
   },
@@ -108,7 +120,7 @@ function loop(): void {
   sinceSave += dt * 1000
   if (sinceSave >= AUTOSAVE_MS) {
     sinceSave = 0
-    saveGame(state)
+    persist()
   }
 }
 
@@ -124,7 +136,7 @@ rendering = requestAnimationFrame(render)
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    saveGame(state)
+    persist()
     cancelAnimationFrame(rendering)
     rendering = 0
   } else if (!rendering) {
@@ -132,7 +144,7 @@ document.addEventListener('visibilitychange', () => {
   }
 })
 
-window.addEventListener('pagehide', () => saveGame(state))
+window.addEventListener('pagehide', persist)
 
 // A hook for balance work in the console. Not referenced by the game itself.
 ;(window as unknown as Record<string, unknown>).LD = {

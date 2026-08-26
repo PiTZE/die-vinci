@@ -117,8 +117,7 @@ const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)')
 
 class Wire {
   readonly el: SVGSVGElement
-  private near: SVGPathElement
-  private far: SVGPathElement
+  private lines: SVGLineElement[]
   private id: SolidId
   private t = Math.random() * Math.PI * 2
   visible = true
@@ -128,27 +127,28 @@ class Wire {
     this.el = document.createElementNS(SVG_NS, 'svg')
     this.el.setAttribute('viewBox', '-1.15 -1.15 2.3 2.3')
     this.el.setAttribute('aria-hidden', 'true')
-    this.far = document.createElementNS(SVG_NS, 'path')
-    this.near = document.createElementNS(SVG_NS, 'path')
-    for (const p of [this.far, this.near]) {
-      p.setAttribute('fill', 'none')
-      p.setAttribute('stroke', 'currentColor')
-      // non-scaling-stroke measures in screen pixels, not viewBox units.
-      p.setAttribute('stroke-width', '1')
-      p.setAttribute('vector-effect', 'non-scaling-stroke')
-      this.el.appendChild(p)
-    }
-    this.far.setAttribute('opacity', '0.35')
+
+    // One element per edge, so depth can fade continuously. Two bucketed paths
+    // were cheaper but every edge snapped between two opacities the moment it
+    // crossed the centre plane, which read as flickering rather than rotation.
+    const { es } = geometry(id)
+    this.lines = es.map(() => {
+      const ln = document.createElementNS(SVG_NS, 'line')
+      ln.setAttribute('stroke', 'currentColor')
+      ln.setAttribute('stroke-width', '1')
+      ln.setAttribute('stroke-linecap', 'round')
+      ln.setAttribute('vector-effect', 'non-scaling-stroke')
+      this.el.appendChild(ln)
+      return ln
+    })
     this.draw()
   }
 
   step(dt: number): void {
-    this.t += dt * 0.5
+    this.t += dt * 0.45
     this.draw()
   }
 
-  /** Edges behind the centre go on the dimmed path, which is enough depth cue
-   *  to read a d20 at 38 pixels without any shading. */
   private draw(): void {
     const { vs, es } = geometry(this.id)
     const ay = this.t
@@ -171,15 +171,20 @@ class Wire {
       pz.push(z2)
     }
 
-    let near = ''
-    let far = ''
-    for (const [a, b] of es) {
-      const seg = `M${px[a].toFixed(3)} ${py[a].toFixed(3)}L${px[b].toFixed(3)} ${py[b].toFixed(3)}`
-      if (pz[a] + pz[b] < 0) far += seg
-      else near += seg
+    for (let i = 0; i < es.length; i++) {
+      const [a, b] = es[i]
+      const ln = this.lines[i]
+      ln.setAttribute('x1', px[a].toFixed(3))
+      ln.setAttribute('y1', py[a].toFixed(3))
+      ln.setAttribute('x2', px[b].toFixed(3))
+      ln.setAttribute('y2', py[b].toFixed(3))
+      // Midpoint depth runs -1 at the back to 1 at the front. Squaring the
+      // normalised value keeps the front edges bright and lets the back ones
+      // fall away, without any step for the eye to catch.
+      const d = (pz[a] + pz[b]) / 2
+      const f = (d + 1) / 2
+      ln.setAttribute('stroke-opacity', (0.22 + 0.78 * f * f).toFixed(3))
     }
-    this.near.setAttribute('d', near)
-    this.far.setAttribute('d', far)
   }
 }
 
@@ -204,10 +209,12 @@ const byEl = new Map<SVGSVGElement, Wire>()
 
 function frame(now: number): void {
   raf = requestAnimationFrame(frame)
-  if (now - last < 50) return
   const dt = Math.min((now - last) / 1000, 0.25)
   last = now
   if (document.hidden) return
+  // No throttle. It was capped at 20fps to save battery and the result was
+  // visibly stepped. Offscreen and hidden solids are skipped instead, which is
+  // where the real saving is.
   for (const w of live) if (w.visible) w.step(dt)
 }
 
