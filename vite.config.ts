@@ -2,8 +2,17 @@ import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // Served at the root of leonard.generis.ir, so assets resolve from '/'.
+// Stamped into the bundle so a player can see which build they are running,
+// which is the only way to answer "did my refresh actually pick up the new
+// version". It also guarantees consecutive builds differ, so the service
+// worker always has something to update to.
+const BUILD_ID = new Date().toISOString().slice(0, 19).replace('T', ' ')
+
 export default defineConfig({
   base: '/',
+  define: {
+    __BUILD_ID__: JSON.stringify(BUILD_ID),
+  },
   build: {
     target: 'es2022',
     // One page, one bundle. Splitting buys nothing here and costs a round trip.
@@ -14,6 +23,11 @@ export default defineConfig({
       // The service worker takes a new build on the next load and activates it
       // without asking. That is the self-updating part.
       registerType: 'autoUpdate',
+      // main.ts imports virtual:pwa-register and registers the worker itself.
+      // Leaving this on would register it a second time from an injected
+      // script, and that plain registration is the one that cannot reload the
+      // page when a new worker takes over.
+      injectRegister: null,
       includeAssets: ['icon-192.png', 'icon-512.png', 'icon-512-maskable.png'],
       manifest: {
         name: "Leonardo's Die",

@@ -99,7 +99,13 @@ export function optionsPane(): Pane {
       wipeRow.appendChild(wipe)
       save.appendChild(wipeRow)
 
-      root.append(theme, notation, save)
+      const about = el('div', 'section')
+      const ah = el('div', 'section-head')
+      ah.appendChild(el('span', 'grow', 'BUILD'))
+      ah.appendChild(el('span', 'num dim', __BUILD_ID__))
+      about.appendChild(ah)
+
+      root.append(theme, notation, save, about)
       paintTheme()
 
       function say(msg: string) {

@@ -20,6 +20,28 @@ import { Shell, type Actions } from './ui/shell'
 import { tablePane } from './ui/table'
 import { optionsPane } from './ui/options'
 import { applyTheme, currentTheme } from './ui/theme'
+import { registerSW } from 'virtual:pwa-register'
+
+// The plugin's injected registerSW.js only calls navigator.serviceWorker
+// .register. The worker then skips waiting and claims the page, but the page
+// you are looking at was already rendered from the previous worker's precache,
+// so a new build needed two refreshes to appear. Registering through the
+// virtual module instead gets the autoUpdate behaviour, which reloads once the
+// new worker takes control. The reload fires pagehide, and that saves.
+const updateSW = registerSW({
+  immediate: true,
+  onRegisteredSW(_url, registration) {
+    if (!registration) return
+    // A tab left open for days should still pick up a new build.
+    const poll = () => registration.update().catch(() => {})
+    setInterval(poll, 60 * 60 * 1000)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) poll()
+    })
+  },
+})
+void updateSW
+
 
 const root = document.getElementById('app')
 if (!root) throw new Error('#app is missing from index.html')

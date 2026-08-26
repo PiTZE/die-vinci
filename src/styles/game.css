@@ -227,7 +227,9 @@
 .action-bar {
   display: flex;
   gap: 8px;
-  padding: 10px var(--gap);
+  /* Sits to the right, where a thumb rests. */
+  justify-content: flex-end;
+  padding: 8px var(--gap);
   background: var(--bg);
   border-top: 1px solid var(--border);
 }
@@ -237,9 +239,16 @@
 }
 
 .max {
-  flex: 1;
-  min-height: 64px;
-  font-size: 0.8rem;
+  /* Antimatter Dimensions makes Max All an ordinary button, 2.5rem tall
+     against a 10px root, and saves its big 5.5rem slabs for Dimension Boost
+     and Galaxy. Study and Folio are the equivalents here, so they keep the
+     slab and this shrinks to match. 44px is the floor for a touch target,
+     which AD's 25px would fail; their web build has no mobile styles at all. */
+  flex: 0 0 auto;
+  min-width: 7rem;
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 0.72rem;
   letter-spacing: 0.14em;
 }
 

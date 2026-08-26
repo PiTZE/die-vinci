@@ -65,6 +65,7 @@ class Readout {
   }
 }
 
+/** Owns the chrome: resource bar, tabs, panes, and the action bar. */
 export class Shell {
   private panes: Pane[] = []
   private tabButtons = new Map<TabId, HTMLButtonElement>()
