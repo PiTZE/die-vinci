@@ -224,21 +224,31 @@
 
 /* -- what happened while the game was closed ------------------------------ */
 
-.away {
-  display: block;
-  width: 100%;
-  margin-bottom: var(--gap);
-  padding: 12px;
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabs-h) + 78px + env(safe-area-inset-bottom));
+  z-index: 5;
+  transform: translate(-50%, 8px);
+  max-width: min(92vw, 28rem);
+  padding: 10px 16px;
   border: 1px solid var(--accent);
+  background: var(--bg);
   color: var(--accent);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   letter-spacing: 0.06em;
   text-align: center;
   font-variant-numeric: tabular-nums;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 350ms ease,
+    transform 350ms ease;
 }
 
-.away:hover {
-  background: var(--fill);
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 /* -- the action bar, pinned in the thumb's reach -------------------------- */
@@ -408,6 +418,10 @@
     padding: var(--gap) calc(var(--gap) * 1.4);
     /* Sized to its content, and only scrolls once it runs out of window. */
     max-height: calc(100dvh - var(--bar-h) - 74px);
+  }
+
+  .toast {
+    bottom: 96px;
   }
 
   .action-bar {

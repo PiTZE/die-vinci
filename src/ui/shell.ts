@@ -1,5 +1,6 @@
 import Decimal from 'break_infinity.js'
-import { format } from '../format'
+import { format, formatTime } from '../format'
+import { consumeAway } from '../game/offline'
 import type { GameState, TabId } from '../state'
 
 /** What a pane is allowed to do to the game. Implemented in main.ts. */
@@ -74,6 +75,8 @@ export class Shell {
   private actionEls = new Map<TabId, HTMLElement>()
   private actionBar = el('div', 'action-bar')
   private actionInner = el('div', 'action-bar-inner')
+  private toastEl = el('div', 'toast')
+  private toastTimer = 0
   private inkOut = new Readout('INK')
   private pointsOut = new Readout('POINTS')
   private active: TabId = 'table'
@@ -123,6 +126,8 @@ export class Shell {
     }
 
     this.actionBar.appendChild(this.actionInner)
+    this.toastEl.setAttribute('role', 'status')
+    this.root.appendChild(this.toastEl)
     this.root.append(bar)
     for (const pane of this.paneEls.values()) this.root.appendChild(pane)
     this.root.append(this.actionBar, tabs)
@@ -147,7 +152,23 @@ export class Shell {
     return this.active
   }
 
+  /** Says its piece and fades. Nothing to dismiss and nothing left behind. */
+  toast(text: string): void {
+    this.toastEl.textContent = text
+    this.toastEl.classList.add('show')
+    window.clearTimeout(this.toastTimer)
+    this.toastTimer = window.setTimeout(() => this.toastEl.classList.remove('show'), 5000)
+  }
+
   update(s: GameState, inkRate: Decimal): void {
+    const away = consumeAway()
+    if (away) {
+      const tail = away.capped ? ' (capped)' : ''
+      this.toast(
+        `AWAY ${formatTime(away.seconds)}${tail}   +${format(away.ink, s.options.notation)} INK`,
+      )
+    }
+
     const n = s.options.notation
     this.inkOut.set(format(s.ink, n), `${format(inkRate, n)}/s`)
     const showPoints = s.wagers > 0 || s.points.gt(0)

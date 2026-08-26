@@ -15,8 +15,7 @@ import {
   solidMultiplier,
   studyReq,
 } from '../game/production'
-import { consumeAway, type AwaySummary } from '../game/offline'
-import { format, formatTime, formatWhole } from '../format'
+import { format, formatWhole } from '../format'
 import { unlockedSolids, type GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey, holdable } from './hold'
@@ -39,8 +38,6 @@ function setText(n: HTMLElement, v: string): void {
 export function tablePane(): Pane {
   const rows: Row[] = []
   let maxBtn: HTMLButtonElement
-  let awayRow: HTMLButtonElement
-  let shownAway: AwaySummary | null = null
   let rollLine: HTMLElement
   let rollBtn: HTMLButtonElement
   let studyBtn: HTMLButtonElement
@@ -54,15 +51,6 @@ export function tablePane(): Pane {
     label: 'TABLE',
 
     mount(root, actions: Actions) {
-      // What the game earned while it was not running. Tap to dismiss.
-      awayRow = el('button', 'away', '')
-      awayRow.type = 'button'
-      awayRow.hidden = true
-      awayRow.addEventListener('click', () => {
-        shownAway = null
-        awayRow.hidden = true
-      })
-
       maxBtn = el('button', 'max', 'MAX')
       maxBtn.type = 'button'
       maxBtn.title = 'Buy the most expensive first, repeatedly  (m)'
@@ -157,7 +145,7 @@ export function tablePane(): Pane {
       const controls = el('div', 'table-controls')
       controls.append(study, folioSection)
       grid.append(chain, controls)
-      root.append(awayRow, roll, grid)
+      root.append(roll, grid)
 
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.
@@ -177,21 +165,10 @@ export function tablePane(): Pane {
     update(s: GameState) {
       const n = s.options.notation
       const open = unlockedSolids(s)
-
-      const arrived = consumeAway()
-      if (arrived) shownAway = arrived
-      if (shownAway) {
-        const tail = shownAway.capped ? ' (capped)' : ''
-        setText(
-          awayRow,
-          `AWAY ${formatTime(shownAway.seconds)}${tail}   +${format(shownAway.ink, n)} INK`,
-        )
-        awayRow.hidden = false
-      }
+      const rate = rollRate(s)
       const canMax = canMaxAll(s)
       maxBtn.disabled = !canMax
       maxBtn.classList.toggle('buyable', canMax)
-      const rate = rollRate(s)
 
       for (const def of SOLIDS) {
         const r = rows[def.idx - 1]

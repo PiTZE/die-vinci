@@ -43,8 +43,8 @@ async function gap(seconds, { offline = true } = {}) {
   return {
     ink: Number(await ev(`window.LD.state.ink.toString()`)),
     rate: Number(await ev(`window.LD.state.solids[0].amount.toString()`)),
-    notice: await ev(`(() => { const b = document.querySelector('.away')
-      return b && getComputedStyle(b).display !== 'none' ? b.textContent : null })()`),
+    notice: await ev(`(() => { const t = document.querySelector('.toast')
+      return t && t.classList.contains('show') ? t.textContent : null })()`),
   }
 }
 
@@ -57,12 +57,11 @@ const long = await gap(600)
 check('a ten minute gap is credited', long.ink > 5e12, `gained ${long.ink.toExponential(2)}`)
 check('notice shown for a long gap', /AWAY 10m/.test(long.notice ?? ''), String(long.notice))
 
-// Dismiss first: the notice deliberately persists until tapped, so leaving it
-// up would make the next assertion read a stale one.
-await ev(`document.querySelector('.away')?.click()`)
-await sleep(200)
-check('notice dismisses on tap',
-  await ev(`(() => { const b = document.querySelector('.away'); return !b || getComputedStyle(b).display === 'none' })()`))
+// The toast fades on its own after five seconds. Wait it out, or the next
+// assertion reads the one still on screen.
+await sleep(5400)
+check('toast fades on its own',
+  await ev(`!document.querySelector('.toast').classList.contains('show')`))
 
 const off = await gap(600, { offline: false })
 // Compared against the credited run rather than an absolute figure: the wait
