@@ -1,7 +1,7 @@
 {
   "name": "leonardos-die",
   "private": true,
-  "version": "0.0.3",
+  "version": "0.0.5",
   "type": "module",
   "description": "An incremental dice game about Leonardo da Vinci, the Platonic solids and the notebooks.",
   "scripts": {

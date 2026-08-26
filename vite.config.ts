@@ -25,6 +25,19 @@ export default defineConfig({
     cssCodeSplit: false,
   },
   plugins: [
+    {
+      // A tiny file the app can fetch past the service worker to find out what
+      // the server actually has. .json is outside the precache glob on purpose,
+      // so this always comes from the network.
+      name: 'emit-version-json',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'version.json',
+          source: JSON.stringify({ version: VERSION, buildId: BUILD_ID }),
+        })
+      },
+    },
     VitePWA({
       // The service worker takes a new build on the next load and activates it
       // without asking. That is the self-updating part.
@@ -58,26 +71,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,woff2}'],
         cleanupOutdatedCaches: true,
-        // The font is a CDN request, so it needs its own rule or the game
-        // falls back to the generic monospace stack once offline.
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
-            handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'google-fonts-css' },
-          },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\//,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'google-fonts-files',
-              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
-        ],
       },
     }),
   ],

@@ -28,9 +28,62 @@ import { registerSW } from 'virtual:pwa-register'
 // so a new build needed two refreshes to appear. Registering through the
 // virtual module instead gets the autoUpdate behaviour, which reloads once the
 // new worker takes control. The reload fires pagehide, and that saves.
+/**
+ * Escape hatch for a wedged service worker.
+ *
+ * A worker from an older build can end up serving its own precached index.html
+ * indefinitely, and the page has no way to notice: everything it can see came
+ * from that same worker. So this asks the network directly, past the worker,
+ * and if the server has a different build it forces the issue. First by asking
+ * the registration to update, then, if that did not take, by unregistering the
+ * worker and deleting its caches outright.
+ *
+ * sessionStorage counts the attempts so a genuinely broken deploy cannot put
+ * the page into a reload loop.
+ */
+const TRIES_KEY = 'leonardos-die-refresh-tries'
+
+async function ensureLatest(registration?: ServiceWorkerRegistration): Promise<void> {
+  let remote: { buildId?: string }
+  try {
+    const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' })
+    if (!res.ok) return
+    remote = await res.json()
+  } catch {
+    // Offline is the normal case here, not a problem to solve.
+    return
+  }
+
+  if (!remote.buildId || remote.buildId === __BUILD_ID__) {
+    sessionStorage.removeItem(TRIES_KEY)
+    return
+  }
+
+  const tries = Number(sessionStorage.getItem(TRIES_KEY) ?? '0')
+  if (tries >= 2) {
+    console.warn(`[leonardos-die] stuck on build ${__BUILD_ID__}, server has ${remote.buildId}`)
+    return
+  }
+  sessionStorage.setItem(TRIES_KEY, String(tries + 1))
+
+  if (registration) {
+    if (tries === 0) {
+      await registration.update().catch(() => {})
+    } else {
+      await registration.unregister().catch(() => {})
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        await Promise.all(keys.map((k) => caches.delete(k)))
+      }
+    }
+  }
+  location.reload()
+}
+
 const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_url, registration) {
+    void ensureLatest(registration)
     if (!registration) return
     // A tab left open for days should still pick up a new build.
     const poll = () => registration.update().catch(() => {})
@@ -41,6 +94,10 @@ const updateSW = registerSW({
   },
 })
 void updateSW
+
+// Also runs when there is no service worker at all, so a plain browser tab
+// still notices a new build.
+if (!('serviceWorker' in navigator)) void ensureLatest()
 
 
 const root = document.getElementById('app')

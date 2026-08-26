@@ -1,3 +1,27 @@
+/* Self-hosted, so the game makes no third-party request and works offline
+   without one. It also keeps Chrome from charging roughly 7MB of quota padding
+   per opaque cross-origin response, which made 150KB of real cache read as
+   9MB of site data.
+
+   IBM Plex Mono, SIL Open Font License 1.1. See public/fonts/OFL.txt.
+   Latin subset only; the game is ASCII plus box drawing. */
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-600.woff2') format('woff2');
+}
+
 *,
 *::before,
 *::after {
