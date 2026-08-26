@@ -141,10 +141,12 @@ export function tablePane(): Pane {
       // Wide screens put the chain and its controls side by side. Stacked, the
       // controls left most of a desktop empty and pushed the chain off centre.
       const grid = el('div', 'table-grid')
+      // Roll rate multiplies the whole chain, so it sits above the chain
+      // rather than beside it.
       const controls = el('div', 'table-controls')
-      controls.append(roll, study, folioSection)
+      controls.append(study, folioSection)
       grid.append(chain, controls)
-      root.append(awayRow, grid)
+      root.append(awayRow, roll, grid)
 
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.
