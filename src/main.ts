@@ -4,7 +4,7 @@ import './styles/base.css'
 import './styles/game.css'
 
 import Decimal from 'break_infinity.js'
-import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, TICK_MS } from './game/balance'
+import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, START_INK, TICK_MS } from './game/balance'
 import {
   buyFolio,
   buyRollRate,
@@ -24,6 +24,13 @@ import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMod
 import { resetForChallenge } from './game/production'
 import type { UpgradeId } from './game/upgrades'
 import { exportSave, importSave, loadGame, saveGame, switchSlot, wipeSave } from './save'
+import {
+  markExported,
+  mirrorToFile,
+  pursuePersistence,
+  readFileMirror,
+  restoreFileMirror,
+} from './durability'
 import type { GameState } from './state'
 import { Shell, type Actions } from './ui/shell'
 import { tablePane } from './ui/table'
@@ -134,11 +141,14 @@ trackViewport()
 let savingEnabled = true
 let dirtyTimer = 0
 
-function persist(): void {
+function persist(force = false): void {
   if (!savingEnabled) return
   window.clearTimeout(dirtyTimer)
   dirtyTimer = 0
   saveGame(state)
+  // Through to the bound file as well, where there is one. Throttled inside,
+  // except on the way out, where this is the last write that will happen.
+  void mirrorToFile(() => exportSave(state), force)
 }
 
 /**
@@ -153,9 +163,6 @@ function persist(): void {
  */
 function persistSoon(): void {
   if (!savingEnabled) return
-  // Tied to the first thing the player actually does, rather than fired at a
-  // visitor who has not started yet. Chrome decides silently; Firefox prompts.
-  void requestPersistentStorage()
   if (dirtyTimer) return
   dirtyTimer = window.setTimeout(persist, 250)
 }
@@ -168,20 +175,6 @@ function persistSoon(): void {
  * away with nobody touching anything. An installed app is usually granted this
  * without a prompt.
  */
-let persistenceAsked = false
-
-async function requestPersistentStorage(): Promise<void> {
-  if (persistenceAsked) return
-  persistenceAsked = true
-  try {
-    if (!navigator.storage?.persist) return
-    if (await navigator.storage.persisted()) return
-    const granted = await navigator.storage.persist()
-    console.info(`[die-vinci] persistent storage ${granted ? 'granted' : 'refused'}`)
-  } catch {
-    // Not supported, or refused. The autosave is still doing its job.
-  }
-}
 
 const actions: Actions = {
   maxAll: () => {
@@ -254,7 +247,10 @@ const actions: Actions = {
     switchSlot(n)
     location.reload()
   },
-  exportSave: () => exportSave(state),
+  exportSave: () => {
+    markExported()
+    return exportSave(state)
+  },
   importSave: (blob) => {
     const next = importSave(blob, Date.now())
     if (!next) return false
@@ -369,6 +365,29 @@ function startRender(): void {
 
 startRender()
 
+// Ask for an eviction exemption, and keep asking. One refused request at boot
+// is not a final answer: Chrome's answer depends on signals that only exist
+// after the player has been here a while.
+pursuePersistence()
+
+/**
+ * A file bound in an earlier session reconnects here, and if this origin was
+ * evicted while the game was closed, the file is the only copy left. Restoring
+ * needs a gesture to re-grant permission, so it can only be offered, not done.
+ */
+void (async () => {
+  await restoreFileMirror()
+  if (!state.wagers && state.ink.lte(START_INK) && !state.studies) {
+    const raw = await readFileMirror()
+    if (!raw) return
+    const recovered = importSave(raw, Date.now())
+    if (!recovered) return
+    state = recovered
+    persist(true)
+    shell.update(state, inkPerSecond(state))
+  }
+})()
+
 /** Settle the clock and make sure something is drawing again. */
 function resume(): void {
   advance(Date.now())
@@ -378,7 +397,7 @@ function resume(): void {
 // Save on either direction. Which of these a platform actually delivers when
 // an installed app is closed varies, and a redundant write costs nothing.
 document.addEventListener('visibilitychange', () => {
-  persist()
+  persist(document.hidden)
   if (!document.hidden) resume()
 })
 
@@ -388,11 +407,11 @@ window.addEventListener('pageshow', resume)
 window.addEventListener('focus', resume)
 window.addEventListener('resume', resume)
 
-window.addEventListener('pagehide', persist)
-window.addEventListener('blur', persist)
+window.addEventListener('pagehide', () => persist(true))
+window.addEventListener('blur', () => persist(true))
 // Chrome fires this before it discards a frozen page, and it is the last
 // chance to write anything.
-window.addEventListener('freeze', persist)
+window.addEventListener('freeze', () => persist(true))
 
 // A hook for balance work in the console. Not referenced by the game itself.
 // The cheats are dev only, so a stable build cannot be trivially skipped past.

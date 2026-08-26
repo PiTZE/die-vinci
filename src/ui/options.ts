@@ -5,6 +5,17 @@ import { applyTheme, currentTheme, themes } from './theme'
 import { installState, manualHint, onInstallChange, promptInstall } from '../install'
 import { CHANNEL_PATHS, OFFLINE_TICK_CHOICES } from '../game/balance'
 import { listBackups } from '../backup'
+import {
+  askForNotifications,
+  askForPersistence,
+  bindFileMirror,
+  fileMirrorState,
+  fileMirrorSupported,
+  notificationsGranted,
+  onDurabilityChange,
+  reconnectFileMirror,
+  unbindFileMirror,
+} from '../durability'
 import { SLOT_COUNT, currentSlot, slotSummary } from '../save'
 import { CONFIRM_KEYS } from './confirm'
 import { formatTime } from '../format'
@@ -87,48 +98,101 @@ export function optionsPane(): Pane {
       btns.append(exp, imp)
       save.appendChild(btns)
 
-      // Whether the browser has agreed not to evict this origin. A refused
-      // request is why a save can vanish after a long absence, so it is worth
-      // being able to see rather than guess at.
+      // Whether the browser has agreed not to evict this origin, and what can
+      // still be done about it when it has not. A refused request is why a save
+      // vanishes after a long absence, so it is shown rather than guessed at.
       const storageRow = el('div', 'row')
       storageRow.appendChild(el('span', 'grow dim', 'STORAGE'))
       const storageState = el('span', 'num dim', 'checking')
       storageRow.appendChild(storageState)
-      const storageAsk = el('button', 'backup-restore', 'ASK AGAIN')
-      storageAsk.hidden = true
       save.appendChild(storageRow)
-      // Chrome decides silently and can refuse. Asking again from a real tap
-      // sometimes succeeds where the automatic request did not, and Firefox
-      // prompts, so the row is tappable.
-      storageRow.appendChild(storageAsk)
+
+      // Chrome answers persist() silently from an undocumented heuristic and
+      // can refuse an installed app. Asking again later genuinely can flip it,
+      // because its site engagement score climbs the longer you play, and
+      // Firefox only prompts from a real gesture. So the row is tappable.
+      const storageAsk = el('button', 'backup-restore', 'ASK AGAIN')
       storageAsk.type = 'button'
+      storageAsk.hidden = true
+      storageRow.appendChild(storageAsk)
       storageAsk.addEventListener('click', async () => {
         storageAsk.textContent = 'ASKING'
-        try {
-          await navigator.storage?.persist?.()
-        } catch {
-          // Refused or unsupported; paintStorage reports whichever it is.
+        const ok = await askForPersistence(true)
+        say(ok ? 'the browser agreed' : 'the browser refused, bind a file below')
+        void paintStorage()
+      })
+
+      // Notification permission is one of the signals Chrome weighs, and the
+      // only one a page can ask for. Offered with the reason attached rather
+      // than taken quietly at boot, since the game sends no notifications.
+      const notifyRow = el('div', 'row')
+      notifyRow.hidden = true
+      const notifyText = el('span', 'grow backup-note',
+        'granting notifications is one of the few signals Chrome accepts')
+      notifyRow.appendChild(notifyText)
+      const notifyBtn = el('button', 'backup-restore', 'ALLOW')
+      notifyBtn.type = 'button'
+      notifyRow.appendChild(notifyBtn)
+      save.appendChild(notifyRow)
+      notifyBtn.addEventListener('click', async () => {
+        const ok = await askForNotifications()
+        say(ok ? 'asked again with that granted' : 'not granted')
+        void paintStorage()
+      })
+
+      // The only copy eviction cannot reach. Chrome and Edge on a desktop have
+      // the picker; Android has no equivalent, so the row hides itself there
+      // and EXPORT stays the answer.
+      const fileRow = el('div', 'row')
+      fileRow.hidden = !fileMirrorSupported()
+      const fileText = el('span', 'grow dim', 'SAVE FILE')
+      fileRow.appendChild(fileText)
+      const fileBtn = el('button', 'backup-restore', 'BIND')
+      fileBtn.type = 'button'
+      fileRow.appendChild(fileBtn)
+      save.appendChild(fileRow)
+      fileBtn.addEventListener('click', async () => {
+        const { state: st } = fileMirrorState()
+        if (st === 'ready') {
+          await unbindFileMirror()
+          say('the file is no longer written to')
+        } else if (st === 'needs-permission') {
+          say((await reconnectFileMirror()) ? 'reconnected' : 'permission refused')
+        } else {
+          say((await bindFileMirror()) ? 'every save now writes there too' : 'no file chosen')
         }
         void paintStorage()
       })
 
       const paintStorage = async () => {
+        let persisted = false
         try {
-          if (!navigator.storage?.persisted) {
-            storageState.textContent = 'unknown'
-            storageAsk.hidden = true
-            return
-          }
-          const ok = await navigator.storage.persisted()
-          storageState.textContent = ok ? 'protected' : 'evictable'
-          storageAsk.hidden = ok
-          storageAsk.textContent = 'ASK AGAIN'
+          persisted = (await navigator.storage?.persisted?.()) ?? false
         } catch {
-          storageState.textContent = 'unknown'
-          storageAsk.hidden = true
+          // Unsupported. Treated the same as refused, which it effectively is.
+        }
+        const supported = !!navigator.storage?.persisted
+        const mirror = fileMirrorState()
+        storageState.textContent = !supported ? 'unknown' : persisted ? 'protected' : 'evictable'
+        storageAsk.hidden = persisted || !supported
+        storageAsk.textContent = 'ASK AGAIN'
+        notifyRow.hidden = persisted || !supported || notificationsGranted()
+        if (mirror.state === 'ready') {
+          fileText.textContent = mirror.name
+          fileText.className = 'grow num'
+          fileBtn.textContent = 'UNBIND'
+        } else if (mirror.state === 'needs-permission') {
+          fileText.textContent = `${mirror.name} needs permission again`
+          fileText.className = 'grow backup-note'
+          fileBtn.textContent = 'RECONNECT'
+        } else {
+          fileText.textContent = 'SAVE FILE'
+          fileText.className = 'grow dim'
+          fileBtn.textContent = 'BIND'
         }
       }
       void paintStorage()
+      onDurabilityChange(() => void paintStorage())
       setInterval(paintStorage, 30_000)
 
       status = el('div', 'empty', '')

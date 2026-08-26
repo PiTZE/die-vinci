@@ -63,7 +63,8 @@ const SECTIONS: Section[] = [
     title: 'YOUR SAVE',
     body: [
       'It lives in this browser and never leaves it. Three slots, and rolling backups at five minutes, thirty minutes and four hours, plus one taken before any update that changes the save.',
-      'OPTIONS shows whether the browser has agreed not to evict it. If that says evictable, export a copy.',
+      'OPTIONS shows whether the browser has agreed not to evict it. The game keeps asking for that, but Chrome answers silently and can refuse an installed app for reasons it will not explain.',
+      'While it says evictable, the backups are still inside the same browser and go with it. Bind a save file on a desktop, or export a copy on a phone. That is the only copy eviction cannot reach.',
     ],
   },
 ]
