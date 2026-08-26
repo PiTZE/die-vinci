@@ -18,6 +18,7 @@ export interface Actions {
   exportSave(): string
   importSave(blob: string): boolean
   wipe(): void
+  restoreBackup(id: string): boolean
 }
 
 export interface Pane {

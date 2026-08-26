@@ -1,4 +1,5 @@
 import Decimal from 'break_infinity.js'
+import { rollBackups, writeBackup } from './backup'
 import { SAVE_KEY, SAVE_VERSION } from './game/balance'
 import { newGame, type GameState } from './state'
 
@@ -87,17 +88,32 @@ function decode(raw: Raw, now: number): GameState {
 
 export function saveGame(s: GameState): void {
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(encode(s)))
+    const raw = JSON.stringify(encode(s))
+    localStorage.setItem(SAVE_KEY, raw)
+    rollBackups(raw)
   } catch {
     // A full or blocked localStorage should not take the game down mid-tick.
   }
 }
 
+/** Long enough away that the save is worth a copy before anything touches it. */
+const AWAY_BACKUP_MS = 30 * 60_000
+
 export function loadGame(now: number): GameState {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
     if (!raw) return newGame(now)
-    return decode(JSON.parse(raw), now)
+    const parsed = JSON.parse(raw)
+
+    // Both copies are taken from the untouched text, before decode runs.
+    // A migration that clears layer 0, which two of them do on purpose, is
+    // otherwise unrecoverable, and a long absence is when a load is most
+    // likely to go wrong.
+    if (Number(parsed.version ?? 1) < SAVE_VERSION) writeBackup('premigration', raw)
+    const last = Number(parsed.lastTick)
+    if (Number.isFinite(last) && now - last > AWAY_BACKUP_MS) writeBackup('away', raw)
+
+    return decode(parsed, now)
   } catch {
     return newGame(now)
   }

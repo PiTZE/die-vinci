@@ -179,14 +179,31 @@
   pointer-events: none;
 }
 
-.solid-progress {
+.solid-fill,
+.solid-fill-can {
   position: absolute;
-  left: 0;
+  top: 0;
   bottom: 0;
-  height: 2px;
+  left: 0;
   width: 0;
-  background: var(--fg-dim);
   pointer-events: none;
+}
+
+/* Already owned of this group of ten. */
+.solid-fill {
+  background: var(--fill-strong);
+}
+
+/* And how many more the ink covers right now, carrying on from it. */
+.solid-fill-can {
+  background: var(--fill);
+}
+
+/* The label alone needs lifting above the fills. The counter is already
+   absolutely positioned and giving it position: relative dropped it back into
+   the flow, on top of the label. */
+.solid-buy-label {
+  position: relative;
 }
 
 .solid-amount {
@@ -403,6 +420,15 @@
   opacity: 0.35;
 }
 
+.backup-restore {
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+}
+
 /* -- generic wide action button ------------------------------------------ */
 
 .action {
@@ -560,17 +586,49 @@
     margin-bottom: 0;
   }
 
+  /* One line per solid, the way AD lays its dimension rows out: a fixed grid
+     so the name, the rates and the amount line up down the whole table, at a
+     row height that fits nine of them on a laptop without scrolling. */
   .solid {
-    grid-template-columns: 48px minmax(0, 1fr) auto auto;
-    grid-template-areas:
-      'icon name amount buy'
-      'icon rate amount buy';
-    gap: 2px 14px;
-    padding: 10px 14px;
+    grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1.2fr) auto auto;
+    grid-template-areas: 'icon name rate amount buy';
+    align-items: center;
+    gap: 14px;
+    padding: 6px 14px;
   }
 
   .solid-icon {
-    width: 44px;
-    height: 44px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .solid-rate {
+    align-self: center;
+  }
+
+  .solid-amount {
+    min-width: 7rem;
+  }
+
+  /* The counter sits top left on a phone, where the button is tall enough for
+     it. On a single-line desktop row it would land on the label, so it moves
+     inline and the label centres in what is left. */
+  .solid-buy {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 38px;
+    min-width: 12rem;
+    padding: 0 10px;
+  }
+
+  .solid-step {
+    position: static;
+    flex: 0 0 auto;
+  }
+
+  .solid-buy-label {
+    flex: 1 1 auto;
+    text-align: center;
   }
 }

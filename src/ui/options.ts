@@ -4,6 +4,8 @@ import { el, type Actions, type Pane } from './shell'
 import { applyTheme, currentTheme, themes } from './theme'
 import { installState, manualHint, onInstallChange, promptInstall } from '../install'
 import { CHANNEL_PATHS, OFFLINE_TICK_CHOICES } from '../game/balance'
+import { listBackups } from '../backup'
+import { formatTime } from '../format'
 
 export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
@@ -203,6 +205,52 @@ export function optionsPane(): Pane {
         el('div', 'empty', 'each channel keeps its own save'),
       )
 
+      // Several copies of different ages, the way Antimatter Dimensions keeps
+      // its eight. A single well-guarded save is no help once something has
+      // already gone wrong with it.
+      const backups = el('div', 'section')
+      const bh = el('div', 'section-head')
+      bh.appendChild(el('span', 'grow', 'BACKUPS'))
+      backups.appendChild(bh)
+      const backupList = el('div', 'backup-list')
+      backups.appendChild(backupList)
+
+      let armedBackup = ''
+      function paintBackups() {
+        const found = listBackups()
+        backupList.replaceChildren()
+        if (!found.length) {
+          backupList.appendChild(el('div', 'empty', 'none yet'))
+          return
+        }
+        for (const b of found) {
+          const row = el('div', 'row')
+          const age = formatTime((Date.now() - b.at) / 1000)
+          row.appendChild(el('span', 'grow dim', `${b.label}`))
+          row.appendChild(el('span', 'num dim', `${age} ago`))
+          const btn = el('button', 'backup-restore', armedBackup === b.id ? 'SURE?' : 'RESTORE')
+          btn.type = 'button'
+          btn.addEventListener('click', () => {
+            if (armedBackup !== b.id) {
+              armedBackup = b.id
+              paintBackups()
+              setTimeout(() => {
+                if (armedBackup === b.id) {
+                  armedBackup = ''
+                  paintBackups()
+                }
+              }, 4000)
+              return
+            }
+            actions.restoreBackup(b.id)
+          })
+          row.appendChild(btn)
+          backupList.appendChild(row)
+        }
+      }
+      paintBackups()
+      setInterval(paintBackups, 20_000)
+
       const about = el('div', 'section')
       const ah = el('div', 'section-head')
       ah.appendChild(el('span', 'grow', 'VERSION'))
@@ -213,7 +261,7 @@ export function optionsPane(): Pane {
       buildRow.appendChild(el('span', 'num dim', __BUILD_ID__))
       about.appendChild(buildRow)
 
-      root.append(theme, notation, install, offline, channel, save, about)
+      root.append(theme, notation, install, offline, channel, save, backups, about)
       paintTheme()
 
       function say(msg: string) {

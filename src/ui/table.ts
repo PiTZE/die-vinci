@@ -26,6 +26,7 @@ interface Row {
   mult: HTMLElement
   step: HTMLElement
   bar: HTMLElement
+  barCan: HTMLElement
   amount: HTMLElement
   rate: HTMLElement
   buy: HTMLButtonElement
@@ -97,22 +98,26 @@ export function tablePane(): Pane {
         const flow = el('span', '', '')
         rate.append(mult, ' ', flow)
 
-        const bar = el('div', 'solid-progress')
-        r.appendChild(bar)
         const buy = el('button', 'solid-buy', '')
         buy.type = 'button'
         // Purchases into the current group of ten, in the corner of the button
         // that completes it. Ten of them doubles the row's multiplier, and
         // without this the doubling arrives unannounced.
+        // Antimatter Dimensions draws this inside the button: one fill for the
+        // part of the group of ten already owned, a second for how many more
+        // the ink covers right now. It says more than a number and it stops
+        // the row needing a separate bar underlining it.
+        const bar = el('span', 'solid-fill')
+        const barCan = el('span', 'solid-fill-can')
         const step = el('span', 'solid-step', '')
         const buyLabel = el('span', 'solid-buy-label', '')
-        buy.append(step, buyLabel)
+        buy.append(bar, barCan, step, buyLabel)
         // Shift buys a single die, the way AD's shift+1-8 does.
         holdable(buy, (m) => actions.buySolid(def.idx, m.shift))
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, mult, step, bar, amount, rate: flow, buy, buyLabel })
+        rows.push({ root: r, mult, step, bar, barCan, amount, rate: flow, buy, buyLabel })
       }
 
       const roll = el('div', 'section')
@@ -210,6 +215,10 @@ export function tablePane(): Pane {
         setText(r.step, `${into}/10`)
         const pct = `${into * 10}%`
         if (r.bar.style.width !== pct) r.bar.style.width = pct
+        const affordable = canBuySolid(s, def.idx) ? buyCount(s, def.idx) : 0
+        const canPct = `${Math.min(10 - into, affordable) * 10}%`
+        if (r.barCan.style.left !== pct) r.barCan.style.left = pct
+        if (r.barCan.style.width !== canPct) r.barCan.style.width = canPct
         setText(r.amount, formatWhole(st.amount, n))
 
         const per = st.amount.times(mult).times(rate)

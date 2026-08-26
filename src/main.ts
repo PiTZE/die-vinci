@@ -15,6 +15,7 @@ import {
   tick,
 } from './game/production'
 import { publishAway, simulateAway } from './game/offline'
+import { restoreBackup } from './backup'
 import { doWager } from './game/wager'
 import { buyUpgrade } from './game/upgrades'
 import type { UpgradeId } from './game/upgrades'
@@ -225,6 +226,15 @@ const actions: Actions = {
     savingEnabled = false
     wipeSave()
     location.reload()
+  },
+  restoreBackup: (id) => {
+    // Saving is switched off first so the live state cannot be written back
+    // over the restored copy while the page is on its way out.
+    savingEnabled = false
+    const ok = restoreBackup(id)
+    if (ok) location.reload()
+    else savingEnabled = true
+    return ok
   },
 }
 
