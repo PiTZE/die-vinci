@@ -44,7 +44,7 @@ import { newGame, type GameState } from './state'
 
 // Decimals do not survive JSON, so every one of them goes out as a string and
 // comes back through the constructor. The field lists below are the contract.
-const DECIMAL_FIELDS = ['ink', 'inkThisWager', 'points'] as const
+const DECIMAL_FIELDS = ['ink', 'inkThisWager', 'points', 'meltPower'] as const
 
 type Raw = Record<string, any>
 
@@ -133,6 +133,7 @@ function decode(raw: Raw, now: number): GameState {
     },
     stats: { ...base.stats, ...(m.stats ?? {}) },
     tarot: { ...(m.tarot ?? {}) },
+    pendingDraft: Array.isArray(m.pendingDraft) ? [...m.pendingDraft] : [],
     pointUpgrades: Array.isArray(m.pointUpgrades) ? [...m.pointUpgrades] : [],
     challengesDone: Array.isArray(m.challengesDone) ? [...m.challengesDone] : [],
     autobuyers: { ...base.autobuyers, ...(m.autobuyers ?? {}) },

@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process'
 const SUITES = [
   // Longest first, so the slow ones are not left starting last.
   'roll', 'freeze', 'ui', 'layout', 'away', 'confirm', 'challenge',
-  'spoilers', 'wager', 'backup', 'install', 'channels', 'durability', 'save',
+  'spoilers', 'wager', 'backup', 'tarot', 'install', 'channels', 'durability', 'save',
 ]
 
 /** One less than the cores. Half the cores measured slower on four (76s

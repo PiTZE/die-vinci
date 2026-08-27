@@ -142,6 +142,28 @@ export function studyRequirement(n: number): number {
  */
 export const STUDY_POWER = 2
 
+// -- melt, the dimensional sacrifice analogue -----------------------------
+//
+// Antimatter Dimensions destroys dimensions one through seven and multiplies
+// the eighth, gated behind a challenge. Here the gate is a card: XIII Death
+// unlocks it, and the card's level is what makes it worth doing.
+//
+// The multiplier replaces rather than stacks, which is what makes when to melt
+// a decision instead of a button to hold. Melting early for a small number
+// costs you nothing but gains you nothing either.
+
+/** Tetrahedra needed before a melt is worth offering. */
+export const MELT_AT = new Decimal(1e6)
+
+/** The multiplier from melting `d4` tetrahedra at Death level `level`. */
+export function meltMultiplier(d4: Decimal, level: number): Decimal {
+  if (level <= 0 || d4.lte(1)) return new Decimal(1)
+  // The log keeps it from running away with the chain: a thousand times the
+  // tetrahedra is a little over twice the multiplier, not a thousand times it.
+  const reach = Math.pow(Math.max(0, d4.log10()), 1.4)
+  return new Decimal(1).plus(reach * level * 0.6)
+}
+
 // -- folios, the antimatter galaxy analogue -------------------------------
 
 /** From Galaxy.baseCost and Galaxy.costMult in src/core/galaxy.js. */

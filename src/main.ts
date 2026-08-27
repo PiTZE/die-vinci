@@ -13,7 +13,11 @@ import {
   startRoll,
   buyStudy,
   inkPerSecond,
+  canMelt,
+  doMelt,
   maxAll,
+  meltGain,
+  meltUnlocked,
   meanFace,
   rollFace as __rollFace,
   rollInterval,
@@ -25,6 +29,7 @@ import { setFullscreen } from './ui/fullscreen'
 import { restoreBackup } from './backup'
 import { devTools } from './dev'
 import { doWager } from './game/wager'
+import { drawOffer, takeCard, weightOf } from './game/tarot'
 import { buyUpgrade } from './game/upgrades'
 import { enterChallenge, exitChallenge } from './game/challenges'
 import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode } from './game/autobuyers'
@@ -42,6 +47,7 @@ import type { GameState } from './state'
 import { Shell, type Actions } from './ui/shell'
 import { tablePane } from './ui/table'
 import { optionsPane } from './ui/options'
+import { tarotPane } from './ui/tarot'
 import { wagerPane } from './ui/wager'
 import { challengesPane } from './ui/challenges'
 import { automationPane } from './ui/automation'
@@ -206,6 +212,12 @@ const actions: Actions = {
     buyAutomator(state)
     persistSoon()
   },
+  takeCard: (id) => {
+    if (takeCard(state, id)) persist()
+  },
+  melt: () => {
+    if (doMelt(state)) persist()
+  },
   toggleAutomator: () => {
     state.autoRollOn = !state.autoRollOn
     // The automator records when its current roll began so the dice animate
@@ -325,6 +337,7 @@ shell.build(
     tablePane(),
     wagerPane(),
     challengesPane(),
+    tarotPane(),
     automationPane(),
     archivePane(),
     optionsPane(),
@@ -471,6 +484,14 @@ const hook: Record<string, unknown> = {
   // The same entry points the buttons use. Nothing here skips a cost check,
   // so it is safe on stable; the cheats below are not and stay dev only.
   actions,
+  // The tarot maths, so a test can assert the weighting over thousands of
+  // draws rather than eyeball three cards. All pure; none touch the save.
+  drawOffer,
+  weightOf,
+  inkPerSecond,
+  meltUnlocked,
+  canMelt,
+  meltGain,
   get rollInterval() {
     return rollInterval(state)
   },

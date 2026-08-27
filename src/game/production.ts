@@ -19,8 +19,10 @@ import {
   ROLL_COST_MULT,
   CATCHUP_AFTER_S,
   ROLL_INTERVAL_BASE,
+  MELT_AT,
   START_INK,
   WAGER_AT,
+  meltMultiplier,
   folioRequirement,
   rollIntervalMultiplier,
   studyRequirement,
@@ -29,6 +31,7 @@ import {
 import { unlockedSolids, type GameState } from '../state'
 import { restrictions } from './challenges'
 import { runAutobuyers } from './autobuyers'
+import { levelOf, modifiers } from './tarot'
 
 /**
  * A study's multiplier reaches down the chain rather than across all of it.
@@ -50,9 +53,10 @@ export function studyBonus(s: GameState, tier: number): Decimal {
 export function solidMultiplier(s: GameState, idx: number): Decimal {
   const st = s.solids[idx - 1]
   const r = restrictions(s)
+  const m = modifiers(s)
   const perTen = r.perTen === null ? perTenMultiplier(s) : new Decimal(r.perTen)
   const weaken = idx === 1 && r.weakenFirst > 1 ? new Decimal(r.weakenFirst) : new Decimal(1)
-  return perTen
+  let out = perTen
     .pow(Math.floor(st.bought / 10))
     .div(weaken)
     .times(studyBonus(s, idx))
@@ -60,12 +64,58 @@ export function solidMultiplier(s: GameState, idx: number): Decimal {
     .times(runMultiplier(s))
     .times(pairMultiplier(s, idx))
     .times(unspentMultiplier(s, idx))
+  // XI Strength reshapes the multiplier rather than adding to it, so it
+  // compounds with everything above instead of sitting beside it.
+  if (m.solidExp !== 1) out = out.pow(m.solidExp)
+  // IV The Emperor and whatever melting has left behind: the deep end, and
+  // nothing else. Both land on the solid the whole chain is feeding.
+  if (idx === openSolids(s)) out = out.times(m.topMult).times(s.meltPower)
+  return out
+}
+
+// -- melt -----------------------------------------------------------------
+
+/** XIII Death is the gate. Without the card there is nothing to melt with. */
+export function meltUnlocked(s: GameState): boolean {
+  return levelOf(s, 'death') > 0
+}
+
+/** What melting right now would be worth. */
+export function meltGain(s: GameState): Decimal {
+  return meltMultiplier(s.solids[0].amount, levelOf(s, 'death'))
+}
+
+export function canMelt(s: GameState): boolean {
+  if (!meltUnlocked(s) || openSolids(s) < SOLIDS.length) return false
+  if (s.solids[0].amount.lt(MELT_AT)) return false
+  // Nothing to gain is nothing to offer. The multiplier replaces rather than
+  // stacks, so melting for less than you already hold is a button that
+  // destroys your table and thanks you for it.
+  return meltGain(s).gt(s.meltPower)
+}
+
+/**
+ * Destroys everything below the deepest solid and leaves a multiplier on it.
+ * Antimatter Dimensions' Dimensional Sacrifice, gated behind a card instead of
+ * a challenge.
+ */
+export function doMelt(s: GameState): boolean {
+  if (!canMelt(s)) return false
+  s.meltPower = meltGain(s)
+  const top = openSolids(s)
+  for (let i = 0; i < top - 1; i++) {
+    s.solids[i].amount = new Decimal(0)
+  }
+  s.stats.melts += 1
+  return true
 }
 
 export function solidCost(s: GameState, idx: number): Decimal {
   const def = SOLIDS[idx - 1]
   const st = s.solids[idx - 1]
-  return def.baseCost.times(def.costMult.pow(Math.floor(st.bought / 10)))
+  return def.baseCost
+    .times(def.costMult.pow(Math.floor(st.bought / 10)))
+    .times(modifiers(s).costFactor)
 }
 
 /**
@@ -143,7 +193,10 @@ export function rollPower(s: GameState): number {
 
 /** Seconds between rolls. */
 export function rollInterval(s: GameState): number {
-  return ROLL_INTERVAL_BASE * Math.pow(rollPower(s), s.rollUpgrades)
+  const base = ROLL_INTERVAL_BASE * Math.pow(rollPower(s), s.rollUpgrades)
+  // VII The Chariot speeds it up, XV The Devil slows it down. A multiplier on
+  // the rate is a divisor on the interval.
+  return base / modifiers(s).rollRateMult
 }
 
 export function rollRate(s: GameState): number {
@@ -151,7 +204,9 @@ export function rollRate(s: GameState): number {
 }
 
 export function rollCost(s: GameState): Decimal {
-  return ROLL_COST_BASE.times(ROLL_COST_MULT.pow(s.rollUpgrades))
+  return ROLL_COST_BASE.times(ROLL_COST_MULT.pow(s.rollUpgrades)).times(
+    modifiers(s).rollCostFactor,
+  )
 }
 
 export function canBuyRollRate(s: GameState): boolean {
@@ -188,11 +243,16 @@ export function canBuyStudy(s: GameState): boolean {
  * not to take one the instant it was affordable.
  */
 function resetTable(s: GameState): void {
-  for (const st of s.solids) {
+  // VIII Justice leaves some of every solid, V The Hierophant leaves ink.
+  const m = modifiers(s)
+  const open = openSolids(s)
+  for (let i = 0; i < s.solids.length; i++) {
+    const st = s.solids[i]
     st.bought = 0
-    st.amount = new Decimal(0)
+    st.amount = new Decimal(m.keepSolids > 0 && i < open ? m.keepSolids : 0)
   }
-  s.ink = new Decimal(START_INK)
+  s.ink = Decimal.max(new Decimal(START_INK), m.keepInk)
+  s.stats.sinceResetMs = 0
   // A spin in the air would otherwise land onto the fresh table and pay out
   // from the solids that were just cleared.
   s.rollStartedAt = 0
@@ -211,8 +271,9 @@ function resetTable(s: GameState): void {
  */
 export function buyStudy(s: GameState): boolean {
   if (!canBuyStudy(s)) return false
+  const kept = Math.floor(s.rollUpgrades * modifiers(s).keepRollFrac)
   s.studies += 1
-  s.rollUpgrades = 0
+  s.rollUpgrades = kept
   resetTable(s)
   return true
 }
@@ -241,9 +302,11 @@ export function canBuyFolio(s: GameState): boolean {
  */
 export function buyFolio(s: GameState): boolean {
   if (!canBuyFolio(s)) return false
+  const m = modifiers(s)
   s.folios += 1
-  s.studies = 0
-  s.rollUpgrades = 0
+  // 0 The Fool: the chain resets and the ladder survives.
+  s.studies = Math.min(s.studies, m.keepStudies)
+  s.rollUpgrades = Math.floor(s.rollUpgrades * m.keepRollFrac)
   resetTable(s)
   return true
 }
@@ -436,19 +499,29 @@ function produce(s: GameState, rolls: number, factors: number[]): void {
   const n = openSolids(s)
   const before = s.solids.map((d) => d.amount)
 
+  const m = modifiers(s)
   const ink = before[0]
     .times(solidMultiplier(s, 1))
     .times(factors[0])
     .times(rolls)
+    .times(m.globalMult)
   s.ink = s.ink.plus(ink)
   s.inkThisWager = s.inkThisWager.plus(ink)
 
+  // The global multiplier lands on every tier, not only on the ink. Applied to
+  // ink alone it would leave the chain above it untouched, so a card that says
+  // it multiplies everything would in fact multiply the last step of nine.
   for (let i = 2; i <= n; i++) {
     const made = before[i - 1]
       .times(solidMultiplier(s, i))
       .times(factors[i - 1])
       .times(rolls)
+      .times(m.globalMult)
     s.solids[i - 2].amount = s.solids[i - 2].amount.plus(made)
+    // I The Magician: a share also lands two tiers down, skipping a rung.
+    if (m.skip > 0 && i >= 3) {
+      s.solids[i - 3].amount = s.solids[i - 3].amount.plus(made.times(m.skip))
+    }
   }
 }
 
@@ -463,6 +536,8 @@ function rolls(s: GameState, i: number): boolean {
 
 /** Rolls every die on the table, records the faces, and produces from them. */
 function resolveOneRoll(s: GameState): void {
+  const m = modifiers(s)
+  const bias = faceBias(s)
   const factors: number[] = []
   for (let i = 0; i < s.solids.length; i++) {
     if (!rolls(s, i)) {
@@ -470,10 +545,33 @@ function resolveOneRoll(s: GameState): void {
       factors.push(0)
       continue
     }
-    const face = rollFace(SOLIDS[i].faces, faceBias(s))
+    // X Wheel of Fortune: rolled again, keeping the better face.
+    let face = rollFace(SOLIDS[i].faces, bias)
+    for (let r = 0; r < m.rerolls; r++) {
+      face = Math.max(face, rollFace(SOLIDS[i].faces, bias))
+    }
     s.faces[i] = face
     factors.push(faceFactor(face, SOLIDS[i].faces))
   }
+
+  // VI The Lovers: dice showing the same face pay double. The only card that
+  // reads the faces against each other rather than one at a time.
+  if (m.pairBonus > 0) {
+    const seen = new Map<number, number[]>()
+    for (let i = 0; i < s.faces.length; i++) {
+      if (!s.faces[i]) continue
+      const at = seen.get(s.faces[i])
+      if (at) at.push(i)
+      else seen.set(s.faces[i], [i])
+    }
+    for (const group of seen.values()) {
+      if (group.length < 2) continue
+      // A pair doubles. Higher levels pay for three of a kind and beyond.
+      const matched = Math.min(group.length, 1 + m.pairBonus)
+      for (const i of group) factors[i] *= matched
+    }
+  }
+
   produce(s, 1, factors)
 }
 
@@ -553,6 +651,7 @@ export function inkPerRoll(s: GameState): Decimal {
   return s.solids[0].amount
     .times(solidMultiplier(s, 1))
     .times(meanFace(SOLIDS[0].faces, faceBias(s)))
+    .times(modifiers(s).globalMult)
 }
 
 export function tick(s: GameState, dt: number, now: number): void {
@@ -561,6 +660,7 @@ export function tick(s: GameState, dt: number, now: number): void {
   // clock the production does, offline catch-up included.
   s.stats.playMs += dt * 1000
   s.stats.wagerMs += dt * 1000
+  s.stats.sinceResetMs += dt * 1000
 
   // Everything stops at the threshold, dice included. Letting the chain run on
   // past it would only be counting into a number the game has already declared

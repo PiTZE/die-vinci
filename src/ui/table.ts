@@ -8,6 +8,9 @@ import {
   canBuySolid,
   canBuyStudy,
   canMaxAll,
+  canMelt,
+  meltGain,
+  meltUnlocked,
   folioReq,
   folioUnlocked,
   rollCost,
@@ -65,6 +68,8 @@ export function tablePane(): Pane {
   let folioLabel: HTMLElement
   let folioBtn: HTMLButtonElement
   let folioLine: HTMLElement
+  let meltBtn: HTMLButtonElement
+  let meltRow: HTMLElement
   let rollNow: HTMLButtonElement
   let rollFill: HTMLElement
   let wagerNow: HTMLButtonElement
@@ -228,6 +233,18 @@ export function tablePane(): Pane {
       resetRow.append(folioBtn, studyBtn)
       resets.appendChild(resetRow)
 
+      // Melting is the deepest of the three and the only one that is not a
+      // reset, so it gets its own line rather than a third of a row.
+      meltBtn = el('button', 'action', '')
+      meltBtn.type = 'button'
+      meltBtn.title = 'Melt the chain into the solid at the top of it'
+      meltBtn.addEventListener('click', () => {
+        if (confirm.request('melt')) actions.melt()
+      })
+      meltRow = el('div', 'row')
+      meltRow.appendChild(meltBtn)
+      resets.appendChild(meltRow)
+
       // One container for all three, so the same DOM reads as a stack on a
       // phone and as two columns on a desktop. Roll rate was a full width band
       // above the table, which on a wide screen pushed everything down for a
@@ -376,6 +393,20 @@ export function tablePane(): Pane {
       const canRoll = canBuyRollRate(s)
       rollBtn.disabled = !canRoll
       rollBtn.classList.toggle('buyable', canRoll)
+
+      // XIII Death is the gate, so nothing about melting exists until it does.
+      meltRow.hidden = !meltUnlocked(s)
+      if (meltUnlocked(s)) {
+        const can = canMelt(s)
+        setText(
+          meltBtn,
+          confirm.isArmed('melt')
+            ? 'SURE? THIS DESTROYS THE CHAIN'
+            : `MELT / x${format(meltGain(s), n)} ON ${SOLIDS[openSolids(s) - 1].short}`,
+        )
+        meltBtn.disabled = !can
+        meltBtn.classList.toggle('buyable', can)
+      }
 
       confirmSettings = s.options.confirms
       const studyArmed = confirm.isArmed('study')

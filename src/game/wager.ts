@@ -14,6 +14,7 @@ import Decimal from 'break_infinity.js'
 import { START_INK, WAGER_AT } from './balance'
 import { unlock } from './autobuyers'
 import { byId } from './challenges'
+import { drawOffer } from './tarot'
 import type { GameState } from '../state'
 
 export function canWager(s: GameState): boolean {
@@ -69,5 +70,12 @@ export function doWager(s: GameState): boolean {
   s.rollAccum = 0
   s.faces = s.faces.map(() => 0)
   s.stats.wagerMs = 0
+  s.stats.sinceResetMs = 0
+
+  // One draft per Wager. It is offered rather than granted, and it waits in
+  // the tarot tab unless it is the first, which interrupts: a player who has
+  // never seen the mechanic will not go looking for it.
+  s.draftProgress += 1
+  if (!s.pendingDraft.length) s.pendingDraft = drawOffer(s)
   return true
 }

@@ -50,6 +50,8 @@ export interface GameState {
   /** And whether it is switched on. */
   autoRollOn: boolean
   rollUpgrades: number
+  /** The multiplier melting has left on the deepest solid. */
+  meltPower: Decimal
   studies: number
   folios: number
 
@@ -67,7 +69,13 @@ export interface GameState {
   achievements: string[]
   /** Milliseconds of production still halted by a challenge restriction. */
   haltMs: number
+  /** Arcanum id to level. Zero and absent are the same thing. */
   tarot: Record<string, number>
+  /** Wagers called since the last draft was earned. */
+  draftProgress: number
+  /** A draft offered and not yet taken. Held in the save so closing the tab
+   *  mid-choice does not lose it. */
+  pendingDraft: string[]
 
   options: {
     notation: NotationId
@@ -91,6 +99,10 @@ export interface GameState {
     playMs: number
     /** Milliseconds since the last Wager, for the upgrade that scales with it. */
     wagerMs: number
+    /** Milliseconds since the last study or folio, for the Chariot. */
+    sinceResetMs: number
+    /** How many times the chain has been melted. */
+    melts: number
   }
 }
 
@@ -107,6 +119,7 @@ export function newGame(now: number): GameState {
     autoRoll: false,
     autoRollOn: true,
     rollUpgrades: 0,
+    meltPower: new Decimal(1),
     studies: 0,
     folios: 0,
     points: new Decimal(0),
@@ -118,6 +131,8 @@ export function newGame(now: number): GameState {
     achievements: [],
     haltMs: 0,
     tarot: {},
+    draftProgress: 0,
+    pendingDraft: [],
     options: {
       notation: 'mixed',
       tab: 'table',
@@ -128,13 +143,15 @@ export function newGame(now: number): GameState {
       offlineTicks: OFFLINE_TICKS_DEFAULT,
       confirms: defaultConfirms(),
     },
-    stats: { started: now, playMs: 0, wagerMs: 0 },
+    stats: { started: now, playMs: 0, wagerMs: 0, sinceResetMs: 0, melts: 0 },
   }
 }
 
 /** How many solids are on the table. Studies unlock the rest. */
 export function unlockedSolids(s: GameState): number {
-  return Math.min(SOLID_COUNT, SOLIDS_AT_START + Math.min(s.studies, STUDIES_THAT_UNLOCK))
+  // XXI The World: a run begins with more of the table already open.
+  const extra = s.tarot?.world ?? 0
+  return Math.min(SOLID_COUNT, SOLIDS_AT_START + extra + Math.min(s.studies, STUDIES_THAT_UNLOCK))
 }
 
 /** The deepest solid the player can currently buy, 1-based. */

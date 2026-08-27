@@ -15,6 +15,8 @@ export interface Actions {
   roll(): void
   buyAutomator(): void
   toggleAutomator(): void
+  takeCard(id: string): void
+  melt(): void
   buyStudy(): void
   buyFolio(): void
   wager(): void

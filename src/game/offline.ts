@@ -17,6 +17,7 @@
 import Decimal from 'break_infinity.js'
 import { OFFLINE_CAP_S } from './balance'
 import { tick } from './production'
+import { modifiers } from './tarot'
 import type { GameState } from '../state'
 
 export interface AwaySummary {
@@ -41,8 +42,10 @@ export function simulateAway(
   // A clock that jumped backwards, or a corrupt lastTick.
   if (!Number.isFinite(elapsed) || elapsed <= 0) return null
 
-  const capped = elapsed > OFFLINE_CAP_S
-  const seconds = Math.min(elapsed, OFFLINE_CAP_S)
+  // XVIII The Moon raises the cap: the hours you were not looking.
+  const cap = OFFLINE_CAP_S * modifiers(s).awayCapMult
+  const capped = elapsed > cap
+  const seconds = Math.min(elapsed, cap)
   const ticks = Math.max(1, Math.min(maxTicks, Math.ceil(seconds * TICKS_PER_SECOND)))
   const dt = seconds / ticks
 

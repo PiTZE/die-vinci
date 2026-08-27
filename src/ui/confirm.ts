@@ -14,6 +14,7 @@ const WINDOW_MS = 4000
 export const CONFIRM_KEYS = [
   { key: 'study', label: 'STUDY' },
   { key: 'folio', label: 'FOLIO' },
+  { key: 'melt', label: 'MELT' },
   { key: 'wager', label: 'THE WAGER' },
   { key: 'enterChallenge', label: 'ENTER A CHALLENGE' },
   { key: 'exitChallenge', label: 'LEAVE A CHALLENGE' },
