@@ -299,18 +299,31 @@ try {
     const fast = await count(16)
     const slow = await count(500)
 
-    // The fill, over one roll, with the readouts at their slowest.
+    // The fill over one roll, measured at both extremes of the setting. An
+    // absolute count of positions is really a count of frames, and inside
+    // npm test the box runs four browsers and hands out three of them in a
+    // second. Both runs get the same frame budget, so comparing them asks the
+    // real question: does the refresh rate change the fill at all.
     s.autoRoll = false; s.rollUpgrades = 0; s.studies = 0
-    s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 4 : 0) })
-    await new Promise(r => setTimeout(r, 250))
     const bar = document.querySelector('.bar-roll-fill')
-    window.LD.actions.roll()
-    const widths = new Set()
-    const t1 = performance.now()
-    while (performance.now() - t1 < 1100) {
-      widths.add(bar.style.width)
-      await new Promise(r => requestAnimationFrame(r))
+    const sweep = async (ms) => {
+      s.options.uiMs = ms
+      s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 4 : 0) })
+      s.ink = new D('1e12'); s.rollStartedAt = 0
+      await new Promise(r => setTimeout(r, 250))
+      window.LD.actions.roll()
+      const widths = new Set()
+      let frames = 0
+      const t1 = performance.now()
+      while (performance.now() - t1 < 1100) {
+        widths.add(bar.style.width)
+        frames++
+        await new Promise(r => requestAnimationFrame(r))
+      }
+      return { widths: widths.size, frames }
     }
+    const fillFast = await sweep(16)
+    const fillSlow = await sweep(500)
 
     // And a purchase shows without waiting half a second for it.
     s.ink = new D('1e12')
@@ -321,12 +334,14 @@ try {
     await new Promise(r => requestAnimationFrame(r))
     const after = document.querySelector('.solid-amount').textContent
     s.options.uiMs = 100
-    return { fast, slow, fill: widths.size, pressed: before !== after } })()`)
+    return { fast, slow, fillFast, fillSlow, pressed: before !== after } })()`)
   check('a slower refresh rate redraws the readouts less often',
     refresh.slow < refresh.fast && refresh.slow <= 6,
     `every frame ${refresh.fast} redraws, 500ms ${refresh.slow}`)
-  check('but the ROLL fill still moves every frame',
-    refresh.fill > 8, `${refresh.fill} widths across one roll at 500ms`)
+  check('but the ROLL fill moves the same at any refresh rate',
+    refresh.fillSlow.widths >= refresh.fillFast.widths * 0.6 && refresh.fillSlow.widths > 2,
+    `every frame ${refresh.fillFast.widths}/${refresh.fillFast.frames} frames, ` +
+      `500ms ${refresh.fillSlow.widths}/${refresh.fillSlow.frames}`)
   check('and a purchase lands without waiting for the next redraw', refresh.pressed === true)
 
   // MAX must never leave the table unable to produce. Roll rate multiplies what

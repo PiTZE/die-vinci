@@ -215,14 +215,32 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0
   s.solids.forEach((d, i) => { d.amount = new D(i === 0 ? 10 : 0) }) })()`)
 await sleep(150)
-await ev(`(() => { window.__s = []
+// Sampled on the frame, because the die is redrawn on the frame. A 40ms timer
+// beats against the frame rate, and two samples inside one frame read as no
+// movement at all.
+await ev(`(() => { window.__s = []; window.__sOn = true
   const ln = document.querySelector('.solid-icon line')
-  window.__t = setInterval(() => window.__s.push([
-    Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1')),
-    document.querySelector('.solid-icon').style.transform]), 40) })()`)
+  const step = () => {
+    if (!window.__sOn) return
+    window.__s.push([Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1')),
+      document.querySelector('.solid-icon').style.transform])
+    requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step) })()`)
 await ev(`${ROLL}.click()`)
-await sleep(1400)
-await ev(`clearInterval(window.__t)`)
+// Waits for frames rather than for time. Inside `npm test` the box runs four
+// browsers and this window delivered twelve frames, which is not enough to
+// average anything: the reading became noise and the check failed on it. Three
+// seconds is the cap, and a healthy run needs about one.
+// Both conditions. Long enough for the throw to finish and settle, which is
+// what the squareness check reads, and enough frames to average the
+// deceleration over. Under load those are not the same thing.
+const tumbleUntil = Date.now() + 1400
+for (let i = 0; i < 30; i++) {
+  await sleep(100)
+  if (Date.now() >= tumbleUntil && (await ev(`window.__s.length`)) >= 45) break
+}
+await ev(`window.__sOn = false`)
 const swing = await ev(`(() => {
   const s = window.__s
   const d = []
@@ -316,18 +334,34 @@ async function spinRate(upgrades) {
     s.autoRoll = true; s.studies = 2; s.rollUpgrades = ${upgrades}
     s.solids.forEach((d, i) => { if (i < 2) { d.bought = 10; d.amount = new D(50) } }) })()`)
   await sleep(150)
-  await ev(`(() => { window.__sp = []
+  // Sampled on the frame, not on a 32ms interval. The die is redrawn once a
+  // frame, so an independent timer beats against the frame rate: two samples
+  // can land inside one frame and read as no movement, and the average then
+  // depends on where the beat happened to fall. That is what made this swing
+  // enough to fail with the middle rate reading slower than the slowest.
+  await ev(`(() => { window.__sp = []; window.__spOn = true
     const ln = document.querySelector('.solid-icon line')
-    window.__spt = setInterval(() => window.__sp.push([
-      Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1'))]), 32) })()`)
+    const step = () => {
+      if (!window.__spOn) return
+      window.__sp.push([Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1'))])
+      requestAnimationFrame(step)
+    }
+    requestAnimationFrame(step) })()`)
   // Long enough to cover several whole throws, and no longer. At one roll a
   // second an eased curve sampled for 1.4s averaged whichever part of it the
   // samples happened to land on, and the reading swung from 0.19 to 0.37
   // between runs; at a hundred rolls a second, 3.2s is 3.1s of waiting for
   // nothing. Three throws or 900ms, whichever is more.
   const span = await ev(`window.LD.rollInterval * 1000`)
-  await sleep(Math.max(900, Math.min(3200, span * 3)))
-  await ev(`clearInterval(window.__spt)`)
+  const want = Math.max(900, Math.min(3200, span * 3))
+  const until = Date.now() + want
+  // Both conditions. Long enough to cover several whole throws, and enough
+  // frames to average, because under load the two are not the same thing.
+  for (let i = 0; i < 40; i++) {
+    await sleep(100)
+    if (Date.now() >= until && (await ev(`window.__sp.length`)) >= 40) break
+  }
+  await ev(`window.__spOn = false`)
   return ev(`(() => { const s = window.__sp, d = []
     for (let i = 1; i < s.length; i++) d.push(Math.hypot(s[i][0]-s[i-1][0], s[i][1]-s[i-1][1]))
     const m = d.filter(v => v > 0)

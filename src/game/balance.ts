@@ -33,15 +33,15 @@ export const OFFLINE_TICK_CHOICES = [500, 2000, 10000] as const
 /**
  * How often the readouts are allowed to redraw, in milliseconds.
  *
- * The game ticks and the dice tumble at full frame rate whatever this says.
- * This is only about how often the numbers on screen are rewritten, and at
- * sixty a second a nine-row table of changing digits is a flicker rather than a
- * reading. Antimatter Dimensions has the same setting and defaults to 50ms.
- *
- * 16 is every frame, for anyone who wants it.
+ * The game ticks, the dice tumble and the ticker crawls at full frame rate
+ * whatever this says. This is only about how often the numbers on screen are
+ * rewritten. It defaults to every frame; the slower settings are there for
+ * anyone who finds a table of changing digits too busy to read, which is what
+ * Antimatter Dimensions offers the same setting for.
  */
 export const UI_MS_CHOICES = [16, 50, 100, 250, 500] as const
-export const UI_MS_DEFAULT = 100
+/** Every frame. The setting is there for anyone who wants it slower. */
+export const UI_MS_DEFAULT = 16
 export const OFFLINE_TICKS_DEFAULT = 2000
 
 /**

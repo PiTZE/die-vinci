@@ -256,14 +256,17 @@ export class Shell {
     this.thoughtLine.style.transform = `translateX(${Math.round(this.thoughtX)}px)`
   }
 
-  /** The per-frame pass, for the pane on screen if it has something moving. */
+  /** The per-frame pass, for everything that moves. */
   animate(s: GameState): void {
+    // The ticker crawls a line across the bar. Stepped from update() it moved
+    // as many times a second as the readouts were redrawn, which at 100ms is
+    // ten and reads as a line juddering rather than crawling. A refresh rate is
+    // about how often a number is rewritten; this is an animation.
+    this.thoughts(s, Date.now())
     this.panes.find((p) => p.id === this.active)?.animate?.(s)
   }
 
   update(s: GameState, inkRate: Decimal): void {
-    const now = Date.now()
-    this.thoughts(s, now)
 
     // The run is over and waiting on you. Said once, not every frame.
     const full = mustWager(s)
