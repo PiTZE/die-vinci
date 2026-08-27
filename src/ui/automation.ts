@@ -10,6 +10,7 @@ import {
 } from '../game/autobuyers'
 import { format } from '../format'
 import type { GameState } from '../state'
+import { automatorCost, automatorUnlocked, canBuyAutomator } from '../game/production'
 import { el, type Actions, type Pane } from './shell'
 
 function setText(n: HTMLElement, v: string): void {
@@ -17,6 +18,9 @@ function setText(n: HTMLElement, v: string): void {
 }
 
 export function automationPane(): Pane {
+  let autoSection: HTMLElement
+  let autoBuy: HTMLButtonElement
+  let autoToggle: HTMLButtonElement
   const rows = new Map<
     string,
     {
@@ -31,9 +35,27 @@ export function automationPane(): Pane {
   return {
     id: 'automation',
     label: 'AUTOMATION',
-    visible: (s) => anyUnlocked(s),
+    visible: (s) => anyUnlocked(s) || automatorUnlocked(s),
 
     mount(root, actions: Actions) {
+      // The roll comes first: it is the one that takes your finger off the
+      // button, and every autobuyer below it is a convenience by comparison.
+      autoSection = el('div', 'section')
+      const ah = el('div', 'section-head')
+      ah.appendChild(el('span', 'grow', 'THE ROLL'))
+      autoSection.appendChild(ah)
+      const autoRow = el('div', 'auto-row')
+      autoRow.appendChild(el('span', 'auto-label', 'ROLLS ITSELF'))
+      autoBuy = el('button', 'auto-up', '')
+      autoBuy.type = 'button'
+      autoBuy.addEventListener('click', () => actions.buyAutomator())
+      autoToggle = el('button', 'auto-toggle', 'ON')
+      autoToggle.type = 'button'
+      autoToggle.addEventListener('click', () => actions.toggleAutomator())
+      autoRow.append(autoToggle, autoBuy)
+      autoSection.appendChild(autoRow)
+      root.append(autoSection)
+
       const section = el('div', 'section')
       const h = el('div', 'section-head')
       h.appendChild(el('span', 'grow', 'AUTOBUYERS'))
@@ -68,6 +90,20 @@ export function automationPane(): Pane {
 
     update(s: GameState) {
       const n = s.options.notation
+
+      autoSection.hidden = !automatorUnlocked(s)
+      if (!s.autoRoll) {
+        setText(autoBuy, `UNLOCK / ${automatorCost()} POINT`)
+        const can = canBuyAutomator(s)
+        autoBuy.disabled = !can
+        autoBuy.classList.toggle('buyable', can)
+        autoToggle.hidden = true
+      } else {
+        autoBuy.hidden = true
+        autoToggle.hidden = false
+        setText(autoToggle, s.autoRollOn ? 'ON' : 'OFF')
+        autoToggle.classList.toggle('buyable', s.autoRollOn)
+      }
       for (const a of AUTOBUYERS) {
         const row = rows.get(a.id)
         if (!row) continue

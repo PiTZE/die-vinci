@@ -13,11 +13,11 @@ import {
   unspentMultiplier,
 } from './upgrades'
 import {
-  AUTOMATOR_AT_STUDIES,
   AUTOMATOR_COST,
   ROLLS_DRAWN_INDIVIDUALLY,
   ROLL_COST_BASE,
   ROLL_COST_MULT,
+  CATCHUP_AFTER_S,
   ROLL_INTERVAL_BASE,
   START_INK,
   WAGER_AT,
@@ -386,7 +386,7 @@ export function rollProgress(s: GameState, now: number): number {
 }
 
 export function rolling(s: GameState): boolean {
-  return s.autoRoll || s.rollStartedAt > 0
+  return rollingItself(s) || s.rollStartedAt > 0
 }
 
 /** Begins a spin. Refused while one is already in flight, which is the whole
@@ -404,7 +404,7 @@ export function mustWager(s: GameState): boolean {
 
 export function startRoll(s: GameState, now: number): boolean {
   if (mustWager(s)) return false
-  if (s.autoRoll || s.rollStartedAt > 0 || s.haltMs > 0) return false
+  if (rollingItself(s) || s.rollStartedAt > 0 || s.haltMs > 0) return false
   s.rollStartedAt = now
   // The faces go with the throw. A die in the air is not still showing you
   // what it landed on last time.
@@ -504,24 +504,32 @@ function applyRolls(s: GameState, count: number): void {
 
 // -- the automator --------------------------------------------------------
 
+/** The automator is offered from the first Wager, and never before it. */
 export function automatorUnlocked(s: GameState): boolean {
-  return s.autoRoll || s.studies >= AUTOMATOR_AT_STUDIES
+  return s.autoRoll || s.wagers > 0
 }
 
-export function automatorCost(): Decimal {
+export function automatorCost(): number {
   return AUTOMATOR_COST
 }
 
 export function canBuyAutomator(s: GameState): boolean {
-  return !s.autoRoll && automatorUnlocked(s) && s.ink.gte(AUTOMATOR_COST)
+  return !s.autoRoll && automatorUnlocked(s) && s.points.gte(AUTOMATOR_COST)
 }
 
 export function buyAutomator(s: GameState): boolean {
   if (!canBuyAutomator(s)) return false
-  s.ink = s.ink.minus(AUTOMATOR_COST)
+  s.points = s.points.minus(AUTOMATOR_COST)
   s.autoRoll = true
+  s.autoRollOn = true
   s.rollStartedAt = 0
   return true
+}
+
+/** Bought and switched on. Switched off, the dice wait for your finger again,
+ *  which is the only way to see a roll land one at a time once you own it. */
+export function rollingItself(s: GameState): boolean {
+  return s.autoRoll && s.autoRollOn
 }
 
 // -- the tick -------------------------------------------------------------
@@ -583,11 +591,23 @@ export function tick(s: GameState, dt: number, now: number): void {
 
   // By hand: nothing happens until a spin finishes, and the dice pay out when
   // they land rather than while they are in the air.
-  if (!s.autoRoll) {
+  if (!rollingItself(s)) {
     s.rollAccum = 0
     if (s.rollStartedAt && now - s.rollStartedAt >= interval * 1000) {
+      // The time in the air, not one roll, and not a count of them.
+      //
+      // One roll per tick capped a held button at ten a second, because the
+      // tick is 100ms, however fast the roll rate had become. With the
+      // automator behind the first Wager that made the first Wager
+      // unreachable by hand. Capping the roll count instead was the same
+      // mistake wearing a bigger number: at a million rolls a second a
+      // thousand per tick is still a throttle.
+      //
+      // So the bound is on elapsed time. Anything longer than a tick's worth
+      // of catch-up belongs to the away path, which has its own budget.
+      const held = Math.min(CATCHUP_AFTER_S, (now - s.rollStartedAt) / 1000)
       s.rollStartedAt = 0
-      resolveOneRoll(s)
+      applyRolls(s, Math.max(1, Math.floor(held / interval)))
     }
     return
   }

@@ -15,7 +15,7 @@ import Decimal from 'break_infinity.js'
 import { newGame } from '../src/state'
 import * as P from '../src/game/production'
 import * as W from '../src/game/wager'
-import { AUTOMATOR_AT_STUDIES, WAGER_AT } from '../src/game/balance'
+import { WAGER_AT } from '../src/game/balance'
 import { SOLIDS } from '../src/game/solids'
 import { UPGRADES, buyUpgrade, canBuy, type UpgradeId } from '../src/game/upgrades'
 import { format } from '../src/format'
@@ -47,10 +47,10 @@ function mark(what: string): void {
 }
 
 /**
- * Before the automator the player is pressing a button, and cannot press it
- * faster than the roll rate. Perfect mashing is the ceiling, so this rolls
- * every interval, which flatters the player slightly and is the right bound
- * for asking whether the opening is too long.
+ * Before the automator the player is holding the button, and cannot roll
+ * faster than the roll rate however hard they hold it. So this rolls every
+ * interval: a perfect hold, which is the right bound for asking how long the
+ * opening asks someone to sit there.
  */
 function advance(): void {
   if (!s.autoRoll) {
@@ -181,5 +181,5 @@ if (done < WAGERS) {
   console.log(`  automator at ${automatorAt ? hms(automatorAt) : 'never'}`)
   console.log(`  peak ink ${format(peak, 'scientific')} at ${hms(peakAt)}`)
   console.log(`  last milestone ${hms(lastMark)}, so ${hms(t - lastMark)} with nothing to show`)
-  console.log(`  (AUTOMATOR appears at ${AUTOMATOR_AT_STUDIES} studies)`)
+  console.log('  (the automator is a post-Wager purchase, so this run was all by hand)')
 }

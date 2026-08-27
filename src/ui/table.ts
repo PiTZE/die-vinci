@@ -7,10 +7,7 @@ import {
   canBuyRollRate,
   canBuySolid,
   canBuyStudy,
-  canBuyAutomator,
   canMaxAll,
-  automatorCost,
-  automatorUnlocked,
   folioReq,
   folioUnlocked,
   rollCost,
@@ -22,6 +19,7 @@ import {
   rollProgress,
   rolling,
   mustWager,
+  rollingItself,
   meanFace,
   faceBias,
   FACE_READABLE_S,
@@ -69,8 +67,6 @@ export function tablePane(): Pane {
   let folioLine: HTMLElement
   let rollNow: HTMLButtonElement
   let rollFill: HTMLElement
-  let autoSection: HTMLElement
-  let autoBtn: HTMLButtonElement
   let wagerNow: HTMLButtonElement
   let resetGroup: HTMLElement
   let lastFace = 0
@@ -198,19 +194,6 @@ export function tablePane(): Pane {
       rr.appendChild(rollBtn)
       roll.appendChild(rr)
 
-      // The first automator. One purchase, never lost, and the moment the game
-      // stops being a button and starts being an idle game.
-      autoSection = el('div', 'section')
-      const ah = el('div', 'section-head')
-      ah.appendChild(el('span', 'grow', 'THE AUTOMATOR'))
-      autoSection.appendChild(ah)
-      autoBtn = el('button', 'action', '')
-      autoBtn.type = 'button'
-      autoBtn.addEventListener('click', () => actions.buyAutomator())
-      const ar = el('div', 'row')
-      ar.appendChild(autoBtn)
-      autoSection.appendChild(ar)
-
       // Folio and study share one section, folio on the left because it is
       // the deeper reset. Before folios are unlocked, study has it to itself.
       const resets = el('div', 'section')
@@ -251,7 +234,7 @@ export function tablePane(): Pane {
       // single line of text; beside the chain it costs no height at all.
       const grid = el('div', 'table-grid')
       const controls = el('div', 'table-controls')
-      controls.append(autoSection, resets)
+      controls.append(resets)
       grid.append(roll, chain, controls)
       root.append(grid)
 
@@ -318,7 +301,7 @@ export function tablePane(): Pane {
       // Once the automator is in, the button has nothing left to do: it can
       // never beat the roll rate, and the bar is better off giving the space
       // back to MAX.
-      rollNow.hidden = s.autoRoll || full
+      rollNow.hidden = rollingItself(s) || full
       if (!s.autoRoll) {
         const p = rollProgress(s, now)
         const pct = `${Math.round(p * 100)}%`
@@ -375,9 +358,9 @@ export function tablePane(): Pane {
         // over any run of rolls. Per second only once the automator is rolling:
         // before it, a rate per second is a claim about how fast you press.
         const each = st.amount.times(mult).times(meanFace(def.faces, faceBias(s)))
-        const per = s.autoRoll ? each.times(rate) : each
+        const per = rollingItself(s) ? each.times(rate) : each
         const unit = def.idx === 1 ? 'ink' : SOLIDS[def.idx - 2].short
-        setText(r.rate, `+${format(per, n)} ${unit}${s.autoRoll ? '/s' : '/roll'}`)
+        setText(r.rate, `+${format(per, n)} ${unit}${rollingItself(s) ? '/s' : '/roll'}`)
 
         const count = buyCount(s, def.idx)
         const price = buyPrice(s, def.idx)
@@ -393,21 +376,6 @@ export function tablePane(): Pane {
       const canRoll = canBuyRollRate(s)
       rollBtn.disabled = !canRoll
       rollBtn.classList.toggle('buyable', canRoll)
-
-      const showAuto = automatorUnlocked(s)
-      autoSection.hidden = !showAuto
-      if (showAuto) {
-        if (s.autoRoll) {
-          setText(autoBtn, 'ROLLING ON ITS OWN')
-          autoBtn.disabled = true
-          autoBtn.classList.remove('buyable')
-        } else {
-          setText(autoBtn, `AUTOMATE THE ROLL / ${format(automatorCost(), n)} INK`)
-          const canAuto = canBuyAutomator(s)
-          autoBtn.disabled = !canAuto
-          autoBtn.classList.toggle('buyable', canAuto)
-        }
-      }
 
       confirmSettings = s.options.confirms
       const studyArmed = confirm.isArmed('study')

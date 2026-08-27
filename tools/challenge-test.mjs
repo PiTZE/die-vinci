@@ -115,7 +115,14 @@ const beforeUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level,
   every: window.LD.state.autobuyers.solid1.level })`)
 // Cost doubles per level, so it is derived rather than assumed to be 1.
 const expectCost = Math.pow(2, beforeUp.level)
-await ev(`[...document.querySelectorAll('.auto-up')].find(b => !b.disabled).click()`)
+// Scoped to the autobuyer list. The automator sits above it in its own
+// section with the same row markup, and an unscoped query finds that first.
+await ev(`(() => {
+  const list = [...document.querySelectorAll('.section')]
+    .find(x => x.textContent.startsWith('AUTOBUYERS'))
+  const b = [...list.querySelectorAll('.auto-up')].find(x => !x.disabled)
+  if (b) b.click()
+})()`)
 await sleep(150)
 const afterUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level, points: Number(window.LD.state.points) })`)
 check('upgrading an autobuyer spends the doubling cost and shortens it',

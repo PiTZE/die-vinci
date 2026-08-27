@@ -47,6 +47,8 @@ export interface GameState {
   rollAccum: number
   /** The first automator. Once bought it is never lost, not even to a Wager. */
   autoRoll: boolean
+  /** And whether it is switched on. */
+  autoRollOn: boolean
   rollUpgrades: number
   studies: number
   folios: number
@@ -103,6 +105,7 @@ export function newGame(now: number): GameState {
     rollStartedAt: 0,
     rollAccum: 0,
     autoRoll: false,
+    autoRollOn: true,
     rollUpgrades: 0,
     studies: 0,
     folios: 0,

@@ -122,12 +122,24 @@ await sleep(1300)
 const afterKey = await ev(`window.LD.state.ink.toString()`)
 check('space rolls', Number(afterKey) > Number(beforeKey), `${beforeKey} -> ${afterKey}`)
 
-// The automator, and the button standing down once it is in.
+// The automator is a post-Wager purchase now, bought with a point in the
+// AUTOMATION tab, so the whole first run is your finger on the button.
+const beforeWager = await ev(`(() => {
+  const t = [...document.querySelectorAll('.tab')].find(x => x.textContent.trim() === 'AUTOMATION')
+  return !t || t.hidden })()`)
+check('no automation tab before the first Wager', beforeWager === true)
+
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.studies = 2; s.ink = new D(1e6) })()`)
-await sleep(150)
-await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.includes('AUTOMATE')).click()`)
-await sleep(150)
+  s.wagers = 1; s.points = new D(3) })()`)
+await sleep(400)
+await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'AUTOMATION').click()`)
+await sleep(300)
+await ev(`[...document.querySelectorAll('.auto-up')].find(b => b.textContent.includes('UNLOCK')).click()`)
+await sleep(300)
+check('it costs a point', (await ev(`Number(window.LD.state.points)`)) === 2,
+  `points now ${await ev(`Number(window.LD.state.points)`)}`)
+await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
+await sleep(300)
 const auto = await ev(`({ auto: window.LD.state.autoRoll,
   btn: getComputedStyle(${ROLL}).display })`)
 check('the automator can be bought', auto.auto === true)
@@ -141,6 +153,20 @@ await sleep(1600)
 const afterAuto = await ev(`window.LD.state.ink.toString()`)
 check('rolls now land on their own', Number(afterAuto) > Number(beforeAuto),
   `${beforeAuto} -> ${afterAuto}`)
+
+// And it can be switched off again, which puts the button back.
+await ev(`window.LD.actions.toggleAutomator()`)
+await sleep(400)
+const offAgain = await ev(`({ on: window.LD.state.autoRollOn,
+  rollBtn: getComputedStyle(${ROLL}).display })`)
+check('switching it off brings ROLL back',
+  offAgain.on === false && offAgain.rollBtn !== 'none', JSON.stringify(offAgain))
+const idleA = await ev(`window.LD.state.ink.toString()`)
+await sleep(900)
+check('and nothing rolls while it is off',
+  (await ev(`window.LD.state.ink.toString()`)) === idleA)
+await ev(`window.LD.actions.toggleAutomator()`)
+await sleep(300)
 
 // A batch must pay the mean face per die, not a flat one, or automating the
 // roll would quietly be a downgrade.

@@ -206,6 +206,15 @@ const actions: Actions = {
     buyAutomator(state)
     persistSoon()
   },
+  toggleAutomator: () => {
+    state.autoRollOn = !state.autoRollOn
+    // The automator records when its current roll began so the dice animate
+    // off the same clock a manual one does. Left set, switching off hands that
+    // roll to the manual path, which lands it a moment later out of nowhere.
+    state.rollStartedAt = 0
+    state.rollAccum = 0
+    persistSoon()
+  },
   buyRollRate: () => {
     buyRollRate(state)
     persistSoon()

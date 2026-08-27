@@ -49,6 +49,9 @@ async function gap(seconds, { offline = true } = {}) {
   await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
     s.options.offline = ${offline}
     s.options.offlineTicks = 2000
+    // Time away only counts once the dice roll themselves, and that is a
+    // post-Wager purchase now rather than something a few studies grant.
+    s.wagers = 1; s.autoRoll = true; s.autoRollOn = true
     s.studies = 3; s.folios = 0; s.rollUpgrades = 0
     s.solids.forEach(d => { d.bought = 0; d.amount = new D(0) })
     s.solids[0].amount = new D('1e10')

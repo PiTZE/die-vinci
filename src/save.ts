@@ -1,6 +1,6 @@
 import Decimal from 'break_infinity.js'
 import { rollBackups, writeBackup } from './backup'
-import { AUTOMATOR_AT_STUDIES, SAVE_KEY, SAVE_VERSION } from './game/balance'
+import { SAVE_KEY, SAVE_VERSION } from './game/balance'
 
 // Three save slots, as Antimatter Dimensions has. Each is its own key, and the
 // chosen one is remembered separately. A save written before slots existed is
@@ -80,8 +80,9 @@ const MIGRATIONS: Record<number, (r: Raw) => Raw> = {
     rollUpgrades: 0,
     ink: '10',
     inkThisWager: '0',
-    autoRoll:
-      (Number(r.studies) || 0) >= AUTOMATOR_AT_STUDIES || (Number(r.wagers) || 0) > 0,
+    // The automator is a post-Wager purchase now, so only a save that had
+    // already called one keeps it.
+    autoRoll: (Number(r.wagers) || 0) > 0,
   }),
   2: (r) => ({
     ...r,

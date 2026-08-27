@@ -59,18 +59,17 @@ export const PER_TEN_MULT = new Decimal(2)
 export const ROLL_INTERVAL_BASE = 1
 
 /**
- * The first automator, which takes the roll off your finger. Priced so it is
- * the thing the opening is for: reachable a few minutes after the second
- * study, and worth every ink, because past a few rolls a second no hand can
- * keep up with the roll rate anyway.
+ * The first automator, which takes the roll off your finger.
+ *
+ * It arrives with the first Wager and costs a point, which makes the whole
+ * first run manual: you hold ROLL, and holding gives exactly the roll rate
+ * because a roll refuses to start while one is in the air. The automator buys
+ * you your finger back, not throughput. That is the "start slowly and then
+ * automate everything" arc, and it is where Antimatter Dimensions puts its
+ * autobuyers too.
  */
-export const AUTOMATOR_AT_STUDIES = 2
-export const AUTOMATOR_COST = new Decimal(1e5)
+export const AUTOMATOR_COST = 1
 
-/** A roll resolved by hand or by the automator is the same roll. Below this
- *  many in one frame each die rolls its own face; above it they are applied in
- *  one step at each die's mean face, because nobody can read a thousand dice a
- *  second and the mean is exact in the limit. */
 export const ROLLS_DRAWN_INDIVIDUALLY = 12
 
 /** Ink cost of the first roll-rate upgrade, then x10 each. */

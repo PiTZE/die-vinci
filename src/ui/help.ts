@@ -1,4 +1,3 @@
-import { AUTOMATOR_AT_STUDIES } from '../game/balance'
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
 import { seal, unseal } from './redact'
@@ -18,7 +17,7 @@ interface Section {
 }
 
 const afterStudy = (s: GameState) => s.studies >= 1 || s.wagers > 0
-const afterAutomator = (s: GameState) => s.autoRoll || s.studies >= AUTOMATOR_AT_STUDIES
+const afterAutomator = (s: GameState) => s.autoRoll || s.wagers > 0
 const nearWager = (s: GameState) => s.wagers > 0 || s.ink.gte('1e290')
 const afterWager = (s: GameState) => s.wagers > 0
 const afterAutobuyer = (s: GameState) =>
@@ -56,8 +55,8 @@ const SECTIONS: Section[] = [
     title: 'THE AUTOMATOR',
     needs: afterAutomator,
     body: [
-      'One purchase, and the dice roll on their own for good. It appears after your second study.',
-      'Past a few rolls a second no hand can keep up with the roll rate, so this is less a choice than a matter of when. Until you own it, time away from the game produces nothing at all.',
+      'One point, once you have called the Wager, and the dice roll on their own. You can switch it off again in AUTOMATION.',
+      'Until you own it you hold ROLL, and holding gives exactly the roll rate: a roll refuses to start while one is in the air. It buys you your finger back rather than any extra speed. It is also what makes time away from the game count.',
       'You never lose it. Not to a study, not to a folio, not to the Wager.',
     ],
   },
