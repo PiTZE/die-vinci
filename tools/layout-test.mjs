@@ -257,6 +257,51 @@ check('and roll rate, folio and study keep most of theirs',
   targets.duo.length >= 2 && targets.duo.every((b) => b.h <= 36 && b.target >= 38),
   JSON.stringify(targets.duo))
 
+// Affordability moved off the buy button's border and onto the row. Nine
+// outlined rectangles competed with each other and with the table's own
+// borders; a tint is read as a state. The button keeps a neutral outline, and
+// what is left of the accent is the word BUY.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 8; s.folios = 1; s.stats.foliosEver = 1; s.wagers = 1
+  s.solids.forEach((d, i) => { d.bought = 14 + i; d.amount = new D(10).pow(12 - i) })
+  s.ink = new D('3.3e17') })()`)
+await sleep(200)
+const tint = await ev(`(() => {
+  const cs = getComputedStyle
+  const rows = [...document.querySelectorAll('.solid')].filter(r => !r.hidden)
+  const read = (r) => {
+    const b = r.querySelector('.solid-buy')
+    return { afford: r.classList.contains('affordable'),
+      tinted: cs(r).backgroundColor !== 'rgba(0, 0, 0, 0)',
+      accentBorder: cs(b).borderTopColor === cs(document.documentElement).getPropertyValue('--accent').trim(),
+      cover: parseFloat(b.querySelector('.solid-cover').style.width) || 0 }
+  }
+  const all = rows.map(read)
+  return { yes: all.filter(r => r.afford), no: all.filter(r => !r.afford) } })()`)
+check('an affordable row is tinted and an unaffordable one is not',
+  tint.yes.length > 0 && tint.no.length > 0 &&
+    tint.yes.every((r) => r.tinted) && tint.no.every((r) => !r.tinted),
+  JSON.stringify({ yes: tint.yes.length, no: tint.no.length }))
+check('and no buy button wears the accent on its border',
+  [...tint.yes, ...tint.no].every((r) => !r.accentBorder))
+// The cost fill answers "how close am I", measured in exponents. A plain ratio
+// reads 0 for almost the whole wait, because the chain steps by orders of
+// magnitude: 1e17 against 1e25 is 0.000003%.
+check('the cost fill is between the extremes on a row not yet affordable',
+  tint.no.some((r) => r.cover > 5 && r.cover < 95) && tint.yes.every((r) => r.cover === 0),
+  JSON.stringify(tint.no.map((r) => r.cover)))
+
+// How far through the run you are, kept on the table rather than behind the
+// WAGER tab, because this run stops dead at the threshold.
+const run = await ev(`(() => {
+  const bar = document.querySelector('.run-bar')
+  const f = bar.querySelector('.run-bar-fill')
+  return { hidden: bar.hidden, label: bar.querySelector('.run-bar-label').textContent,
+    fill: parseFloat(f.style.width) || 0 } })()`)
+check('the table shows how far through the run you are',
+  run.hidden === false && /\d/.test(run.label) && run.fill > 0 && run.fill < 100,
+  JSON.stringify(run))
+
 // FOLIO and STUDY share one header, and with nothing between them the pair
 // read as one sentence: "FOLIO 1 STUDY 8". The divider has to land on the same
 // line as the gap between the two buttons under it, or it looks like a third

@@ -163,6 +163,39 @@ export function canBuyGroup(s: GameState, idx: number): boolean {
   return s.ink.gte(need)
 }
 
+/**
+ * How close the wallet is to the next purchase, 0 to 1, measured in exponents.
+ *
+ * Antimatter Dimensions fills its cost button by this, so a row you cannot
+ * afford says how close you are rather than only saying no. Theirs is the plain
+ * ratio, which works because its early costs sit within a few multiples of each
+ * other. This chain steps by orders of magnitude, so a ratio is 0 for almost
+ * the entire wait and then 1: at 1e17 against a price of 1e25 it reads
+ * 0.000003%, which is a bar that never moves.
+ *
+ * Exponents instead. 17 of 25 is 68%, and since the ink grows exponentially,
+ * distance in exponents is roughly distance in time, which is what the bar is
+ * being asked. The wallet is the ink, except in the challenge that makes a
+ * solid pay for the one above it.
+ */
+export function affordFraction(s: GameState, idx: number): number {
+  if (idx > openSolids(s)) return 0
+  const r = restrictions(s)
+  let wallet = s.ink
+  if (r.payWithOffset > 0) {
+    const from = idx - r.payWithOffset
+    if (from < 1) return 0
+    wallet = s.solids[from - 1].amount
+  }
+  const price = buyPrice(s, idx)
+  if (wallet.gte(price)) return 1
+  const top = price.log10()
+  if (!Number.isFinite(top) || top <= 0) return 1
+  const have = wallet.lte(0) ? 0 : wallet.log10()
+  if (!Number.isFinite(have)) return 0
+  return Math.max(0, Math.min(1, have / top))
+}
+
 export function canBuySolid(s: GameState, idx: number): boolean {
   if (idx > openSolids(s)) return false
   const r = restrictions(s)

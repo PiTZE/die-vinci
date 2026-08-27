@@ -5,6 +5,7 @@ import {
   buyPrice,
   canBuyFolio,
   canBuyRollRate,
+  affordFraction,
   canBuySolid,
   canBuyStudy,
   canMaxAll,
@@ -27,6 +28,7 @@ import {
   faceBias,
   FACE_READABLE_S,
 } from '../game/production'
+import { WAGER_AT } from '../game/balance'
 import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
@@ -45,6 +47,7 @@ interface Row {
   amount: HTMLElement
   rate: HTMLElement
   buy: HTMLButtonElement
+  cover: HTMLElement
   buyLabel: HTMLElement
   buyCost: HTMLElement
 }
@@ -110,6 +113,9 @@ export function tablePane(): Pane {
   let rollFill: HTMLElement
   let wagerNow: HTMLButtonElement
   let resetGroup: HTMLElement
+  let runBar: HTMLElement
+  let runFill: HTMLElement
+  let runLabel: HTMLElement
   let lastFace = 0
 
 
@@ -208,6 +214,10 @@ export function tablePane(): Pane {
         // part of the group of ten already owned, a second for how many more
         // the ink covers right now. It says more than a number and it stops
         // the row needing a separate bar underlining it.
+        // How much of the price the ink covers, drawn across the button.
+        // Antimatter Dimensions fills its cost button this way, so a row you
+        // cannot afford says how close you are rather than only saying no.
+        const cover = el('span', 'solid-cover')
         const bar = el('span', 'solid-fill')
         const barCan = el('span', 'solid-fill-can')
         // What it does on the left, what it costs on the right. The two used
@@ -216,13 +226,13 @@ export function tablePane(): Pane {
         // and ellipsises itself when the cost grows.
         const buyLabel = el('span', 'solid-buy-label', '')
         const buyCost = el('span', 'solid-buy-cost', '')
-        buy.append(bar, barCan, buyLabel, buyCost)
+        buy.append(cover, bar, barCan, buyLabel, buyCost)
         // Shift buys a single die, the way AD's shift+1-8 does.
         holdable(buy, (m) => actions.buySolid(def.idx, m.shift))
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, icon, face, mult, bar, barCan, amount, rate: flow, buy, buyLabel, buyCost })
+        rows.push({ root: r, icon, face, mult, cover, bar, barCan, amount, rate: flow, buy, buyLabel, buyCost })
       }
 
       const roll = el('div', 'section table-roll')
@@ -293,7 +303,20 @@ export function tablePane(): Pane {
       const controls = el('div', 'table-controls')
       controls.append(resets)
       grid.append(roll, chain, controls)
-      root.append(grid)
+
+      // How far through the run you are, kept on the table rather than behind
+      // the WAGER tab. Antimatter Dimensions puts its percentage to Infinity on
+      // the main screen, and it matters more here: this run does not merely
+      // slow down at the threshold, it stops dead and demands a Wager.
+      //
+      // On a log scale, because the run spans 308 orders of magnitude and a
+      // linear bar would read zero for all but the last seconds of it.
+      runBar = el('div', 'run-bar')
+      runFill = el('span', 'run-bar-fill')
+      runLabel = el('span', 'run-bar-label', '')
+      runBar.append(runFill, runLabel)
+
+      root.append(grid, runBar)
 
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.
@@ -429,6 +452,29 @@ export function tablePane(): Pane {
         const can = canBuySolid(s, def.idx)
         r.buy.disabled = !can
         r.buy.classList.toggle('buyable', can)
+        // Affordability moved off the button's border and onto the row, so
+        // nine of them read as states rather than as nine outlined rectangles.
+        r.root.classList.toggle('affordable', can)
+        // And once the row says it, the cover has nothing left to add, so it
+        // only draws while the price is still out of reach.
+        const covered = can ? '0%' : `${(affordFraction(s, def.idx) * 100).toFixed(1)}%`
+        if (r.cover.style.width !== covered) r.cover.style.width = covered
+      }
+
+      // Gated exactly as the WAGER tab is, so the bar and the tab that explains
+      // it arrive together and neither gives the other away early.
+      const showRun = s.wagers > 0 || s.ink.gte(WAGER_AT.div(1e60))
+      runBar.hidden = !showRun
+      // Emptied rather than merely hidden. Before the first Wager this gate can
+      // close again, when a study drops the ink back under the threshold, and
+      // the spoiler test reads textContent, which includes hidden nodes. A
+      // label left behind would name the Wager to someone who has not met it.
+      if (!showRun) setText(runLabel, '')
+      if (showRun) {
+        const pct = Math.min(100, (Math.max(0, s.ink.log10()) / WAGER_AT.log10()) * 100)
+        setText(runLabel, `TO THE WAGER  ${pct.toFixed(2)}%`)
+        const w = `${pct.toFixed(2)}%`
+        if (runFill.style.width !== w) runFill.style.width = w
       }
 
       setText(rollLine, `${format(new Decimal(rate), n)}/s`)

@@ -247,6 +247,38 @@
    Pinned to the top left corner it read as a separate thing floating above
    the button's own text: the label centres in the button, the button is the
    height of the whole row, and the two ended up stacked and unrelated. */
+/* How much of the price the ink covers, across the whole button. One fill, not
+   two: the pair of full-height slabs this replaces had the label sitting half
+   on and half off them and read as a broken progress bar. This one is behind
+   the text, subtle, and stops entirely once the row is affordable, because at
+   that point the row's own tint has already said so. */
+.solid-cover {
+  pointer-events: none;
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  /* Faded out at its leading edge rather than cut off square. A hard vertical
+     edge under the label is what made the fills this replaces read as a broken
+     progress bar, and this one is answering "how close", which does not need a
+     precise boundary to be read. */
+  background: linear-gradient(to right, var(--fill) 0%, var(--fill) 78%, transparent 100%);
+}
+
+/* Affordable and unbought, the one thing the accent means. On the row rather
+   than on the button's border: nine outlined rectangles compete with each
+   other and with the table's own borders, where a tint is read as a state.
+   Mixed from --accent rather than given its own token, so there is one value
+   to keep right instead of the same colour written into both palettes. */
+.solid.affordable {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* So the button keeps a neutral outline whatever it can afford. The accent it
+   still carries is on the word BUY, which is one word rather than a rectangle. */
+.solid-buy.buyable {
+  border-color: var(--border);
+}
+
 /* Owned of this group of ten, then how many more the ink covers, carrying on
    from it. Three pixels of 14% white is invisible, which is what the old
    full-height slab got away with because it had area; a rule needs contrast
@@ -552,6 +584,35 @@
   align-items: baseline;
   gap: 8px;
   min-width: 0;
+}
+
+/* How far through the run you are, on the table itself. One bar with its own
+   label inside it, the way Antimatter Dimensions draws its percentage to
+   Infinity, rather than a labelled section wrapping a bar. */
+.run-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  margin-top: var(--gap);
+  border: 1px solid var(--border-faint);
+  overflow: hidden;
+}
+
+.run-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--fill);
+}
+
+.run-bar-label {
+  position: relative;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
 }
 
 /* -- the wager and its points grid --------------------------------------- */
