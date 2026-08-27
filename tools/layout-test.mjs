@@ -224,6 +224,39 @@ check('the group-of-ten rule sits on the bottom edge, clear of the text',
   buys.every((r) => r.ruleAtBottom),
   JSON.stringify(buys.filter((r) => !r.ruleAtBottom).slice(0, 2)))
 
+// The buy buttons and the roll rate, folio and study buttons are drawn thin,
+// well under the 44px a finger needs. The target is restored by a pseudo
+// element that reaches past the border on both sides, so what is drawn and
+// what can be pressed are deliberately different sizes. If that ever comes
+// apart the buttons stay pretty and become hard to hit, which is worse than
+// the fat buttons they replaced.
+const targets = await ev(`(() => {
+  const reach = (el) => {
+    // elementFromPoint answers for the viewport, so a button below the fold
+    // reports no reach at all rather than a small one. That is the measurement
+    // failing, not the button.
+    el.scrollIntoView({ block: 'center' })
+    const b = el.getBoundingClientRect(), x = b.left + b.width / 2
+    const out = (y) => { const e = document.elementFromPoint(x, y); return !!e && e.closest('button') === el }
+    let up = 0, down = 0
+    while (up < 30 && out(b.top - up - 1)) up++
+    while (down < 30 && out(b.bottom + down + 1)) down++
+    return { h: Math.round(b.height), target: Math.round(b.height + up + down) }
+  }
+  const buy = [...document.querySelectorAll('.solid:not([hidden]) .solid-buy')].slice(0, 3).map(reach)
+  const duo = [...document.querySelectorAll('.action.duo')].filter(d => !d.hidden).map(reach)
+  return { buy, duo } })()`)
+check('a thin buy button still has a 44px target',
+  targets.buy.length >= 3 && targets.buy.every((b) => b.h <= 34 && b.target >= 44),
+  JSON.stringify(targets.buy))
+// These are full-width, so they are the easiest things on the screen to hit
+// sideways and the vertical reach matters less. On a phone the folio and study
+// row can sit directly above the action bar, which takes the downward reach,
+// and 38 is what is left. Worth knowing rather than rounding up to 44.
+check('and roll rate, folio and study keep most of theirs',
+  targets.duo.length >= 2 && targets.duo.every((b) => b.h <= 36 && b.target >= 38),
+  JSON.stringify(targets.duo))
+
 // FOLIO and STUDY share one header, and with nothing between them the pair
 // read as one sentence: "FOLIO 1 STUDY 8". The divider has to land on the same
 // line as the gap between the two buttons under it, or it looks like a third
