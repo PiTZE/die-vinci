@@ -343,6 +343,36 @@ export function tablePane(): Pane {
       }
     },
 
+    /**
+     * The ROLL fill, every frame whatever the refresh rate says.
+     *
+     * It crosses the button once a roll, so at 100ms it would be ten steps
+     * rather than a sweep. The refresh rate is about how often the readouts are
+     * rewritten; a bar moving across a button is the opposite case.
+     */
+    animate(s: GameState) {
+      const now = Date.now()
+
+      // A throw is an eased curve arriving at rest. Rolls too fast to watch get
+      // one continuous turn instead, because restarting that curve every thirty
+      // milliseconds is a stutter rather than an animation.
+      //
+      // Every frame, whatever the refresh rate says. Fed from update() it moved
+      // in as many steps a second as the readouts were redrawn, which at 100ms
+      // is ten and reads as a stutter.
+      const duration = rollInterval(s)
+      const readable = duration >= FACE_READABLE_S
+      const spinning = rolling(s) && s.haltMs <= 0 && !mustWager(s)
+      setBlur(spinning && !readable)
+      if (!spinning) setThrow(1, duration)
+      else if (readable) setThrow(rollProgress(s, now), duration)
+
+      // And the fill crossing the ROLL button, which is one sweep a roll.
+      if (s.autoRoll || rollNow.hidden) return
+      const pct = `${Math.round(rollProgress(s, now) * 100)}%`
+      if (rollFill.style.width !== pct) rollFill.style.width = pct
+    },
+
     action() {
       return actionGroup
     },
@@ -353,7 +383,6 @@ export function tablePane(): Pane {
       // short.
       const open = openSolids(s)
       const rate = rollRate(s)
-      const now = Date.now()
 
       // The dice only turn while a roll is in the air. Under the automator
       // that is always, which is exactly the difference the purchase buys.
@@ -370,12 +399,8 @@ export function tablePane(): Pane {
       const duration = rollInterval(s)
       const readable = duration >= FACE_READABLE_S
 
-      // A throw is an eased curve arriving at rest. Rolls too fast to watch
-      // get one continuous turn instead, because restarting that curve every
-      // thirty milliseconds is a stutter rather than an animation.
-      setBlur(spinning && !readable)
-      if (!spinning) setThrow(1, duration)
-      else if (readable) setThrow(rollProgress(s, now), duration)
+      // The throw itself is driven from animate(), every frame. Feeding it from
+      // here would step the tumble at whatever the refresh rate is.
 
       // A throw is its own sound only while rolls are far enough apart to hear
       // apart. Below that the shake loop underneath takes over, rising and
@@ -393,9 +418,6 @@ export function tablePane(): Pane {
       // back to MAX.
       rollNow.hidden = rollingItself(s) || full
       if (!s.autoRoll) {
-        const p = rollProgress(s, now)
-        const pct = `${Math.round(p * 100)}%`
-        if (rollFill.style.width !== pct) rollFill.style.width = pct
         rollNow.classList.toggle('buyable', !s.rollStartedAt && s.haltMs <= 0)
       }
       const canMax = canMaxAll(s)

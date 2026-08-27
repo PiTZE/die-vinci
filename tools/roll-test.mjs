@@ -94,8 +94,12 @@ const readLanded = `({
   shown: document.querySelector('.solid-face').textContent,
   spinning: window.LD.state.rollStartedAt > 0,
 })`
+// Waits for the screen, not just the state. The readouts redraw on the refresh
+// rate rather than every frame, so the dice can come to rest up to one interval
+// before the face is drawn, and reading the DOM the instant the state settles
+// caught the previous frame's blank.
 let landed = await ev(readLanded)
-for (let i = 0; i < 40 && landed.spinning; i++) {
+for (let i = 0; i < 40 && (landed.spinning || landed.shown === ''); i++) {
   await sleep(150)
   landed = await ev(readLanded)
 }

@@ -3,7 +3,7 @@ import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { applyTheme, currentTheme, themes } from './theme'
 import { installState, manualHint, onInstallChange, promptInstall } from '../install'
-import { CHANNEL_PATHS, OFFLINE_TICK_CHOICES } from '../game/balance'
+import { CHANNEL_PATHS, OFFLINE_TICK_CHOICES, UI_MS_CHOICES, UI_MS_DEFAULT } from '../game/balance'
 import { listBackups } from '../backup'
 import { THOUGHT_SPEEDS } from './thoughts'
 import { fullscreenSupported, isFullscreen, onFullscreenChange } from './fullscreen'
@@ -146,6 +146,14 @@ export function optionsPane(): Pane {
         },
       ))
       add(cycler('NOTATION', NOTATIONS, (s) => s.options.notation, (id) => actions.setNotation(id)))
+      // The game ticks and the dice tumble at full frame rate whatever this
+      // says. It is only how often the readouts are rewritten.
+      add(cycler(
+        'REFRESH',
+        UI_MS_CHOICES.map((n) => ({ id: n, label: n === 16 ? 'EVERY FRAME' : `${n}MS` })),
+        (s) => s.options.uiMs ?? UI_MS_DEFAULT,
+        (n) => actions.setUiMs(n),
+      ))
       add(cycler(
         'THOUGHTS',
         THOUGHT_SPEEDS,

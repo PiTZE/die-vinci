@@ -2,6 +2,7 @@ import Decimal from 'break_infinity.js'
 import { SOLIDS, SOLID_COUNT } from './game/solids'
 import {
   OFFLINE_TICKS_DEFAULT,
+  UI_MS_DEFAULT,
   SAVE_VERSION,
   SOLIDS_AT_START,
   START_INK,
@@ -92,6 +93,8 @@ export interface GameState {
     offline: boolean
     /** How many ticks a long absence is simulated in. */
     offlineTicks: number
+    /** How often the readouts redraw. The game does not slow down with it. */
+    uiMs: number
     /** One switch per destructive action. See ui/confirm.ts. */
     confirms: Record<string, boolean>
   }
@@ -155,6 +158,7 @@ export function newGame(now: number): GameState {
       fullscreen: false,
       offline: true,
       offlineTicks: OFFLINE_TICKS_DEFAULT,
+      uiMs: UI_MS_DEFAULT,
       confirms: defaultConfirms(),
     },
     stats: { started: now, playMs: 0, wagerMs: 0, sinceResetMs: 0, melts: 0, foliosEver: 0,

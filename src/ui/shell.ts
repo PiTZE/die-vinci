@@ -33,6 +33,7 @@ export interface Actions {
   setFullscreen(on: boolean, echo?: boolean): void
   setOffline(on: boolean): void
   setOfflineTicks(n: number): void
+  setUiMs(n: number): void
   setConfirm(key: string, on: boolean): void
   cycleAutobuyerMode(id: string): void
   useSlot(n: number): void
@@ -54,6 +55,15 @@ export interface Pane {
   action?(): HTMLElement | null
   /** Tabs stay hidden until the game has something to put in them. */
   visible?(s: GameState): boolean
+  /**
+   * Anything that has to move every frame, whatever the refresh rate says.
+   *
+   * The refresh rate governs how often the readouts are rewritten, and at sixty
+   * a second a table of changing digits is a flicker. An animation is the
+   * opposite case: the ROLL fill crosses its button once a roll, and at 100ms
+   * that is ten steps rather than a sweep.
+   */
+  animate?(s: GameState): void
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -244,6 +254,11 @@ export class Shell {
       this.thoughtAt = now
     }
     this.thoughtLine.style.transform = `translateX(${Math.round(this.thoughtX)}px)`
+  }
+
+  /** The per-frame pass, for the pane on screen if it has something moving. */
+  animate(s: GameState): void {
+    this.panes.find((p) => p.id === this.active)?.animate?.(s)
   }
 
   update(s: GameState, inkRate: Decimal): void {

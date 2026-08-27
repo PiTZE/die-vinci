@@ -245,6 +245,90 @@ try {
     `max fired ${two.max - one.max} times with ROLL down`)
   check('and ROLL keeps repeating too', two.roll - one.roll > 1, `roll fired ${two.roll - one.roll} more`)
 
+  // touchEnd lists the point being released, so this lifts the ROLL finger.
+  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(1, rollAt)] })
+  // Counted straight after the release rather than before it. The repeat fires
+  // every 60ms, and the gap between the previous count and the release being
+  // processed is two CDP round trips, which under four parallel browsers is
+  // long enough for three or four more presses to land. Allowing for them made
+  // the tolerance a measure of how loaded the box was: this failed at +3 and at
+  // +4 on a busy run and passed alone. Starting the window after the release
+  // asks the real question instead, and the answer is exact.
+  const atRelease = await counts()
+  await sleep(500)
+  const lifted = await counts()
+  check('lifting one finger stops only that button',
+    lifted.roll === atRelease.roll && lifted.max - atRelease.max > 1,
+    `roll +${lifted.roll - atRelease.roll}, max +${lifted.max - atRelease.max}`)
+
+  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(2, maxAt)] })
+  await sleep(400)
+  const done = await counts()
+  await sleep(150)
+  const after = await counts()
+  check('and lifting the second stops that one', after.max - done.max === 0,
+    `max +${after.max - done.max} after both released`)
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false })
+
+  // The refresh rate governs the readouts and nothing else. The game ticks and
+  // the ROLL fill moves at full frame rate whatever it says, and a press has to
+  // land at once rather than waiting for the next scheduled redraw.
+  const refresh = await evaluate(`(async () => {
+    const s = window.LD.state, D = window.LD.Decimal
+    // Earlier checks in this file hold buttons and keys down. A repeat still
+    // running calls persistSoon every 60ms, which asks for an immediate redraw
+    // every 60ms, so the throttle would look broken when it is being told to
+    // draw. blur is the game's own release-everything path.
+    window.dispatchEvent(new Event('blur'))
+    await new Promise(r => setTimeout(r, 100))
+    s.autoRoll = true; s.studies = 3; s.rollUpgrades = 25
+    s.solids.forEach((d, i) => { if (i < 4) { d.bought = 20; d.amount = new D('1e6') } })
+    s.ink = new D('1e5')
+    const ink = () => document.querySelector('.res-value').textContent
+    const count = async (ms) => {
+      s.options.uiMs = ms
+      await new Promise(r => setTimeout(r, 250))
+      const seen = new Set()
+      const t0 = performance.now()
+      while (performance.now() - t0 < 2000) {
+        seen.add(ink())
+        await new Promise(r => requestAnimationFrame(r))
+      }
+      return seen.size
+    }
+    const fast = await count(16)
+    const slow = await count(500)
+
+    // The fill, over one roll, with the readouts at their slowest.
+    s.autoRoll = false; s.rollUpgrades = 0; s.studies = 0
+    s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 4 : 0) })
+    await new Promise(r => setTimeout(r, 250))
+    const bar = document.querySelector('.bar-roll-fill')
+    window.LD.actions.roll()
+    const widths = new Set()
+    const t1 = performance.now()
+    while (performance.now() - t1 < 1100) {
+      widths.add(bar.style.width)
+      await new Promise(r => requestAnimationFrame(r))
+    }
+
+    // And a purchase shows without waiting half a second for it.
+    s.ink = new D('1e12')
+    await new Promise(r => setTimeout(r, 250))
+    const before = document.querySelector('.solid-amount').textContent
+    window.LD.actions.buySolid(1)
+    await new Promise(r => requestAnimationFrame(r))
+    await new Promise(r => requestAnimationFrame(r))
+    const after = document.querySelector('.solid-amount').textContent
+    s.options.uiMs = 100
+    return { fast, slow, fill: widths.size, pressed: before !== after } })()`)
+  check('a slower refresh rate redraws the readouts less often',
+    refresh.slow < refresh.fast && refresh.slow <= 6,
+    `every frame ${refresh.fast} redraws, 500ms ${refresh.slow}`)
+  check('but the ROLL fill still moves every frame',
+    refresh.fill > 8, `${refresh.fill} widths across one roll at 500ms`)
+  check('and a purchase lands without waiting for the next redraw', refresh.pressed === true)
+
   // MAX must never leave the table unable to produce. Roll rate multiplies what
   // the dice pay, so with no dice it multiplies nothing, and ink can only come
   // from a die. V The Hierophant leaves exactly 1000 ink after a reset, which is
@@ -305,30 +389,6 @@ try {
   check('one tap on S still only arms', oneTap.studies === 0 && oneTap.label === '?',
     JSON.stringify(oneTap))
 
-  // touchEnd lists the point being released, so this lifts the ROLL finger.
-  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(1, rollAt)] })
-  // Counted straight after the release rather than before it. The repeat fires
-  // every 60ms, and the gap between the previous count and the release being
-  // processed is two CDP round trips, which under four parallel browsers is
-  // long enough for three or four more presses to land. Allowing for them made
-  // the tolerance a measure of how loaded the box was: this failed at +3 and at
-  // +4 on a busy run and passed alone. Starting the window after the release
-  // asks the real question instead, and the answer is exact.
-  const atRelease = await counts()
-  await sleep(500)
-  const lifted = await counts()
-  check('lifting one finger stops only that button',
-    lifted.roll === atRelease.roll && lifted.max - atRelease.max > 1,
-    `roll +${lifted.roll - atRelease.roll}, max +${lifted.max - atRelease.max}`)
-
-  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(2, maxAt)] })
-  await sleep(400)
-  const done = await counts()
-  await sleep(150)
-  const after = await counts()
-  check('and lifting the second stops that one', after.max - done.max === 0,
-    `max +${after.max - done.max} after both released`)
-  await send('Emulation.setTouchEmulationEnabled', { enabled: false })
 
   const shot = await send('Page.captureScreenshot', { format: 'png' })
   const { writeFileSync } = await import('node:fs')

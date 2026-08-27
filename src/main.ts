@@ -4,7 +4,7 @@ import './styles/base.css'
 import './styles/game.css'
 
 import Decimal from 'break_infinity.js'
-import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, START_INK, TICK_MS } from './game/balance'
+import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, START_INK, TICK_MS, UI_MS_DEFAULT } from './game/balance'
 import {
   buyFolio,
   buyAutomator,
@@ -182,6 +182,7 @@ function persist(force = false): void {
  * one of them.
  */
 function persistSoon(): void {
+  nudgeUi()
   if (!savingEnabled) return
   if (dirtyTimer) return
   dirtyTimer = window.setTimeout(persist, 250)
@@ -303,6 +304,10 @@ const actions: Actions = {
   },
   setOfflineTicks: (n) => {
     state.options.offlineTicks = n
+    persistSoon()
+  },
+  setUiMs: (n) => {
+    state.options.uiMs = n
     persistSoon()
   },
   setConfirm: (key, on) => {
@@ -429,14 +434,38 @@ setInterval(loop, TICK_MS)
  */
 let loopId = 0
 let lastRenderAt = Date.now()
+let lastUiAt = 0
+/** Set when something happened that the screen should show without waiting. */
+let uiDirty = true
+
+/**
+ * A press should land on screen now, not on the next scheduled redraw. At 100ms
+ * the wait would be at the edge of noticeable and it is free to skip.
+ */
+function nudgeUi(): void {
+  uiDirty = true
+}
 
 function startRender(): void {
   const mine = ++loopId
   const step = (): void => {
     if (mine !== loopId) return
+    // Stamped every frame whatever the refresh rate says, because this is what
+    // the watchdog reads. Gating it would have the watchdog restart the loop
+    // every two seconds at any setting slower than that.
     lastRenderAt = Date.now()
-    state.options.tab = shell.activeTab
-    shell.update(state, inkPerSecond(state))
+    // Anything that has to move goes every frame. The dice keep their own loop;
+    // this is the ROLL fill, which crosses its button once a roll.
+    shell.animate(state)
+    // The readouts are the throttled part, because at sixty a second a table of
+    // changing digits is a flicker rather than a reading.
+    const gap = state.options.uiMs ?? UI_MS_DEFAULT
+    if (uiDirty || lastRenderAt - lastUiAt >= gap) {
+      uiDirty = false
+      lastUiAt = lastRenderAt
+      state.options.tab = shell.activeTab
+      shell.update(state, inkPerSecond(state))
+    }
     requestAnimationFrame(step)
   }
   requestAnimationFrame(step)
