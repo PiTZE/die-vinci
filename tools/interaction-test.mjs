@@ -245,6 +245,23 @@ try {
     `max fired ${two.max - one.max} times with ROLL down`)
   check('and ROLL keeps repeating too', two.roll - one.roll > 1, `roll fired ${two.roll - one.roll} more`)
 
+  // MAX must never leave the table unable to produce. Roll rate multiplies what
+  // the dice pay, so with no dice it multiplies nothing, and ink can only come
+  // from a die. V The Hierophant leaves exactly 1000 ink after a reset, which is
+  // exactly ROLL_COST_BASE, so one press of MAX bought a faster roll, spent the
+  // last of the ink and left a run that could never recover.
+  const emptyTable = await evaluate(`(() => {
+    const s = window.LD.state, D = window.LD.Decimal
+    s.tarot = { hierophant: 1 }
+    s.studies = 0; s.rollUpgrades = 0
+    s.solids.forEach((d) => { d.bought = 0; d.amount = new D(0) })
+    s.ink = new D(1000)
+    window.LD.actions.maxAll()
+    return { ink: s.ink.toString(), dice: s.solids[0].amount.toString(),
+      roll: s.rollUpgrades } })()`)
+  check('MAX buys dice before roll rate on an empty table',
+    Number(emptyTable.dice) > 0, JSON.stringify(emptyTable))
+
   // F and S were the only controls in the game that did nothing when held. MAX
   // was holdable and so were the f and s keys; the two bar buttons were wired
   // to a plain click.

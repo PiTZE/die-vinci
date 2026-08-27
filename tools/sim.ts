@@ -18,13 +18,42 @@ import * as W from '../src/game/wager'
 import { WAGER_AT } from '../src/game/balance'
 import { SOLIDS } from '../src/game/solids'
 import { UPGRADES, buyUpgrade, canBuy, type UpgradeId } from '../src/game/upgrades'
+import { ACHIEVEMENTS, achievementPower, checkAchievements } from '../src/game/achievements'
+import { ARCANA, drawOffer, owned, takeCard } from '../src/game/tarot'
 import { format } from '../src/format'
 
 const HOURS = Number(process.argv[2] ?? 8)
 const WAGERS = Number(process.env.WAGERS ?? 1)
-const PUSH_AT = process.argv[3] ?? '1e200'
+// Where to stop resetting and push for the threshold. 1e200 was optimal when
+// roll rate cost x10; at x20 it costs 55 minutes, because the run is slower and
+// the last stretch is where a reset hurts most. Swept at 1e200, 1e240, 1e270,
+// 1e285, 1e295, 1e300, 1e305 and 1e308, it is 1h33m, 59m, 38m09s, 38m03s,
+// 38m12s, 38m27s, 38m34s and 38m32s: a flat plateau from 1e270 up and a cliff
+// below it. Anything on the plateau is within ten seconds of the best.
+const PUSH_AT = process.argv[3] ?? '1e285'
 const DT = 0.25
 const QUIET = process.env.QUIET === '1'
+const TAROT = process.env.TAROT ?? 'draft'
+const FORCE = process.env.FORCE ?? ''
+
+/**
+ * Which arcana a greedy player would rather have, worst to best. Ranked by what
+ * they do to production rather than by tier, so the greedy run measures the
+ * ceiling the cards actually reach and not the one the draft weights suggest.
+ */
+const RANK = [
+  'hermit', 'moon', 'stars', 'world', 'hierophant', 'lovers', 'chariot',
+  'temperance', 'justice', 'hanged', 'wheel', 'magician', 'priestess',
+  'emperor', 'empress', 'tower', 'devil', 'death', 'strength', 'judgement',
+  'fool', 'sun',
+] as const
+
+/** A fixed stream, so two runs of the same settings are the same run. */
+let seed = 12345
+function rng(): number {
+  seed = (seed * 1103515245 + 12345) & 0x7fffffff
+  return seed / 0x7fffffff
+}
 
 const s = newGame(0)
 let t = 0
@@ -64,6 +93,16 @@ function advance(): void {
   P.tick(s, DT, ms)
 }
 
+/**
+ * The archive pays x1.03 an entry and the entries are earned by playing, so a
+ * run that never checks them is a run without a multiplier the real game hands
+ * out for free. Nothing here chases them; they arrive on their own.
+ */
+function collect(): void {
+  if (process.env.NO_ARCHIVE === '1') return
+  checkAchievements(s)
+}
+
 function dump(): void {
   if (QUIET || !marks.length) return
   console.log(`\n${'milestone'.padEnd(24)}${'at'.padStart(8)}${'gap'.padStart(9)}   ink`)
@@ -92,6 +131,7 @@ const rungAt = new Map<number, number>()
 
 while (t < HOURS * 3600 && done < WAGERS) {
   advance()
+  collect()
   t += DT
 
   if (s.ink.gt(1)) {
@@ -136,9 +176,32 @@ while (t < HOURS * 3600 && done < WAGERS) {
       if (!next) break
       buyUpgrade(s, next)
     }
+    // A draft a Wager. TAROT=off plays without them; TAROT=greedy takes the
+    // strongest card on offer every time, which is the ceiling a real player
+    // reaches for; anything else takes the first offered, which is the draft's
+    // own weighting having its way and is closer to what most runs look like.
+    // FORCE=<id> takes the same arcanum every time, so one card's effect can be
+    // measured on its own rather than through whatever the draft happened to
+    // hand out. That is the only way to ask whether any single card flattens
+    // the curve.
+    if (FORCE) {
+      s.pendingDraft = [FORCE as never]
+      takeCard(s, FORCE)
+    } else if (TAROT !== 'off') {
+      const offer = drawOffer(s, undefined, () => rng())
+      if (offer.length) {
+        const pick = TAROT === 'greedy'
+          ? offer.slice().sort((a, b) => RANK.indexOf(b) - RANK.indexOf(a))[0]
+          : offer[0]
+        s.pendingDraft = offer
+        takeCard(s, pick)
+      }
+    }
     console.log(
       `\nWAGER ${done}  after ${hms(t - lastWager)}  (total ${hms(t)})  ` +
-        `points=${s.points}  upgrades=${s.pointUpgrades.length}/${Object.keys(UPGRADES).length}`,
+        `points=${s.points}  upgrades=${s.pointUpgrades.length}/${Object.keys(UPGRADES).length}  ` +
+        `archive=${s.achievements.length}/${ACHIEVEMENTS.length} x${achievementPower(s).toNumber().toFixed(3)}  ` +
+        `arcana=${owned(s)}`,
     )
     dump()
     lastWager = t

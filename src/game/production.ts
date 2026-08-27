@@ -370,7 +370,17 @@ export function maxAll(s: GameState): void {
   for (let steps = 0; steps < MAX_ALL_STEPS; steps++) {
     let best: { price: Decimal; buy: () => boolean } | null = null
 
-    if (canBuyRollRate(s)) best = { price: rollCost(s), buy: () => buyRollRate(s) }
+    // Roll rate multiplies what the dice pay, so with no dice on the table it
+    // multiplies nothing. MAX buys the most expensive affordable thing, and
+    // that used to include roll rate on an empty table: V The Hierophant leaves
+    // exactly 1000 ink after a reset, which is exactly ROLL_COST_BASE, so one
+    // press bought a faster roll, spent the last of the ink and left nothing to
+    // roll. Ink can only come from a die, so that run could never recover.
+    //
+    // A player pressing R deliberately can still do it. This is only about the
+    // button that decides for them.
+    const canProduce = s.solids.slice(0, open).some((d) => d.amount.gt(0))
+    if (canProduce && canBuyRollRate(s)) best = { price: rollCost(s), buy: () => buyRollRate(s) }
     for (let idx = 1; idx <= open; idx++) {
       if (!canBuySolid(s, idx)) continue
       const price = buyPrice(s, idx)
