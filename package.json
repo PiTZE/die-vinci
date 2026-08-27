@@ -25,7 +25,8 @@
     "test:confirm": "node tools/confirm-test.mjs",
     "test:layout": "node tools/layout-test.mjs",
     "test:durability": "node tools/durability-test.mjs",
-    "test:roll": "node tools/roll-test.mjs"
+    "test:roll": "node tools/roll-test.mjs",
+    "test:spoilers": "node tools/spoiler-test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

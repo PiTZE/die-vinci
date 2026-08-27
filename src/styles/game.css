@@ -736,6 +736,24 @@
   min-height: 2.9em;
 }
 
+/* A topic or an entry the player has not reached. The blocks are text, not a
+   bar drawn on top, so nothing readable is sitting in the DOM behind them. */
+.sealed {
+  color: var(--fg-muted);
+  opacity: 0.42;
+  cursor: default;
+  letter-spacing: 0.04em;
+}
+
+.sealed:hover {
+  background: none;
+  text-shadow: none;
+}
+
+.archive-cell.sealed {
+  border-style: dashed;
+}
+
 /* -- help ---------------------------------------------------------------- */
 
 /* The whole header is the toggle, so the tap target is the full row rather

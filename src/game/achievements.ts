@@ -13,7 +13,23 @@ export interface AchievementDef {
   name: string
   note: string
   done: (s: GameState) => boolean
+  /**
+   * When this entry is allowed to be seen at all.
+   *
+   * Without it the archive is a table of contents for the whole game: someone
+   * ten minutes in could read "call the Wager", "clear a challenge" and "bind
+   * a folio" and know the shape of everything ahead. An entry appears once the
+   * thing it names exists, and an entry already earned always shows.
+   */
+  needs?: (s: GameState) => boolean
 }
+
+/** True once the player has met the system each group of entries is about. */
+const seenFolios = (s: GameState) => s.folios > 0 || s.wagers > 0
+const seenWager = (s: GameState) => s.wagers > 0
+const seenChallenges = (s: GameState) => s.wagers > 0
+const seenAutobuyers = (s: GameState) =>
+  s.challengesDone.length > 0 || Object.values(s.autobuyers).some((a) => a.unlocked)
 
 const bought = (s: GameState) => s.solids.reduce((a, d) => a + d.bought, 0)
 
@@ -27,39 +43,55 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'study1', name: 'Sheet One', note: 'take a study',
     done: (s) => s.studies >= 1 },
   { id: 'openall', name: 'The Whole Table', note: 'unlock every solid',
-    done: (s) => s.studies >= SOLID_COUNT - 4 },
+    done: (s) => s.studies >= SOLID_COUNT - 4,
+    needs: (s) => s.studies >= 1 },
   { id: 'folio1', name: 'Bound', note: 'bind a folio',
-    done: (s) => s.folios >= 1 },
+    done: (s) => s.folios >= 1,
+    needs: seenFolios },
   { id: 'folio5', name: 'A Quire', note: 'bind five folios',
-    done: (s) => s.folios >= 5 },
+    done: (s) => s.folios >= 5,
+    needs: seenFolios },
   { id: 'roll50', name: 'Blur', note: 'reach fifty roll rate upgrades',
-    done: (s) => s.rollUpgrades >= 50 },
+    done: (s) => s.rollUpgrades >= 50,
+    needs: (s) => s.rollUpgrades >= 20 },
   { id: 'wager1', name: 'The Interrupted Game', note: 'call the Wager',
-    done: (s) => s.wagers >= 1 },
+    done: (s) => s.wagers >= 1,
+    needs: (s) => s.ink.gte('1e290') || s.wagers > 0 },
   { id: 'wager5', name: 'Pacioli Would Approve', note: 'call it five times',
-    done: (s) => s.wagers >= 5 },
+    done: (s) => s.wagers >= 5,
+    needs: seenWager },
   { id: 'wager25', name: 'Division of Stakes', note: 'call it twenty-five times',
-    done: (s) => s.wagers >= 25 },
+    done: (s) => s.wagers >= 25,
+    needs: seenWager },
   { id: 'points10', name: 'Problem of Points', note: 'hold ten points at once',
-    done: (s) => s.points.gte(10) },
+    done: (s) => s.points.gte(10),
+    needs: seenWager },
   { id: 'grid', name: 'Fully Read', note: 'buy every points upgrade',
-    done: (s) => s.pointUpgrades.length >= 11 },
+    done: (s) => s.pointUpgrades.length >= 11,
+    needs: seenWager },
   { id: 'chal1', name: 'Under Constraint', note: 'clear a challenge',
-    done: (s) => s.challengesDone.length >= 1 },
+    done: (s) => s.challengesDone.length >= 1,
+    needs: seenChallenges },
   { id: 'chal6', name: 'Half the Ladder', note: 'clear six challenges',
-    done: (s) => s.challengesDone.length >= 6 },
+    done: (s) => s.challengesDone.length >= 6,
+    needs: seenChallenges },
   { id: 'chalall', name: 'Nothing Left to Prove', note: 'clear every challenge',
-    done: (s) => s.challengesDone.length >= 12 },
+    done: (s) => s.challengesDone.length >= 12,
+    needs: seenChallenges },
   { id: 'auto1', name: 'It Rolls Itself', note: 'unlock an autobuyer',
-    done: (s) => AUTOBUYERS.some((a) => s.autobuyers[a.id]?.unlocked) },
+    done: (s) => AUTOBUYERS.some((a) => s.autobuyers[a.id]?.unlocked),
+    needs: seenAutobuyers },
   { id: 'autoall', name: 'The Machine Learns', note: 'unlock every autobuyer',
-    done: (s) => AUTOBUYERS.every((a) => s.autobuyers[a.id]?.unlocked) },
+    done: (s) => AUTOBUYERS.every((a) => s.autobuyers[a.id]?.unlocked),
+    needs: seenAutobuyers },
   { id: 'autofast', name: 'Faster Than Thought', note: 'take an autobuyer to its floor',
-    done: (s) => AUTOBUYERS.some((a) => (s.autobuyers[a.id]?.level ?? 0) >= 5) },
+    done: (s) => AUTOBUYERS.some((a) => (s.autobuyers[a.id]?.level ?? 0) >= 5),
+    needs: seenAutobuyers },
   { id: 'bought500', name: 'Industrious', note: 'buy five hundred solids in one run',
     done: (s) => bought(s) >= 500 },
   { id: 'sphere', name: 'Septuaginta Duarum Basium', note: 'own a sphere of seventy-two',
-    done: (s) => s.solids[SOLID_COUNT - 1].amount.gte(1) },
+    done: (s) => s.solids[SOLID_COUNT - 1].amount.gte(1),
+    needs: (s) => s.studies >= 7 },
   { id: 'away', name: 'It Kept Working', note: 'return to eight hours of progress',
     done: (s) => s.stats.playMs >= 8 * 3600_000 },
   { id: 'hour', name: 'An Hour at the Table', note: 'play for an hour',
@@ -85,6 +117,16 @@ export function checkAchievements(s: GameState): string[] {
     }
   }
   return fresh
+}
+
+/**
+ * The entries the player is allowed to see. An entry already earned always
+ * shows, because there is nothing left to spoil about something you did.
+ */
+export function visibleAchievements(s: GameState): AchievementDef[] {
+  return ACHIEVEMENTS.filter(
+    (a) => s.achievements.includes(a.id) || !a.needs || a.needs(s),
+  )
 }
 
 export function byId(id: string): AchievementDef | undefined {
