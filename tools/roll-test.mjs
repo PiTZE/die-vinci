@@ -84,13 +84,21 @@ const mid = await ev(`(() => {
 check('pressing ROLL starts a spin', mid.spinning === true, JSON.stringify(mid))
 check('and pays nothing mid-air', mid.ink === stillIdle, mid.ink)
 
-await sleep(1200)
-const landed = await ev(`({
+// Polled rather than slept. The roll takes one interval, and a fixed 1200ms
+// against a 1000ms interval leaves 200ms for the tick that resolves it, which
+// is not enough on a box running four browsers: this read a face of 0 and
+// called it a broken die. Six seconds is a cap, not a delay.
+const readLanded = `({
   ink: window.LD.state.ink.toString(),
   face: window.LD.state.faces[0],
   shown: document.querySelector('.solid-face').textContent,
   spinning: window.LD.state.rollStartedAt > 0,
-})`)
+})`
+let landed = await ev(readLanded)
+for (let i = 0; i < 40 && landed.spinning; i++) {
+  await sleep(150)
+  landed = await ev(readLanded)
+}
 check('the roll lands and pays', Number(landed.ink) > Number(stillIdle), `${stillIdle} -> ${landed.ink}`)
 check('the d4 shows a face of 1 to 4', landed.face >= 1 && landed.face <= 4, `rolled ${landed.face}`)
 const archivePay = await ev(`window.LD.achievementPower(window.LD.state).toNumber()`)
