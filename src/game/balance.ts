@@ -75,7 +75,18 @@ export const ROLLS_DRAWN_INDIVIDUALLY = 12
 
 /** Ink cost of the first roll-rate upgrade, then x10 each. */
 export const ROLL_COST_BASE = new Decimal(1000)
-export const ROLL_COST_MULT = new Decimal(10)
+/**
+ * Antimatter Dimensions charges x10 a level for tickspeed and it holds there.
+ * It does not hold here: this chain is nine tiers rather than eight and the
+ * faces are taken raw, so ink outruns x10 easily and roll rate can be bought
+ * forever. At x10 the whole first Wager was twelve and a half minutes.
+ *
+ * The response is exponential in this number and there is no shock absorber:
+ * x16 is 23 minutes, x18 is 42, x20 is an hour and a half, x25 is most of a
+ * day. Anything that changes the chain's output changes what this should be,
+ * so re-run `npm run sim` after touching solids, faces or studies.
+ */
+export const ROLL_COST_MULT = new Decimal(20)
 
 export function rollIntervalMultiplier(folios: number): number {
   if (folios < 3) {
