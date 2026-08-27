@@ -105,6 +105,42 @@ check('and it keeps a 44px target above the indicator',
 check('without counting the indicator twice',
   inset.tabsBarH <= 44 + 34 + 4, JSON.stringify(inset))
 check('the top bar clears the status bar', inset.barTextTop >= 47, JSON.stringify(inset))
+
+// Eight tabs of real English do not fit across 390px. They are not squeezed
+// into each other any more; the bar scrolls instead. A fresh save only shows
+// four, which fit, so the rest have to be unlocked before this means anything.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 8; s.wagers = 2; s.autoRoll = true; s.challengesDone = [1,2]
+  s.points = new D(4); s.ink = new D('1e40') })()`)
+await sleep(900)
+const bar = await ev(`(() => {
+  const tabs = [...document.querySelectorAll('.tab')].filter(t => getComputedStyle(t).display !== 'none')
+  let collide = false
+  for (let i = 1; i < tabs.length; i++) {
+    if (tabs[i].getBoundingClientRect().left < tabs[i-1].getBoundingClientRect().right - 1) collide = true
+  }
+  const el = document.querySelector('.tabs')
+  return { n: tabs.length, collide, scrolls: el.scrollWidth > el.clientWidth + 1,
+    labels: tabs.map(t => t.textContent.trim()) }
+})()`)
+check('tab labels never run into each other', bar.collide === false, JSON.stringify(bar.labels))
+check('and the bar scrolls when they do not fit', bar.scrolls === true, JSON.stringify(bar))
+
+// A tab reached from anywhere but a tap on it has to be brought into view.
+await ev(`window.LD.actions.setTab && window.LD.actions.setTab('help')`)
+await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'HELP').click()`)
+await sleep(500)
+const seen = await ev(`(() => {
+  const t = [...document.querySelectorAll('.tab')].find(x => x.getAttribute('aria-selected') === 'true')
+  const b = t.getBoundingClientRect()
+  return { label: t.textContent.trim(), left: Math.round(b.left), right: Math.round(b.right), w: innerWidth }
+})()`)
+check('the selected tab is scrolled into view',
+  seen.left >= -1 && seen.right <= seen.w + 1, JSON.stringify(seen))
+
+// Back to the table, or every check below reads a hidden pane.
+await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
+await sleep(500)
 await ev(`document.documentElement.style.removeProperty('--safe-b')`)
 await ev(`document.documentElement.style.removeProperty('--safe-t')`)
 

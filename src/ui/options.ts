@@ -136,6 +136,14 @@ export function optionsPane(): Pane {
       io.rows = 4
       io.spellcheck = false
       io.setAttribute('aria-label', 'Save data')
+      // No keyboard, ever. Nothing here is typed by hand: EXPORT writes the
+      // save and IMPORT reads it, both through the clipboard. Tapping the box
+      // still gets the paste menu, which is the only reason to touch it.
+      // Safari ignores a change to this after the fact, so it is set once.
+      io.setAttribute('inputmode', 'none')
+      io.setAttribute('autocomplete', 'off')
+      io.setAttribute('autocapitalize', 'off')
+      io.setAttribute('autocorrect', 'off')
       io.style.cssText =
         'width:100%;background:transparent;color:inherit;font:inherit;font-size:0.7rem;border:1px solid var(--border-faint);padding:8px;resize:vertical'
       const ioWrap = el('div', 'row')

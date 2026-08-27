@@ -106,6 +106,10 @@ const io = await ev(`({
 })`)
 check('EXPORT fills the box without focusing it',
   io.filled === true && io.focused === false, JSON.stringify(io))
+// And nothing here is typed by hand, so the box asks for no keyboard at all.
+// Safari ignores a change to this after the fact, so it has to be set up front.
+check('the save box asks for no keyboard',
+  (await ev(`document.querySelector('textarea').getAttribute('inputmode')`)) === 'none')
 
 ws.close();chrome.kill();await sleep(400);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)

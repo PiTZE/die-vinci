@@ -13,6 +13,9 @@
   height: var(--app-h, 100svh);
   max-height: var(--app-h, 100svh);
   overflow: hidden;
+  /* Landscape on a notched iPhone. Zero everywhere else. */
+  padding-left: var(--safe-l);
+  padding-right: var(--safe-r);
 }
 
 /* -- top bar ------------------------------------------------------------- */
@@ -76,6 +79,9 @@
    the bottom edge on an iPhone and floated above a bare strip. On anything
    without a home indicator the inset is zero and nothing moves, which is why
    this survived: it is invisible on every device in this house. */
+/* The words are kept and the bar scrolls. Eight tabs of real English do not
+   fit across 390px, and squeezing them ran CHALLENGES into AUTOMATION with no
+   gap between them. */
 .tabs {
   display: flex;
   align-items: stretch;
@@ -84,21 +90,31 @@
   /* The buttons carry the home indicator's clearance, so adding it here too
      counted it twice and made the bar 90px on an iPhone for a 44px target. */
   min-height: var(--tabs-h);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  padding-left: var(--safe-l);
+  padding-right: var(--safe-r);
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
-  flex: 1;
+  /* Sized to its own word, never squeezed. A tab that does not fit is reached
+     by scrolling rather than by being crushed into its neighbour. */
+  flex: 0 0 auto;
   border: 0;
   border-right: 1px solid var(--border-faint);
-  font-size: 0.6rem;
+  font-size: 0.64rem;
   letter-spacing: 0.06em;
+  white-space: nowrap;
   color: var(--fg-muted);
-  padding: 8px 1px calc(8px + var(--safe-b));
+  padding: 8px 14px calc(8px + var(--safe-b));
   min-height: calc(44px + var(--safe-b));
-  /* Seven of these on a 390px phone. Without this the longest labels win and
-     the rest are squeezed to nothing. */
-  min-width: 0;
-  overflow: hidden;
 }
 
 .tab:last-child {
@@ -849,7 +865,9 @@
     align-items: stretch;
     border-top: 0;
     border-right: 1px solid var(--border);
-    padding-bottom: 0;
+    padding: 0;
+    overflow-x: visible;
+    overflow-y: auto;
   }
 
   .tab {

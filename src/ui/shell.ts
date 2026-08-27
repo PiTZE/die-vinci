@@ -178,6 +178,10 @@ export class Shell {
       if (pane) pane.hidden = !on
       const act = this.actionEls.get(tab)
       if (act) act.hidden = !on
+      // The bar scrolls on a phone, so a tab selected from anywhere other
+      // than a tap on it could sit off the right edge with nothing to say it
+      // had changed. Unlock announcements do exactly that.
+      if (on) btn.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     }
     this.actionBar.hidden = !this.actionEls.has(id)
   }

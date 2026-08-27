@@ -45,19 +45,52 @@ function base(): string {
  * unlock, and on the first roll the download has not finished, so playThrow
  * returned early, nothing started, and iOS stayed locked for the session.
  */
-function unlock(): boolean {
-  if (!make()) return false
-  if (ctx!.state === 'suspended') void ctx!.resume()
+function unlock(): void {
+  if (!make() || !ctx) return
+  playbackSession()
   try {
-    const blip = ctx!.createBufferSource()
-    blip.buffer = ctx!.createBuffer(1, 1, ctx!.sampleRate)
-    blip.connect(ctx!.destination)
+    // Safari does not accept a context that was merely created during a tap.
+    // It wants a source actually started, and one sample of silence is one.
+    const blip = ctx.createBufferSource()
+    blip.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
+    blip.connect(ctx.destination)
     blip.start(0)
   } catch {
     // Already unlocked, or the context is gone. Neither is worth reporting.
   }
+  // resume() is a promise, so the state is never 'running' by the time this
+  // returns. Reporting success here is what kept the listeners from ever
+  // firing twice: the first pointerdown built a suspended context, called
+  // this a win, and unregistered touchend and every gesture after it.
+  void ctx
+    .resume()
+    .then(() => {
+      if (ctx?.state === 'running') stopArming()
+    })
+    .catch(() => {
+      // Refused. The listeners stay on and the next gesture tries again.
+    })
   void load()
-  return true
+}
+
+/**
+ * The reason an iPhone plays nothing at all.
+ *
+ * Safari starts a page's audio session as 'ambient', and an ambient session is
+ * silenced by the ringer switch. Every unlock trick in the world is beside the
+ * point while that is the case. 'playback' is the session type for something
+ * that exists to make sound, and it ignores the switch.
+ *
+ * Safari is the only engine that implements this, which is fine, because
+ * Safari is the only one that needed it.
+ */
+function playbackSession(): void {
+  try {
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
+    if (session) session.type = 'playback'
+  } catch {
+    // Not supported, or refused. Sound still works with the ringer on.
+  }
 }
 
 function make(): boolean {
@@ -90,23 +123,33 @@ function ready(): boolean {
   return true
 }
 
-// The first touch anywhere arms the audio, not the first roll. Registered once
-// and removed as soon as it fires.
+// Every gesture arms the audio until it is genuinely running, not just until
+// a context exists. Anything that only makes a sound uses the context if it is
+// there and never builds one: building outside a gesture is what leaves Safari
+// with a permanently suspended one, and the spin bed runs every frame.
+let arming: (() => void) | null = null
+
+function stopArming(): void {
+  arming?.()
+  arming = null
+}
+
 if (typeof window !== 'undefined') {
-  const arm = () => {
-    if (unlock()) {
-      window.removeEventListener('pointerdown', arm)
-      window.removeEventListener('touchend', arm)
-      window.removeEventListener('keydown', arm)
-    }
+  const arm = () => unlock()
+  // pointerdown, touchend and click, because which of them counts as an
+  // activation is not the same answer on every iOS version.
+  const events = ['pointerdown', 'touchend', 'click', 'keydown'] as const
+  for (const e of events) window.addEventListener(e, arm, { passive: true })
+  arming = () => {
+    for (const e of events) window.removeEventListener(e, arm)
   }
-  window.addEventListener('pointerdown', arm, { passive: true })
-  window.addEventListener('touchend', arm, { passive: true })
-  window.addEventListener('keydown', arm, { passive: true })
+
   // Safari suspends the context when the tab goes away and does not always
   // bring it back on its own.
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && ctx?.state === 'suspended') void ctx.resume()
+    if (document.hidden || !ctx) return
+    playbackSession()
+    if (ctx.state === 'suspended') void ctx.resume()
   })
 }
 

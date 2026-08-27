@@ -14,10 +14,18 @@
   --gap: 14px;
   --bar-h: 52px;
   --tabs-h: 56px;
-  /* Named so a test can stand in for it. env() cannot be faked, and a bug that
-     only appears on hardware with a home indicator is one nobody can see. */
-  --safe-b: env(safe-area-inset-bottom);
-  --safe-t: env(safe-area-inset-top);
+  /* Named so a test can stand in for them: env() cannot be faked, and a bug
+     that only shows on hardware with a home indicator is one nobody can see.
+     max-inset rather than inset, because Safari collapses the plain one to
+     zero the moment its toolbar hides on scroll, which drops the tab bar onto
+     the home indicator mid-swipe. The nested env() is the fallback for
+     browsers that only have the original. */
+  --safe-b: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-t: env(safe-area-max-inset-top, env(safe-area-inset-top, 0px));
+  /* Landscape on a notched iPhone puts 44px of screen either side out of
+     reach. Zero in portrait and on everything else. */
+  --safe-l: env(safe-area-max-inset-left, env(safe-area-inset-left, 0px));
+  --safe-r: env(safe-area-max-inset-right, env(safe-area-inset-right, 0px));
   /* Numbers get their own width so a growing value never reflows a row. */
   --num-w: 9.5rem;
 }
