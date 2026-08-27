@@ -261,9 +261,12 @@
   inset: 0;
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  /* Wide enough that the ten read as ten. At 1px the shaded run looked like a
-     single bar with hairlines in it. */
-  gap: 2px;
+  /* No gap. Ten is the granularity, not a thing to draw: the fill steps in
+     tenths because ten dice raise the price, and it reads as one bar, which is
+     what Antimatter Dimensions draws. With a 2px gap the shaded run became
+     separate squares, and since the label sits over the first two, a button at
+     six of ten showed four squares stranded in the middle of it. */
+  gap: 0;
 }
 
 .solid-block {
