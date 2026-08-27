@@ -273,11 +273,19 @@
   background: transparent;
 }
 
-/* Neutral, not the accent. The accent means affordable and unbought, and it is
-   already on the border and on the word BUY; spending it here as well would
-   make it mean two things on one button. */
+/* The accent, which is what the fill is for. Antimatter Dimensions colours its
+   cost button and leaves the rest of the row alone, and the fill is the only
+   thing on this button that changes as you play. */
 .solid-block.on {
-  background: var(--fill-strong);
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* The border and the label stay their normal colours whatever the button can
+   afford. The accent on this button belongs to the fill; putting it on all
+   three made an affordable row three shades of one colour. */
+.solid-buy.buyable {
+  color: var(--fg);
+  border-color: var(--border);
 }
 
 
@@ -675,17 +683,6 @@
 
 /* -- the wager and its points grid --------------------------------------- */
 
-.wager-bar {
-  height: 3px;
-  margin: 0 10px;
-  background: var(--fill);
-}
-
-.wager-bar-fill {
-  height: 100%;
-  width: 0;
-  background: var(--accent);
-}
 
 .upgrade-grid {
   display: flex;

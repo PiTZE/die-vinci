@@ -85,8 +85,18 @@ const dead1 = await ev(shown); await sleep(150); const dead2 = await ev(shown)
 check('display stops when the frame chain dies', dead1 === dead2, `${dead1} -> ${dead2}`)
 
 await ev(`window.requestAnimationFrame = window.__origRaf`)
-await sleep(3000)
-const alive1 = await ev(shown); await sleep(1200); const alive2 = await ev(shown)
+// Polled rather than slept. The watchdog runs on an interval, and a fixed 3s
+// wait was really a claim about how loaded the box is: this passed alone and
+// failed inside `npm test`, on a run where the whole suite took half again as
+// long as usual. Twelve seconds is a cap, not a delay; a working watchdog
+// finishes in about three.
+let alive1 = await ev(shown)
+let alive2 = alive1
+for (let i = 0; i < 40 && alive1 === alive2; i++) {
+  await sleep(300)
+  alive1 = alive2
+  alive2 = await ev(shown)
+}
 check('watchdog restarts rendering on its own', alive1 !== alive2, `${alive1} -> ${alive2}`)
 
 // And the game itself must never have stopped counting while that happened.

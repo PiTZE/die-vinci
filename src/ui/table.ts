@@ -127,14 +127,21 @@ export function tablePane(): Pane {
       barFolio = el('button', 'bar-btn', 'F')
       barFolio.type = 'button'
       barFolio.title = 'Bind a folio  (f)'
-      barFolio.addEventListener('click', () => {
+      // Held, like MAX and like the f key, which has repeated since it was
+      // bound. A plain click here meant the two bar buttons were the only
+      // controls in the game that did nothing when you held them.
+      //
+      // The confirmation still applies. A repeat arms and the next one fires,
+      // so a hold takes studies at half the repeat rate rather than skipping
+      // the guard, and a single accidental tap still only arms.
+      holdable(barFolio, () => {
         if (canFolioNow && confirm.request('folio')) actions.buyFolio()
       })
 
       barStudy = el('button', 'bar-btn', 'S')
       barStudy.type = 'button'
       barStudy.title = 'Take a study  (s)'
-      barStudy.addEventListener('click', () => {
+      holdable(barStudy, () => {
         if (canStudyNow && confirm.request('study')) actions.buyStudy()
       })
 

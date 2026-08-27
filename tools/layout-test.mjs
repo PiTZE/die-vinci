@@ -286,16 +286,26 @@ const tint = await ev(`(() => {
       accentBorder: cs(b).borderTopColor === accent }
   }
   const all = rows.map(read)
-  return { yes: all.filter(r => r.afford), no: all.filter(r => !r.afford) } })()`)
-// Affordable and unbought shows on the border and on the word BUY, and nowhere
-// else. Filling the button or washing the row was tried and both were wrong:
-// late in a run eight rows of nine are affordable at once, so a shade that size
-// marks nothing and the ten blocks behind the label become unreadable.
-check('an affordable buy button shows it on the border',
-  tint.yes.length > 0 && tint.no.length > 0 && tint.yes.every((r) => r.accentBorder),
-  JSON.stringify({ yes: tint.yes.length, no: tint.no.length }))
-check('and neither the button nor its row is shaded',
-  [...tint.yes, ...tint.no].every((r) => !r.rowTinted && !r.btnFilled))
+  // color-mix computes to color(srgb 1 0 0 / 0.45), not rgb(), so the channels
+  // come back as 0-to-1 floats and cannot be compared against the accent token
+  // by string. What the check is actually for is that the fill is coloured
+  // rather than grey, and a grey has three equal channels whatever the syntax.
+  const lit = document.querySelector('.solid-block.on')
+  const fillColour = lit ? cs(lit).backgroundColor : 'none'
+  const ch = lit ? (fillColour.match(/[\\d.]+/g) || []).slice(0, 3).map(Number) : []
+  return { yes: all.filter(r => r.afford), no: all.filter(r => !r.afford),
+    fillColour,
+    filledAccent: ch.length === 3 && !(ch[0] === ch[1] && ch[1] === ch[2]) } })()`)
+// The accent on this button belongs to the group-of-ten fill and to nothing
+// else. It was on the border and the label for a build, which made an
+// affordable row three shades of one colour, and washing the whole row was
+// tried before that: late in a run eight rows of nine are affordable at once,
+// so a shade that size marks nothing.
+check('the group-of-ten fill is coloured, not grey',
+  tint.yes.length > 0 && tint.no.length > 0 && tint.filledAccent === true,
+  JSON.stringify({ yes: tint.yes.length, no: tint.no.length, fill: tint.fillColour }))
+check('and the border, the label and the row stay their normal colours',
+  [...tint.yes, ...tint.no].every((r) => !r.rowTinted && !r.btnFilled && !r.accentBorder))
 
 // How far through the run you are, kept on the table rather than behind the
 // WAGER tab, because this run stops dead at the threshold.

@@ -8,7 +8,7 @@ import {
   isBought,
   type UpgradeId,
 } from '../game/upgrades'
-import { canWager, pointsFromWager, wagerProgress } from '../game/wager'
+import { canWager, pointsFromWager } from '../game/wager'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey } from './hold'
@@ -22,7 +22,6 @@ export function wagerPane(): Pane {
   let confirm: Confirmer
   let confirmSettings: Record<string, boolean> = {}
   let callBtn: HTMLButtonElement
-  let callBar: HTMLElement
   let callLine: HTMLElement
   let pointsLine: HTMLElement
   let note: HTMLElement
@@ -47,10 +46,6 @@ export function wagerPane(): Pane {
       ch.appendChild(callLine)
       call.appendChild(ch)
 
-      const barWrap = el('div', 'wager-bar')
-      callBar = el('div', 'wager-bar-fill')
-      barWrap.appendChild(callBar)
-      call.appendChild(barWrap)
 
       callBtn = el('button', 'action', '')
       callBtn.type = 'button'
@@ -117,8 +112,6 @@ export function wagerPane(): Pane {
       if (!noteFor) setText(note, 'touch an upgrade to read what it does')
 
       setText(callLine, `${s.wagers}`)
-      const pct = `${(wagerProgress(s) * 100).toFixed(1)}%`
-      if (callBar.style.width !== pct) callBar.style.width = pct
       confirmSettings = s.options.confirms
       const ready = canWager(s)
       setText(

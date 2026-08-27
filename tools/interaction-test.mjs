@@ -245,6 +245,49 @@ try {
     `max fired ${two.max - one.max} times with ROLL down`)
   check('and ROLL keeps repeating too', two.roll - one.roll > 1, `roll fired ${two.roll - one.roll} more`)
 
+  // F and S were the only controls in the game that did nothing when held. MAX
+  // was holdable and so were the f and s keys; the two bar buttons were wired
+  // to a plain click.
+  const heldReset = await evaluate(`(async () => {
+    const s = window.LD.state, D = window.LD.Decimal
+    s.options.confirms.study = false
+    s.studies = 0
+    // A study resets the table, so the requirement is topped up throughout the
+    // hold. A real endgame does this on its own, faster than you can press.
+    const top = () => { s.ink = new D('1e60')
+      s.solids.forEach((d) => { d.bought = 40; d.amount = new D('1e30') }) }
+    top(); const keep = setInterval(top, 20)
+    const btn = [...document.querySelectorAll('.bar-btn')].find(b => b.textContent.trim() === 'S')
+    const press = (t, target) => target.dispatchEvent(
+      new PointerEvent(t, { bubbles: true, pointerId: 9, button: 0, isPrimary: true }))
+    press('pointerdown', btn)
+    await new Promise(r => setTimeout(r, 1000))
+    const held = s.studies
+    press('pointerup', window)
+    await new Promise(r => setTimeout(r, 300))
+    clearInterval(keep)
+    return { held, after: s.studies - held } })()`)
+  check('holding S keeps taking studies', heldReset.held > 3, `${heldReset.held} while held`)
+  check('and releasing it stops', heldReset.after === 0, `${heldReset.after} after release`)
+
+  // The confirmation still guards a single tap. A hold arms and the next
+  // repeat fires, so it runs at half the repeat rate rather than skipping it.
+  const oneTap = await evaluate(`(async () => {
+    const s = window.LD.state, D = window.LD.Decimal
+    s.options.confirms.study = true
+    s.studies = 0; s.ink = new D('1e60')
+    s.solids.forEach((d) => { d.bought = 40; d.amount = new D('1e30') })
+    await new Promise(r => setTimeout(r, 150))
+    const btn = [...document.querySelectorAll('.bar-btn')].find(b => b.textContent.trim() === 'S')
+    const press = (t, target) => target.dispatchEvent(
+      new PointerEvent(t, { bubbles: true, pointerId: 10, button: 0, isPrimary: true }))
+    press('pointerdown', btn); press('pointerup', window)
+    await new Promise(r => setTimeout(r, 200))
+    // Arming renames the button, so the reference is kept rather than looked up.
+    return { studies: s.studies, label: btn.textContent.trim() } })()`)
+  check('one tap on S still only arms', oneTap.studies === 0 && oneTap.label === '?',
+    JSON.stringify(oneTap))
+
   // touchEnd lists the point being released, so this lifts the ROLL finger.
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(1, rollAt)] })
   // Counted straight after the release rather than before it. The repeat fires
