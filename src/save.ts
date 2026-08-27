@@ -61,6 +61,13 @@ function encode(s: GameState): Raw {
  * tarot field later should not cost anyone their save.
  */
 const MIGRATIONS: Record<number, (r: Raw) => Raw> = {
+  // 4 -> 5: repairs a meltPower of 0. Melting multiplies up from 1 and can
+  // never legitimately land on zero, so any save holding one got it from the
+  // decode bug above rather than from playing.
+  4: (r) => ({
+    ...r,
+    meltPower: !r.meltPower || new Decimal(r.meltPower).lte(0) ? '1' : r.meltPower,
+  }),
   // 1 -> 2: the chain went from six solids to nine and the solids themselves
   // changed. Carrying the old amounts over by position would silently hand a
   // player a pile of d9 they never bought, so layer 0 starts again. Options,
@@ -139,8 +146,14 @@ function decode(raw: Raw, now: number): GameState {
     autobuyers: { ...base.autobuyers, ...(m.autobuyers ?? {}) },
     achievements: Array.isArray(m.achievements) ? [...m.achievements] : [],
   }
+  // Falls back to the fresh game's value, not to zero. Three of these four
+  // start at zero and one starts at one, and the blanket `?? 0` handed a save
+  // written before meltPower existed a meltPower of 0. That multiplies the
+  // deepest solid by nothing. Before a Wager the deepest solid only feeds the
+  // tier below it, so the loss hid; after one it is also the solid that makes
+  // the ink, and the whole chain produced zero however the dice landed.
   for (const f of DECIMAL_FIELDS) {
-    (s as any)[f] = new Decimal(m[f] ?? 0)
+    (s as any)[f] = new Decimal(m[f] ?? (base as any)[f])
   }
   s.solids = base.solids.map((d, i) => {
     const got = Array.isArray(m.solids) ? m.solids[i] : undefined

@@ -4,6 +4,7 @@
 // cards and nothing else, because a choice competing with a grid of things you
 // already own is a choice people click past. Otherwise it is what you hold.
 import { ARCANA, ARCANA_BY_ID, draftPending, levelOf, owned } from '../game/tarot'
+import { WAGER_AT } from '../game/balance'
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
 import { seal, unseal } from './redact'
@@ -114,7 +115,11 @@ export function tarotPane(): Pane {
 
       const have = owned(s)
       setText(head, `${have}/${ARCANA.length}`)
-      const pct = `${Math.min(100, s.draftProgress > 0 ? 100 : 0)}%`
+      // Ink toward the next Wager, on a log scale, because one Wager is one
+      // draft. It read 100% from the first Wager onward before this: the
+      // placeholder tested draftProgress, which counts drafts already earned
+      // and only ever climbs, so the bar filled once and stayed full.
+      const pct = `${(Math.min(1, Math.max(0, s.ink.log10()) / WAGER_AT.log10()) * 100).toFixed(1)}%`
       if (barFill.style.width !== pct) barFill.style.width = pct
 
       for (const a of ARCANA) {

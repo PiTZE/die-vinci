@@ -121,6 +121,40 @@ check('melting pays the top solid and empties the rest',
   Number(melt.after) > Number(melt.before) && melt.lowerCleared === '0',
   JSON.stringify(melt))
 
+// The first draft has to interrupt. draftInterrupts existed and nothing ever
+// called it, so the very first card sat behind a tab a new player had no
+// reason to open and the mechanic simply never happened for them.
+const interrupt = await ev(`(() => {
+  const s = window.LD.state, D = window.LD.Decimal
+  s.tarot = {}; s.pendingDraft = []; s.options.tab = 'table'
+  s.ink = new D('1e309'); s.inkThisWager = new D('1e309')
+  window.LD.actions.wager()
+  const on = [...document.querySelectorAll('.tab')].find(b => b.getAttribute('aria-selected') === 'true')
+  return { pending: s.pendingDraft.length, tab: on?.textContent?.trim() }
+})()`)
+check('the first draft interrupts and opens the tab',
+  interrupt.pending > 0 && /^T/.test(interrupt.tab ?? ''), JSON.stringify(interrupt))
+
+// A save written before meltPower existed decoded it as 0, and the deepest
+// solid is multiplied by it. Before a Wager the deepest solid only feeds the
+// tier below, so the loss hid; after one it is also the solid that makes the
+// ink, and the whole chain produced nothing whatever the dice showed.
+const revived = await ev(`(() => {
+  const s = window.LD.state, D = window.LD.Decimal
+  s.tarot = {}; s.studies = 0; s.folios = 0; s.wagers = 1
+  s.solids.forEach(d => { d.amount = new D(0); d.bought = 0 })
+  s.solids[0] = { bought: 1, amount: new D(1) }
+  const blob = window.LD.exportSave(s)
+  // Strip the field the way a save written before it existed would not have it.
+  const raw = JSON.parse(atob(blob)); delete raw.meltPower
+  const back = window.LD.importSave(btoa(JSON.stringify(raw)), Date.now())
+  return { power: back.meltPower.toString(), mult: window.LD.solidMultiplier(back, 1).toString() }
+})()`)
+check('a save with no meltPower still multiplies by one',
+  revived.power === '1', `meltPower ${revived.power}`)
+check('so the first solid after a Wager is not zeroed',
+  Number(revived.mult) > 0, `x${revived.mult}`)
+
 // The ten mode fills the group of ten or waits. Flooring at one made it the
 // single mode wearing a different label for most of the game.
 const modes = await ev(`(() => {

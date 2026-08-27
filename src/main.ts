@@ -13,6 +13,7 @@ import {
   startRoll,
   buyStudy,
   inkPerSecond,
+  solidMultiplier,
   canBuyGroup,
   canMelt,
   doMelt,
@@ -30,7 +31,7 @@ import { setFullscreen } from './ui/fullscreen'
 import { restoreBackup } from './backup'
 import { devTools } from './dev'
 import { doWager } from './game/wager'
-import { drawOffer, takeCard, weightOf } from './game/tarot'
+import { draftInterrupts, drawOffer, takeCard, weightOf } from './game/tarot'
 import { buyUpgrade } from './game/upgrades'
 import { enterChallenge, exitChallenge } from './game/challenges'
 import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode, runAutobuyers as rawRunAutobuyers } from './game/autobuyers'
@@ -243,6 +244,14 @@ const actions: Actions = {
   },
   wager: () => {
     doWager(state)
+    // The first draft interrupts. Someone who has just called their first
+    // Wager has no reason to know the TAROT tab now has a choice waiting in
+    // it, and a card sitting unclaimed behind a tab is a mechanic that never
+    // happened. Every draft after this one waits to be opened.
+    if (draftInterrupts(state)) {
+      shell.select('tarot')
+      shell.toast('THE DRAFT: CHOOSE ONE')
+    }
     persistSoon()
   },
   buyUpgrade: (id) => {
@@ -345,7 +354,9 @@ shell.build(
     optionsPane(),
     helpPane(),
   ],
-  state.options.tab,
+  // A pending first draft wins over the remembered tab, so closing the game
+  // mid-choice and coming back lands on the choice rather than losing it.
+  draftInterrupts(state) ? 'tarot' : state.options.tab,
 )
 
 /**
@@ -498,6 +509,11 @@ const hook: Record<string, unknown> = {
     buyFolio: () => buyFolio(st),
   }),
   weightOf,
+  // The save round trip and the multiplier it feeds, so a test can prove a
+  // save missing a field still decodes to a chain that produces something.
+  exportSave: (st: GameState) => exportSave(st),
+  importSave: (blob: string, now: number) => importSave(blob, now),
+  solidMultiplier,
   inkPerSecond,
   meltUnlocked,
   canMelt,
