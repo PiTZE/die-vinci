@@ -13,6 +13,7 @@ import {
   startRoll,
   buyStudy,
   inkPerSecond,
+  canBuyGroup,
   canMelt,
   doMelt,
   maxAll,
@@ -32,9 +33,10 @@ import { doWager } from './game/wager'
 import { drawOffer, takeCard, weightOf } from './game/tarot'
 import { buyUpgrade } from './game/upgrades'
 import { enterChallenge, exitChallenge } from './game/challenges'
-import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode } from './game/autobuyers'
+import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode, runAutobuyers as rawRunAutobuyers } from './game/autobuyers'
 import { resetForChallenge } from './game/production'
 import type { UpgradeId } from './game/upgrades'
+import { format } from './format'
 import { exportSave, importSave, loadGame, saveGame, switchSlot, wipeSave } from './save'
 import {
   markExported,
@@ -487,6 +489,14 @@ const hook: Record<string, unknown> = {
   // The tarot maths, so a test can assert the weighting over thousands of
   // draws rather than eyeball three cards. All pure; none touch the save.
   drawOffer,
+  format,
+  runAutobuyers: (st: GameState, ms: number) => rawRunAutobuyers(st, ms, {
+    buySolid: (idx, one) => buySolid(st, idx, one),
+    canBuyGroup: (idx) => canBuyGroup(st, idx),
+    buyRollRate: () => buyRollRate(st),
+    buyStudy: () => buyStudy(st),
+    buyFolio: () => buyFolio(st),
+  }),
   weightOf,
   inkPerSecond,
   meltUnlocked,

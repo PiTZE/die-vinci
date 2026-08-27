@@ -128,6 +128,8 @@ export function anyUnlocked(s: GameState): boolean {
 
 /** What each autobuyer does when its interval elapses. Wired up in production. */
 export interface AutobuyerActions {
+  /** Whether the whole group of ten is affordable, for the ten mode. */
+  canBuyGroup(idx: number): boolean
   buySolid: (idx: number, one: boolean) => boolean
   buyRollRate: () => boolean
   buyStudy: () => boolean
@@ -147,6 +149,10 @@ export function runAutobuyers(s: GameState, dtMs: number, act: AutobuyerActions)
     a.since -= fires * every
     while (fires-- > 0) {
       const m = mode(s, d.id)
+      // Ten means ten. It waits for the whole group rather than buying one at
+      // a time whenever the ink is short, which made it the single mode
+      // wearing a different label for most of the game.
+      if (m === 'ten' && d.id.startsWith('solid') && !act.canBuyGroup(Number(d.id.slice(5)))) break
       const ok = d.id.startsWith('solid')
         ? act.buySolid(Number(d.id.slice(5)), m === 'single')
         : d.id === 'rollRate'

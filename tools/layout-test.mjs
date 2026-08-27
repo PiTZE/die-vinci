@@ -177,6 +177,18 @@ const buys = await ev(`(() => {
 check('the counter and the label share one line on every row',
   buys.length >= 8 && buys.every((r) => r.sameLine),
   JSON.stringify(buys.filter((r) => !r.sameLine).slice(0, 2)))
+// One long label used to widen its own button and step out of line with the
+// eight above it. The buy column is a fixed width now.
+const aligned = await ev(`(() => {
+  const rows = [...document.querySelectorAll('.solid')].filter(r => getComputedStyle(r).display !== 'none')
+  const lefts = new Set(rows.map(r => Math.round(r.querySelector('.solid-buy').getBoundingClientRect().left)))
+  const widths = new Set(rows.map(r => Math.round(r.querySelector('.solid-buy').getBoundingClientRect().width)))
+  return { rows: rows.length, lefts: [...lefts], widths: [...widths] }
+})()`)
+check('every buy button is the same width and starts at the same edge',
+  aligned.rows >= 6 && aligned.lefts.length === 1 && aligned.widths.length === 1,
+  JSON.stringify(aligned))
+
 check('and neither overflows the button nor runs into the other',
   buys.every((r) => !r.overflows && !r.collides),
   JSON.stringify(buys.filter((r) => r.overflows || r.collides).slice(0, 2)))

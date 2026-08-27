@@ -143,6 +143,26 @@ export function openSolids(s: GameState): number {
   return Math.min(unlockedSolids(s), restrictions(s).cap)
 }
 
+/**
+ * Whether the whole group of ten is affordable.
+ *
+ * The autobuyer's ten mode is meant to fill the group in one purchase, the way
+ * Antimatter Dimensions' is. buyCount floors at one, so without this the mode
+ * dribbled out single dice whenever the ink was short, which is most of the
+ * time, and was indistinguishable from the single mode.
+ */
+export function canBuyGroup(s: GameState, idx: number): boolean {
+  if (idx > openSolids(s)) return false
+  const r = restrictions(s)
+  const need = solidCost(s, idx).times(10 - (s.solids[idx - 1].bought % 10))
+  if (r.payWithOffset > 0) {
+    const from = idx - r.payWithOffset
+    if (from < 1) return false
+    return s.solids[from - 1].amount.gte(need)
+  }
+  return s.ink.gte(need)
+}
+
 export function canBuySolid(s: GameState, idx: number): boolean {
   if (idx > openSolids(s)) return false
   const r = restrictions(s)
@@ -682,6 +702,7 @@ export function tick(s: GameState, dt: number, now: number): void {
 
   runAutobuyers(s, dt * 1000, {
     buySolid: (idx, one) => buySolid(s, idx, one),
+    canBuyGroup: (idx) => canBuyGroup(s, idx),
     buyRollRate: () => buyRollRate(s),
     buyStudy: () => buyStudy(s),
     buyFolio: () => buyFolio(s),

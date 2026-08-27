@@ -121,6 +121,41 @@ check('melting pays the top solid and empties the rest',
   Number(melt.after) > Number(melt.before) && melt.lowerCleared === '0',
   JSON.stringify(melt))
 
+// The ten mode fills the group of ten or waits. Flooring at one made it the
+// single mode wearing a different label for most of the game.
+const modes = await ev(`(() => {
+  const s = window.LD.state, D = window.LD.Decimal
+  s.tarot = {}; s.studies = 3; s.meltPower = new D(1)
+  s.autobuyers.solid1 = { unlocked: true, on: true, mode: 'ten', level: 0, since: 0 }
+  const out = {}
+  for (const [name, ink] of [['rich', '1e30'], ['poor', '25']]) {
+    for (const m of ['single', 'ten', 'max']) {
+      s.autobuyers.solid1.mode = m
+      s.solids[0].bought = 0
+      s.solids.forEach(d => { d.amount = new D(0) })
+      s.ink = new D(ink)
+      s.autobuyers.solid1.since = 0
+      window.LD.runAutobuyers(s, 600)
+      out[name + ':' + m] = s.solids[0].bought
+    }
+  }
+  return out })()`)
+check('the modes buy what they say when the ink is there',
+  modes['rich:single'] === 1 && modes['rich:ten'] === 10 && modes['rich:max'] > 10,
+  JSON.stringify(modes))
+// 25 ink buys two tetrahedra at ten each, so ten mode must buy nothing at all.
+check('and ten waits for the whole group rather than dribbling out singles',
+  modes['poor:ten'] === 0 && modes['poor:single'] === 1,
+  `poor: single ${modes['poor:single']}, ten ${modes['poor:ten']}, max ${modes['poor:max']}`)
+
+// No trailing zeros: three characters that say nothing widened a button out
+// of line with the eight above it.
+const shown = await ev(`(() => {
+  const D = window.LD.Decimal
+  return [1e17, 1e5, 1.5e6, 35.52, 9.99].map(v => window.LD.format(new D(v), 'mixed')) })()`)
+check('numbers carry no trailing zeros',
+  shown.every((t) => !/\.0+($|[A-Za-z])/.test(t)), JSON.stringify(shown))
+
 ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

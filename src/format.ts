@@ -19,8 +19,16 @@ const LETTERS = [
   'Vg', 'UVg', 'DVg', 'TVg', 'QaVg', 'QiVg', 'SxVg', 'SpVg', 'OcVg', 'NoVg',
 ]
 
+/**
+ * Two places, without the zeros that carry no information.
+ *
+ * 100.00Qa is three characters longer than 100Qa and says exactly as much, and
+ * those three characters were enough to push one buy button wider than the
+ * eight above it and break the column.
+ */
 function mantissaString(m: number, places: number): string {
-  return m.toFixed(places)
+  const fixed = m.toFixed(places)
+  return fixed.includes('.') ? fixed.replace(/\.?0+$/, '') : fixed
 }
 
 function scientific(d: Decimal, places: number): string {
