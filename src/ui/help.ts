@@ -204,7 +204,7 @@ export function helpPane(): Pane {
           g.body.replaceChildren()
           g.filled = ''
           g.body.hidden = true
-          if (g.mark.textContent !== '\u2593') g.mark.textContent = '\u2593'
+          if (g.mark.textContent !== '?') g.mark.textContent = '?'
         }
         g.head.classList.toggle('sealed', !on)
         g.head.setAttribute('aria-disabled', String(!on))

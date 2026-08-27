@@ -736,13 +736,16 @@
   min-height: 2.9em;
 }
 
-/* A topic or an entry the player has not reached. The blocks are text, not a
-   bar drawn on top, so nothing readable is sitting in the DOM behind them. */
+/* A topic or an entry the player has not reached. The garble is text, not a
+   bar drawn on top, so nothing readable is sitting in the DOM behind it. */
 .sealed {
   color: var(--fg-muted);
-  opacity: 0.42;
+  opacity: 0.5;
   cursor: default;
-  letter-spacing: 0.04em;
+  /* The characters change under their own steam; letting their widths change
+     with them would make the whole line twitch sideways. */
+  font-variant-numeric: tabular-nums;
+  user-select: none;
 }
 
 .sealed:hover {

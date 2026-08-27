@@ -60,7 +60,7 @@ check('and those words are not in the document at all',
   !AHEAD.some((w) => freshHelpAll.includes(w)),
   AHEAD.filter((w) => freshHelpAll.includes(w)).join(',') || 'none present')
 check('sealed topics are shown, redacted, not removed',
-  freshHelp.includes('\u2593'), freshHelp)
+  !freshHelp.includes('THE WAGER') && freshHelp.length > 40, freshHelp)
 
 // The blocks have to move, and to be a texture rather than one repeated glyph.
 const first = await ev(`document.querySelector('.archive-cell.sealed, .help-head.sealed')
@@ -70,8 +70,11 @@ const second = await ev(`document.querySelector('.help-head.sealed')
   ? document.querySelector('.help-head.sealed span').textContent : ''`)
 check('the redaction animates', first !== '' && second !== '' && first !== second,
   `${JSON.stringify(first)} -> ${JSON.stringify(second)}`)
-check('and is a texture, not one repeated block',
-  new Set([...first.replace(/ /g, '')]).size > 1, JSON.stringify(first))
+// A flicker, not static. Bitburner's own rate would have most of a short
+// heading disturbed at once, so the rate scales with length here.
+const moved = [...first].filter((c, i) => c !== second[i]).length
+check('a flicker rather than static', moved >= 1 && moved <= first.length * 0.6,
+  `${moved} of ${first.length} changed in 700ms`)
 
 check('and still has the ones it needs',
   ['ROLLING', 'THE TABLE', 'ROLL RATE', 'KEYS'].every((t) => freshHelp.includes(t)), freshHelp)
