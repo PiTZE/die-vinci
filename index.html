@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="A game about Leo." />
     <meta name="theme-color" content="#000000" />
+    <!-- Installed on iOS, where there is no fullscreen mode. Translucent means
+         the page runs under the status bar rather than below a bar in a colour
+         of its own choosing; the safe-area insets keep content out of it. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>die Vinci</title>
     <script>
       // Runs before first paint so the theme never flashes. Mirrors the logic

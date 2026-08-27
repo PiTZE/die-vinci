@@ -104,9 +104,12 @@
 }
 
 .tab {
-  /* Sized to its own word, never squeezed. A tab that does not fit is reached
-     by scrolling rather than by being crushed into its neighbour. */
-  flex: 0 0 auto;
+  /* Grows to share whatever width there is, never shrinks below its own word.
+     Fixed at auto the four tabs of an early save left 60% of the bar empty;
+     at flex: 1 the eight tabs of a late one crushed CHALLENGES into
+     AUTOMATION. This fills the bar when they fit and scrolls when they do
+     not. */
+  flex: 1 0 auto;
   border: 0;
   border-right: 1px solid var(--border-faint);
   font-size: 0.64rem;

@@ -106,6 +106,17 @@ check('without counting the indicator twice',
   inset.tabsBarH <= 44 + 34 + 4, JSON.stringify(inset))
 check('the top bar clears the status bar', inset.barTextTop >= 47, JSON.stringify(inset))
 
+// Few enough tabs to fit, and they share the bar between them. Sizing each to
+// its own label left an early save with 60% of the bar empty.
+const early = await ev(`(() => {
+  const t = [...document.querySelectorAll('.tab')].filter(x => getComputedStyle(x).display !== 'none')
+  const bar = document.querySelector('.tabs').getBoundingClientRect()
+  const span = t[t.length-1].getBoundingClientRect().right - t[0].getBoundingClientRect().left
+  return { n: t.length, span: Math.round(span), barW: Math.round(bar.width) }
+})()`)
+check('tabs that fit share the whole bar',
+  early.n <= 6 && Math.abs(early.span - early.barW) < 2, JSON.stringify(early))
+
 // Eight tabs of real English do not fit across 390px. They are not squeezed
 // into each other any more; the bar scrolls instead. A fresh save only shows
 // four, which fit, so the rest have to be unlocked before this means anything.
