@@ -12,6 +12,7 @@ import {
   buySolid,
   startRoll,
   buyStudy,
+  folioUnlocked,
   inkPerSecond,
   solidMultiplier,
   canBuyGroup,
@@ -509,6 +510,9 @@ const hook: Record<string, unknown> = {
     buyFolio: () => buyFolio(st),
   }),
   weightOf,
+  // Whether the folio section shows at all, so a test can prove that binding
+  // one does not hide it.
+  folioUnlocked,
   // The save round trip and the multiplier it feeds, so a test can prove a
   // save missing a field still decodes to a chain that produces something.
   exportSave: (st: GameState) => exportSave(st),

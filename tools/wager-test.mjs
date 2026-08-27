@@ -100,12 +100,15 @@ await sleep(150)
 // Only the active pane updates, so the table has to be on screen to be read.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'TABLE').click()`)
 await sleep(150)
-const studyNeedBefore = await ev(`(() => { const t = [...document.querySelectorAll('.action')]
-  .find(b => b.textContent.startsWith('STUDY /')); return t ? t.textContent : 'none' })()`)
+// The verb and the requirement are separate spans now, so the button reads
+// "STUDY" then "20 d8" rather than one slash-joined string.
+const need = `(() => { const t = [...document.querySelectorAll('.action')]
+  .find(b => b.textContent.startsWith('STUDY'))
+  return t ? (t.querySelector('.btn-cost')?.textContent ?? t.textContent) : 'none' })()`
+const studyNeedBefore = await ev(need)
 await ev(`window.LD.state.pointUpgrades = ['timeMult','solids19','solids37','resetBoost']`)
 await sleep(150)
-const studyNeedAfter = await ev(`(() => { const t = [...document.querySelectorAll('.action')]
-  .find(b => b.textContent.startsWith('STUDY /')); return t ? t.textContent : 'none' })()`)
+const studyNeedAfter = await ev(need)
 check('resetBoost lowers the study requirement by 9',
   studyNeedBefore.includes('20 ') && studyNeedAfter.includes('11 '),
   `${studyNeedBefore} -> ${studyNeedAfter}`)

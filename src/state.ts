@@ -103,6 +103,8 @@ export interface GameState {
     sinceResetMs: number
     /** How many times the chain has been melted. */
     melts: number
+    /** Folios bound over the whole save. Never reset, unlike s.folios. */
+    foliosEver: number
   }
 }
 
@@ -143,7 +145,7 @@ export function newGame(now: number): GameState {
       offlineTicks: OFFLINE_TICKS_DEFAULT,
       confirms: defaultConfirms(),
     },
-    stats: { started: now, playMs: 0, wagerMs: 0, sinceResetMs: 0, melts: 0 },
+    stats: { started: now, playMs: 0, wagerMs: 0, sinceResetMs: 0, melts: 0, foliosEver: 0 },
   }
 }
 

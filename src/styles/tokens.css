@@ -16,16 +16,31 @@
   --tabs-h: 56px;
   /* Named so a test can stand in for them: env() cannot be faked, and a bug
      that only shows on hardware with a home indicator is one nobody can see.
-     max-inset rather than inset, because Safari collapses the plain one to
-     zero the moment its toolbar hides on scroll, which drops the tab bar onto
-     the home indicator mid-swipe. The nested env() is the fallback for
-     browsers that only have the original. */
-  --safe-b: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
-  --safe-t: env(safe-area-max-inset-top, env(safe-area-inset-top, 0px));
+     In a browser tab the browser's own chrome sits below the viewport and has
+     already accounted for the gesture bar, so the live inset is the honest
+     number here. */
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
   /* Landscape on a notched iPhone puts 44px of screen either side out of
      reach. Zero in portrait and on everything else. */
-  --safe-l: env(safe-area-max-inset-left, env(safe-area-inset-left, 0px));
-  --safe-r: env(safe-area-max-inset-right, env(safe-area-inset-right, 0px));
+  --safe-l: env(safe-area-inset-left, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
   /* Numbers get their own width so a growing value never reflows a row. */
   --num-w: 9.5rem;
+}
+
+/* Installed, nothing sits below the viewport, and Safari collapses the live
+   inset to zero the moment its toolbar hides on scroll, which drops the tab
+   bar onto the home indicator mid-swipe. max-inset does not collapse, so it is
+   the one to use here and only here: in a browser tab it reserves a band for a
+   toolbar that is already on screen, which is what made the tab bar too tall
+   on Android. The nested env() is the fallback for browsers that only have the
+   original. */
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+  :root {
+    --safe-b: env(safe-area-max-inset-bottom, env(safe-area-inset-bottom, 0px));
+    --safe-t: env(safe-area-max-inset-top, env(safe-area-inset-top, 0px));
+    --safe-l: env(safe-area-max-inset-left, env(safe-area-inset-left, 0px));
+    --safe-r: env(safe-area-max-inset-right, env(safe-area-inset-right, 0px));
+  }
 }

@@ -59,6 +59,37 @@ const s2 = await ev(`window.LD.state.studies`)
 await ev(`${studyBtn}.click()`); await sleep(150)
 check('setting off means one press', (await ev(`window.LD.state.studies`)) === s2 + 1)
 
+// A key has no button to be disabled, so S and F armed a confirmation for a
+// reset that could not happen. Pressing again then did nothing at all, which
+// reads as the game ignoring you.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.options.confirms.study = true; s.options.confirms.folio = true
+  s.studies = 0; s.folios = 0; s.stats.foliosEver = 0
+  s.solids.forEach(d => { d.amount = new D(0); d.bought = 0 })
+  s.ink = new D(0) })()`)
+await sleep(150)
+const key = (k) => ev(`window.dispatchEvent(new KeyboardEvent('keydown', { key: ${JSON.stringify(k)}, bubbles: true }))`)
+await key('s'); await key('f'); await sleep(150)
+const idle = await ev(`(() => {
+  const t = [...document.querySelectorAll('.action.duo')].map(b => b.textContent)
+  const bar = [...document.querySelectorAll('.bar-btn')].map(b => b.textContent)
+  return { armed: t.some(x => x.startsWith('SURE?')) || bar.includes('?'), bar } })()`)
+check('S and F do not arm a reset that cannot happen', idle.armed === false, JSON.stringify(idle))
+
+// Binding a folio must not hide the section that just became the point of the
+// game. It clears the studies that opened the table, so the requirement goes
+// unmet and the whole section used to vanish until all nine were open again.
+const folio = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 8; s.folios = 0; s.stats.foliosEver = 0
+  s.solids.forEach(d => { d.amount = new D('1e12'); d.bought = 20 })
+  const before = window.LD.folioUnlocked(s)
+  window.LD.actions.buyFolio()
+  const after = window.LD.folioUnlocked(s)
+  s.wagers += 1; s.folios = 0; s.studies = 0
+  return { before, after, pastWager: window.LD.folioUnlocked(s), studies: s.studies } })()`)
+check('a folio stays unlocked once one is bound',
+  folio.before === true && folio.after === true && folio.pastWager === true, JSON.stringify(folio))
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

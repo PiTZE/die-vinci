@@ -306,6 +306,12 @@ export function folioReq(s: GameState): { idx: number; need: Decimal } {
 
 export function folioUnlocked(s: GameState): boolean {
   if (restrictions(s).noFolios) return false
+  // Binding one opens it for good. A folio clears the studies that opened the
+  // table, so the section that had just become the point of the game vanished
+  // the moment you used it and did not come back until you had re-opened all
+  // nine solids. The requirement still has to be met to press it; what is
+  // permanent is knowing it is there.
+  if (s.stats.foliosEver > 0) return true
   return unlockedSolids(s) >= SOLIDS.length
 }
 
@@ -324,6 +330,7 @@ export function buyFolio(s: GameState): boolean {
   if (!canBuyFolio(s)) return false
   const m = modifiers(s)
   s.folios += 1
+  s.stats.foliosEver += 1
   // 0 The Fool: the chain resets and the ladder survives.
   s.studies = Math.min(s.studies, m.keepStudies)
   s.rollUpgrades = Math.floor(s.rollUpgrades * m.keepRollFrac)

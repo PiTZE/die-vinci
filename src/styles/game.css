@@ -242,35 +242,30 @@
    Pinned to the top left corner it read as a separate thing floating above
    the button's own text: the label centres in the button, the button is the
    height of the whole row, and the two ended up stacked and unrelated. */
-.solid-step {
-  position: relative;
-  flex: 0 0 auto;
-  color: var(--fg-muted);
-  font-size: 0.58rem;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  pointer-events: none;
+/* Owned of this group of ten, then how many more the ink covers, carrying on
+   from it. Three pixels of 14% white is invisible, which is what the old
+   full-height slab got away with because it had area; a rule needs contrast
+   instead. */
+.solid-fill {
+  background: var(--fg-dim);
 }
 
+.solid-fill-can {
+  background: var(--border);
+}
+
+/* The group of ten, as a rule along the bottom edge rather than a slab behind
+   the label. Full height, the two fills were a pair of hard grey rectangles
+   with the text sitting half on and half off them, and the button read as a
+   broken progress bar rather than as something to press. */
 .solid-fill,
 .solid-fill-can {
   pointer-events: none;
   position: absolute;
-  top: 0;
   bottom: 0;
   left: 0;
+  height: 3px;
   width: 0;
-  pointer-events: none;
-}
-
-/* Already owned of this group of ten. */
-.solid-fill {
-  background: var(--fill-strong);
-}
-
-/* And how many more the ink covers right now, carrying on from it. */
-.solid-fill-can {
-  background: var(--fill);
 }
 
 .solid-amount {
@@ -309,8 +304,13 @@
   align-self: stretch;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
+  /* BUY hard left, the price hard right. The gap between them is the button's
+     width doing something rather than being padding. */
+  justify-content: space-between;
+  gap: 8px;
+  /* The extra at the bottom is the band the progress rule sits in, so the
+     text never rides on top of it. */
+  padding: 4px 10px 7px;
   font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
 }
@@ -318,10 +318,22 @@
 /* Centred in whatever the counter leaves, which is what makes the pair read
    as one control rather than two. position lifts it above the two fills. */
 .solid-buy-label {
+  position: relative;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* The price is the half that grows, so it is the half that gets the slack and
+   the ellipsis. It stays muted even when the button is affordable: the accent
+   is worth more on one word than spread across the whole string, and nine rows
+   of fully accented buttons is a wall of one colour that signals nothing. */
+.solid-buy-cost {
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
-  text-align: center;
-  position: relative;
+  text-align: right;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -912,6 +924,34 @@
   letter-spacing: 0.06em;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* Same grammar as the buy button, for the buttons that stretch to their
+   container. A slash-joined pair centred in a full width button is a label
+   with no relationship to the box around it. */
+.action.duo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  padding: 10px 14px;
+}
+
+.action.duo.solo {
+  justify-content: center;
+}
+
+.btn-cost {
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.solo .btn-cost {
+  display: none;
 }
 
 .row {

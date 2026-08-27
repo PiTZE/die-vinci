@@ -40,13 +40,38 @@ interface Row {
   icon: SVGSVGElement
   face: HTMLElement
   mult: HTMLElement
-  step: HTMLElement
   bar: HTMLElement
   barCan: HTMLElement
   amount: HTMLElement
   rate: HTMLElement
   buy: HTMLButtonElement
   buyLabel: HTMLElement
+  buyCost: HTMLElement
+}
+
+/**
+ * A verb on the left and what it costs on the right, rather than the two
+ * joined by a slash and centred. A centred pair tells you nothing about the
+ * button's width, so a button that stretches ends up with its label adrift in
+ * the middle of an empty box, and the longer half ellipsises first.
+ *
+ * Buttons that only ever say one thing do not call this and stay centred.
+ */
+function duo(btn: HTMLElement, verb: string, cost = ''): void {
+  let a = btn.firstElementChild as HTMLElement | null
+  let b = a?.nextElementSibling as HTMLElement | null
+  if (!a || !b) {
+    btn.textContent = ''
+    a = el('span', 'btn-verb', '')
+    b = el('span', 'btn-cost', '')
+    btn.append(a, b)
+    btn.classList.add('duo')
+  }
+  setText(a, verb)
+  setText(b, cost)
+  // A confirmation replaces both halves with one sentence, which belongs in
+  // the middle of the button the way any single label does.
+  btn.classList.toggle('solo', cost === '')
 }
 
 function setText(n: HTMLElement, v: string): void {
@@ -61,6 +86,16 @@ export function tablePane(): Pane {
   let barStudy: HTMLButtonElement
   let actionGroup: HTMLElement
   let confirmSettings: Record<string, boolean> = {}
+  /**
+   * Whether a study or a folio can actually be taken right now.
+   *
+   * The buttons carry this as `disabled`, but a key binding has no button to
+   * be disabled, so S and F armed a confirmation for a reset that could not
+   * happen. You then pressed the key again to confirm and nothing at all
+   * occurred, which reads as the game ignoring you.
+   */
+  let canStudyNow = false
+  let canFolioNow = false
   let rollLine: HTMLElement
   let rollBtn: HTMLButtonElement
   let studyBtn: HTMLButtonElement
@@ -89,14 +124,14 @@ export function tablePane(): Pane {
       barFolio.type = 'button'
       barFolio.title = 'Bind a folio  (f)'
       barFolio.addEventListener('click', () => {
-        if (confirm.request('folio')) actions.buyFolio()
+        if (canFolioNow && confirm.request('folio')) actions.buyFolio()
       })
 
       barStudy = el('button', 'bar-btn', 'S')
       barStudy.type = 'button'
       barStudy.title = 'Take a study  (s)'
       barStudy.addEventListener('click', () => {
-        if (confirm.request('study')) actions.buyStudy()
+        if (canStudyNow && confirm.request('study')) actions.buyStudy()
       })
 
       // The whole opening of the game is this button. It sits in the middle of
@@ -174,15 +209,19 @@ export function tablePane(): Pane {
         // the row needing a separate bar underlining it.
         const bar = el('span', 'solid-fill')
         const barCan = el('span', 'solid-fill-can')
-        const step = el('span', 'solid-step', '')
+        // What it does on the left, what it costs on the right. The two used
+        // to be one centred string joined by a slash, which is a label that
+        // floats in the middle of whatever width the button happened to get
+        // and ellipsises itself when the cost grows.
         const buyLabel = el('span', 'solid-buy-label', '')
-        buy.append(bar, barCan, step, buyLabel)
+        const buyCost = el('span', 'solid-buy-cost', '')
+        buy.append(bar, barCan, buyLabel, buyCost)
         // Shift buys a single die, the way AD's shift+1-8 does.
         holdable(buy, (m) => actions.buySolid(def.idx, m.shift))
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, icon, face, mult, step, bar, barCan, amount, rate: flow, buy, buyLabel })
+        rows.push({ root: r, icon, face, mult, bar, barCan, amount, rate: flow, buy, buyLabel, buyCost })
       }
 
       const roll = el('div', 'section table-roll')
@@ -261,10 +300,10 @@ export function tablePane(): Pane {
       bindKey('space', () => actions.roll())
       bindKey('r', () => actions.buyRollRate())
       bindKey('s', () => {
-        if (confirm.request('study')) actions.buyStudy()
+        if (canStudyNow && confirm.request('study')) actions.buyStudy()
       })
       bindKey('f', () => {
-        if (confirm.request('folio')) actions.buyFolio()
+        if (canFolioNow && confirm.request('folio')) actions.buyFolio()
       })
       for (const def of SOLIDS) {
         bindKey(String(def.idx), (mods) => actions.buySolid(def.idx, mods.shift))
@@ -329,7 +368,7 @@ export function tablePane(): Pane {
       maxBtn.disabled = !canMax
       maxBtn.classList.toggle('buyable', canMax)
 
-      const canStudyNow = canBuyStudy(s)
+      canStudyNow = canBuyStudy(s)
       barStudy.disabled = !canStudyNow
       barStudy.classList.toggle('buyable', canStudyNow)
 
@@ -343,8 +382,10 @@ export function tablePane(): Pane {
         const mult = solidMultiplier(s, def.idx)
         setText(r.mult, `x${format(mult, n)}`)
 
+        // The group of ten reads as a rule along the bottom edge of the
+        // button now rather than as a number crammed in beside the label at
+        // 0.58rem. The exact count stays on the title for a desktop hover.
         const into = st.bought % 10
-        setText(r.step, `${into}/10`)
         const pct = `${into * 10}%`
         if (r.bar.style.width !== pct) r.bar.style.width = pct
         const affordable = canBuySolid(s, def.idx) ? buyCount(s, def.idx) : 0
@@ -381,7 +422,9 @@ export function tablePane(): Pane {
 
         const count = buyCount(s, def.idx)
         const price = buyPrice(s, def.idx)
-        setText(r.buyLabel, `BUY ${count} / ${format(price, n)}`)
+        setText(r.buyLabel, `BUY ${count}`)
+        setText(r.buyCost, format(price, n))
+        r.buy.title = `${into}/10 toward the next doubling`
         const can = canBuySolid(s, def.idx)
         r.buy.disabled = !can
         r.buy.classList.toggle('buyable', can)
@@ -389,7 +432,7 @@ export function tablePane(): Pane {
 
       setText(rollLine, `${format(new Decimal(rate), n)}/s`)
       const rc = rollCost(s)
-      setText(rollBtn, `FASTER / ${format(rc, n)} INK`)
+      duo(rollBtn, 'FASTER', `${format(rc, n)} INK`)
       const canRoll = canBuyRollRate(s)
       rollBtn.disabled = !canRoll
       rollBtn.classList.toggle('buyable', canRoll)
@@ -398,12 +441,8 @@ export function tablePane(): Pane {
       meltRow.hidden = !meltUnlocked(s)
       if (meltUnlocked(s)) {
         const can = canMelt(s)
-        setText(
-          meltBtn,
-          confirm.isArmed('melt')
-            ? 'SURE? THIS DESTROYS THE CHAIN'
-            : `MELT / x${format(meltGain(s), n)} ON ${SOLIDS[openSolids(s) - 1].short}`,
-        )
+        if (confirm.isArmed('melt')) duo(meltBtn, 'SURE? THIS DESTROYS THE CHAIN')
+        else duo(meltBtn, 'MELT', `x${format(meltGain(s), n)} ON ${SOLIDS[openSolids(s) - 1].short}`)
         meltBtn.disabled = !can
         meltBtn.classList.toggle('buyable', can)
       }
@@ -414,10 +453,8 @@ export function tablePane(): Pane {
 
       const sq = studyReq(s)
       setText(studyLine, `${s.studies}`)
-      setText(
-        studyBtn,
-        studyArmed ? 'SURE? THIS RESETS' : `STUDY / ${formatWhole(sq.need, n)} ${SOLIDS[sq.idx - 1].short}`,
-      )
+      if (studyArmed) duo(studyBtn, 'SURE? THIS RESETS')
+      else duo(studyBtn, 'STUDY', `${formatWhole(sq.need, n)} ${SOLIDS[sq.idx - 1].short}`)
       setText(barStudy, studyArmed ? '?' : 'S')
       const canStudy = canBuyStudy(s)
       studyBtn.disabled = !canStudy
@@ -427,18 +464,16 @@ export function tablePane(): Pane {
       folioLabel.hidden = !showFolio
       folioBtn.hidden = !showFolio
       barFolio.hidden = !showFolio
+      canFolioNow = showFolio && canBuyFolio(s)
       if (showFolio) {
-        const canFolioNow = canBuyFolio(s)
         barFolio.disabled = !canFolioNow
         barFolio.classList.toggle('buyable', canFolioNow)
       }
       if (showFolio) {
         const { idx, need } = folioReq(s)
         setText(folioLine, `${s.folios}`)
-        setText(
-          folioBtn,
-          folioArmed ? 'SURE? THIS RESETS' : `FOLIO / ${formatWhole(need, n)} ${SOLIDS[idx - 1].short}`,
-        )
+        if (folioArmed) duo(folioBtn, 'SURE? THIS RESETS')
+        else duo(folioBtn, 'FOLIO', `${formatWhole(need, n)} ${SOLIDS[idx - 1].short}`)
         setText(barFolio, folioArmed ? '?' : 'F')
         const canFolio = canBuyFolio(s)
         folioBtn.disabled = !canFolio

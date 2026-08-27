@@ -107,6 +107,29 @@ check('without counting the indicator twice',
   inset.tabsBarH <= 44 + 34 + 4, JSON.stringify(inset))
 check('the top bar clears the status bar', inset.barTextTop >= 47, JSON.stringify(inset))
 
+// In a browser tab the browser's own chrome sits below the viewport and has
+// already accounted for the gesture bar, so nothing extra is owed. The tokens
+// used safe-area-max-inset everywhere, which does not collapse when a toolbar
+// hides and therefore always reports the largest inset the browser could ever
+// apply. In a tab that reserved a band for a toolbar already on screen, and
+// the tab bar came out too tall on Android.
+//
+// Only the browser half is testable here. env() cannot be faked, so the
+// standalone branch needs hardware; what this pins is that the tokens are not
+// unconditionally the max variant.
+await ev(`document.documentElement.style.removeProperty('--safe-b')`)
+await ev(`document.documentElement.style.removeProperty('--safe-t')`)
+await sleep(150)
+const tabbed = await ev(`(() => {
+  const tabs = document.querySelector('.tabs').getBoundingClientRect()
+  const css = getComputedStyle(document.documentElement)
+  return { h: Math.round(tabs.height), safeB: css.getPropertyValue('--safe-b').trim() } })()`)
+check('a browser tab reserves no band under the tab bar',
+  tabbed.safeB === '0px' && tabbed.h <= 60, JSON.stringify(tabbed))
+await ev(`document.documentElement.style.setProperty('--safe-b', '34px')`)
+await ev(`document.documentElement.style.setProperty('--safe-t', '47px')`)
+await sleep(150)
+
 // Few enough tabs to fit, and they share the bar between them. Sizing each to
 // its own label left an early save with 60% of the bar empty.
 const early = await ev(`(() => {
@@ -165,16 +188,21 @@ const buys = await ev(`(() => {
   return rows.map(r => {
     const b = r.querySelector('.solid-buy').getBoundingClientRect()
     const l = r.querySelector('.solid-buy-label').getBoundingClientRect()
-    const c = r.querySelector('.solid-step').getBoundingClientRect()
+    const c = r.querySelector('.solid-buy-cost').getBoundingClientRect()
+    const rule = r.querySelector('.solid-fill').getBoundingClientRect()
     return {
       label: r.querySelector('.solid-buy-label').textContent,
+      cost: r.querySelector('.solid-buy-cost').textContent,
       sameLine: Math.abs((l.top + l.bottom) / 2 - (c.top + c.bottom) / 2) < 4,
-      overflows: l.right > b.right + 1 || l.left < b.left - 1,
-      collides: c.right > l.left + 1
+      overflows: c.right > b.right + 1 || l.left < b.left - 1,
+      collides: l.right > c.left + 1,
+      // The rule reads the group of ten along the bottom edge. Above the text
+      // it would be an underline through the label instead.
+      ruleAtBottom: b.bottom - rule.bottom <= 3 && rule.top > l.bottom
     }
   })
 })()`)
-check('the counter and the label share one line on every row',
+check('the label and the price share one line on every row',
   buys.length >= 8 && buys.every((r) => r.sameLine),
   JSON.stringify(buys.filter((r) => !r.sameLine).slice(0, 2)))
 // One long label used to widen its own button and step out of line with the
@@ -192,6 +220,9 @@ check('every buy button is the same width and starts at the same edge',
 check('and neither overflows the button nor runs into the other',
   buys.every((r) => !r.overflows && !r.collides),
   JSON.stringify(buys.filter((r) => r.overflows || r.collides).slice(0, 2)))
+check('the group-of-ten rule sits on the bottom edge, clear of the text',
+  buys.every((r) => r.ruleAtBottom),
+  JSON.stringify(buys.filter((r) => !r.ruleAtBottom).slice(0, 2)))
 
 // Back to the table, or every check below reads a hidden pane.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
