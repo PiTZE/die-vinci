@@ -224,6 +224,39 @@ check('the group-of-ten rule sits on the bottom edge, clear of the text',
   buys.every((r) => r.ruleAtBottom),
   JSON.stringify(buys.filter((r) => !r.ruleAtBottom).slice(0, 2)))
 
+// FOLIO and STUDY share one header, and with nothing between them the pair
+// read as one sentence: "FOLIO 1 STUDY 8". The divider has to land on the same
+// line as the gap between the two buttons under it, or it looks like a third
+// thing rather than the split between two.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 8; s.folios = 1; s.stats.foliosEver = 1
+  s.solids.forEach(d => { d.amount = new D('1e12'); d.bought = 20 }) })()`)
+await sleep(200)
+const head = await ev(`(() => {
+  const h = document.querySelector('.reset-head')
+  const halves = [...h.querySelectorAll('.reset-half')].filter(x => !x.hidden)
+  const row = [...document.querySelectorAll('.row')]
+    .find(r => [...r.querySelectorAll('.action')].filter(b => !b.hidden).length === 2)
+  if (!row || halves.length !== 2) return { skip: true, halves: halves.length, row: !!row }
+  const b = [...row.querySelectorAll('.action')].filter(x => !x.hidden).map(x => x.getBoundingClientRect())
+  const hb = h.getBoundingClientRect()
+  return {
+    off: Math.abs((hb.left + hb.width / 2) - (b[0].right + b[1].left) / 2),
+    widths: halves.map(x => Math.round(x.getBoundingClientRect().width)),
+    btns: b.map(x => Math.round(x.width)),
+    alone: h.classList.contains('alone'),
+  } })()`)
+check('the folio and study readouts split on the same line as their buttons',
+  !head.skip && head.off <= 1 && head.widths[0] === head.btns[0] && head.alone === false,
+  JSON.stringify(head))
+// And with no folio yet there is only one readout, so nothing to divide.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 0; s.folios = 0; s.stats.foliosEver = 0
+  s.solids.forEach(d => { d.amount = new D(0); d.bought = 0 }) })()`)
+await sleep(200)
+check('and the divider is gone before folios exist',
+  (await ev(`document.querySelector('.reset-head').classList.contains('alone')`)) === true)
+
 // Back to the table, or every check below reads a hidden pane.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
 await sleep(150)

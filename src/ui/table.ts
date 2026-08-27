@@ -100,6 +100,7 @@ export function tablePane(): Pane {
   let rollBtn: HTMLButtonElement
   let studyBtn: HTMLButtonElement
   let studyLine: HTMLElement
+  let resetHead: HTMLElement
   let folioLabel: HTMLElement
   let folioBtn: HTMLButtonElement
   let folioLine: HTMLElement
@@ -241,7 +242,7 @@ export function tablePane(): Pane {
       // Folio and study share one section, folio on the left because it is
       // the deeper reset. Before folios are unlocked, study has it to itself.
       const resets = el('div', 'section')
-      const resetHead = el('div', 'section-head reset-head')
+      resetHead = el('div', 'section-head reset-head')
 
       folioLabel = el('span', 'reset-half')
       folioLine = el('span', 'num dim', '')
@@ -462,6 +463,9 @@ export function tablePane(): Pane {
 
       const showFolio = folioUnlocked(s)
       folioLabel.hidden = !showFolio
+      // With folio hidden, study has the header to itself and there is nothing
+      // for the rule down the middle to divide.
+      resetHead.classList.toggle('alone', !showFolio)
       folioBtn.hidden = !showFolio
       barFolio.hidden = !showFolio
       canFolioNow = showFolio && canBuyFolio(s)

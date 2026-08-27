@@ -496,16 +496,42 @@
   gap: 0;
 }
 
+/* Two readouts in one header. Without a divider, FOLIO's count sat right up
+   against the word STUDY and "FOLIO 1 STUDY 8" read as one sentence with
+   "1 STUDY" in the middle of it.
+
+   The header takes the same 10px gap and the same 10px side padding as the row
+   of buttons under it, so its two halves come out exactly as wide as the two
+   buttons. That puts the centre line in the same place for both, and the rule
+   is drawn there rather than on a half's edge: a border sits at the start of
+   the second half, which is the far side of the gap, not the middle of it. */
+.reset-head {
+  position: relative;
+  gap: 10px;
+}
+
+.reset-head::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  bottom: 5px;
+  width: 1px;
+  background: var(--border-faint);
+}
+
+/* Before folios are unlocked, study has the header to itself, and a rule down
+   the middle of it divides nothing. */
+.reset-head.alone::after {
+  display: none;
+}
+
 .reset-half {
   display: flex;
   flex: 1 1 0;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-}
-
-.reset-half + .reset-half {
-  padding-left: 10px;
 }
 
 /* -- the wager and its points grid --------------------------------------- */
