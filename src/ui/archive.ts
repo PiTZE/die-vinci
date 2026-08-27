@@ -1,10 +1,11 @@
-import { ACHIEVEMENTS, visibleAchievements } from '../game/achievements'
+import { ACHIEVEMENTS, achievementPower, visibleAchievements } from '../game/achievements'
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
 import { seal, unseal } from './redact'
 
 export function archivePane(): Pane {
   let head: HTMLElement
+  let payLine: HTMLElement
   let sealed: HTMLElement
   const cells = new Map<string, { cell: HTMLElement; name: HTMLElement; note: HTMLElement }>()
 
@@ -19,6 +20,12 @@ export function archivePane(): Pane {
       head = el('span', 'num dim', '')
       h.appendChild(head)
       section.appendChild(h)
+
+      // What the set is worth, stated where Antimatter Dimensions states it:
+      // at the top of the tab, before the grid. An entry you have earned is
+      // worth something, so the tab has to say so somewhere.
+      payLine = el('div', 'archive-pay', '')
+      section.appendChild(payLine)
 
       const grid = el('div', 'archive-grid')
       for (const a of ACHIEVEMENTS) {
@@ -39,6 +46,12 @@ export function archivePane(): Pane {
       const got = s.achievements.length
       const want = `${got}/${ACHIEVEMENTS.length}`
       if (head.textContent !== want) head.textContent = want
+
+      // Never large enough to need Decimal formatting: thirty-one entries at
+      // x1.03 each is about x2.5, so three places is the whole story and the
+      // third one is where a single new entry shows up.
+      const pay = `every solid x${achievementPower(s).toNumber().toFixed(3)}`
+      if (payLine.textContent !== pay) payLine.textContent = pay
 
       // Entries about systems the player has not met yet stay out of sight.
       // The count still says how many there are in total, so nothing is

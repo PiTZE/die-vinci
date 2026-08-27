@@ -271,19 +271,19 @@ const tint = await ev(`(() => {
   const rows = [...document.querySelectorAll('.solid')].filter(r => !r.hidden)
   const read = (r) => {
     const b = r.querySelector('.solid-buy')
-    return { afford: r.classList.contains('affordable'),
-      tinted: cs(r).backgroundColor !== 'rgba(0, 0, 0, 0)',
-      accentBorder: cs(b).borderTopColor === cs(document.documentElement).getPropertyValue('--accent').trim(),
+    return { afford: b.classList.contains('buyable'),
+      rowTinted: cs(r).backgroundColor !== 'rgba(0, 0, 0, 0)',
+      btnFilled: cs(b).backgroundColor !== 'rgba(0, 0, 0, 0)',
       cover: parseFloat(b.querySelector('.solid-cover').style.width) || 0 }
   }
   const all = rows.map(read)
   return { yes: all.filter(r => r.afford), no: all.filter(r => !r.afford) } })()`)
-check('an affordable row is tinted and an unaffordable one is not',
+check('an affordable buy button is filled and an unaffordable one is not',
   tint.yes.length > 0 && tint.no.length > 0 &&
-    tint.yes.every((r) => r.tinted) && tint.no.every((r) => !r.tinted),
+    tint.yes.every((r) => r.btnFilled) && tint.no.every((r) => !r.btnFilled),
   JSON.stringify({ yes: tint.yes.length, no: tint.no.length }))
-check('and no buy button wears the accent on its border',
-  [...tint.yes, ...tint.no].every((r) => !r.accentBorder))
+check('and the row around it is never tinted',
+  [...tint.yes, ...tint.no].every((r) => !r.rowTinted))
 // The cost fill answers "how close am I", measured in exponents. A plain ratio
 // reads 0 for almost the whole wait, because the chain steps by orders of
 // magnitude: 1e17 against 1e25 is 0.000003%.

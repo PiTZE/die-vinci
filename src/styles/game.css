@@ -264,19 +264,14 @@
   background: linear-gradient(to right, var(--fill) 0%, var(--fill) 78%, transparent 100%);
 }
 
-/* Affordable and unbought, the one thing the accent means. On the row rather
-   than on the button's border: nine outlined rectangles compete with each
-   other and with the table's own borders, where a tint is read as a state.
-   Mixed from --accent rather than given its own token, so there is one value
-   to keep right instead of the same colour written into both palettes. */
-.solid.affordable {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-
-/* So the button keeps a neutral outline whatever it can afford. The accent it
-   still carries is on the word BUY, which is one word rather than a rectangle. */
+/* Affordable and unbought: the button fills with the accent, the way Antimatter
+   Dimensions fills its cost button. The row around it stays as it is. A wash
+   across the whole row was tried for one build and was wrong: late in a run
+   eight rows of nine are affordable at once, so the tint covered most of the
+   table and marked nothing. The button is the thing you press, so the button is
+   the thing that lights up. */
 .solid-buy.buyable {
-  border-color: var(--border);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 /* Owned of this group of ten, then how many more the ink covers, carrying on
@@ -615,6 +610,97 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* One button per setting: its name above its current value, pressed to move to
+   the next. Sized so a phone gets two columns and a desktop four or five, which
+   is the whole point of the shape. */
+.opt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  padding: 7px 10px;
+  text-align: left;
+}
+
+.opt-name {
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-muted);
+}
+
+.opt-value {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.opt:disabled .opt-value {
+  color: var(--fg-muted);
+}
+
+/* Label left, value right, the same grammar as a buy button and a section
+   header. Shared by STATS and ABOUT, because two tabs inventing two ways to
+   print a name and a number is two chances to drift. */
+.kv-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.kv-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-faint);
+  font-size: 0.68rem;
+}
+
+.kv-row:last-child {
+  border-bottom: 0;
+}
+
+.kv-label {
+  flex: 0 0 auto;
+  letter-spacing: 0.1em;
+  color: var(--fg-muted);
+}
+
+.kv-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one line of prose the game allows itself. */
+.kv-note {
+  padding: 9px 10px;
+  font-size: 0.68rem;
+  color: var(--fg-muted);
+}
+
+.kv-link {
+  color: var(--fg-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.kv-link:hover,
+.kv-link:focus-visible {
+  color: var(--accent);
+}
+
 /* -- the wager and its points grid --------------------------------------- */
 
 .wager-bar {
@@ -815,9 +901,21 @@
 
 /* -- the Conquestion Archive --------------------------------------------- */
 
+/* What the whole set pays, above the grid, where Antimatter Dimensions puts
+   the same line. */
+.archive-pay {
+  padding: 8px 10px 0;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Denser than two columns: thirty-one entries in a two-wide list is a page you
+   scroll rather than a set you can see the shape of. */
 .archive-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
   gap: 8px;
   padding: 10px;
 }
@@ -826,16 +924,24 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-height: 60px;
-  padding: 7px 8px;
+  min-height: 56px;
+  padding: 7px 9px;
   border: 1px solid var(--border-faint);
-  opacity: 0.4;
+  /* Unearned is dim but legible. At 0.4 the whole grid read as switched off,
+     which is the wrong impression: most of it is things you will get. */
+  opacity: 0.55;
 }
 
+/* Earned wears the accent, the one thing it means everywhere else in the game:
+   this one is yours. */
 .archive-cell.bought {
   opacity: 1;
-  border-color: var(--border-mid);
-  background: var(--fill);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.archive-cell.bought .archive-name {
+  color: var(--accent);
 }
 
 .archive-name {

@@ -49,17 +49,57 @@ async function paste(inBox: string): Promise<string> {
   }
 }
 
+function setText(n: HTMLElement, v: string): void {
+  if (n.textContent !== v) n.textContent = v
+}
+
+interface Cycle {
+  root: HTMLButtonElement
+  sync(s: GameState): void
+}
+
+/**
+ * One setting, one button: its name above its current value, and a press moves
+ * to the next value.
+ *
+ * Antimatter Dimensions' options screen is built this way, and it is why twenty
+ * settings fit on a phone. A row of buttons per setting, one per choice, is
+ * honest about what the choices are and costs a whole band of screen each:
+ * THEME alone was 1500px by 80px to hold two words. Thirteen of those is a
+ * screen you scroll through looking for the one you wanted.
+ */
+function cycler<T>(
+  name: string,
+  choices: readonly { id: T; label: string }[],
+  read: (s: GameState) => T,
+  write: (v: T) => void,
+): Cycle {
+  const root = el('button', 'opt') as HTMLButtonElement
+  root.type = 'button'
+  const value = el('span', 'opt-value', '')
+  root.append(el('span', 'opt-name', name), value)
+  let at: T | undefined
+  root.addEventListener('click', () => {
+    if (root.disabled) return
+    const i = choices.findIndex((c) => c.id === at)
+    write(choices[(i + 1) % choices.length].id)
+  })
+  return {
+    root,
+    sync(s) {
+      at = read(s)
+      const c = choices.find((x) => x.id === at)
+      setText(value, c ? c.label : '?')
+    },
+  }
+}
+
 export function optionsPane(): Pane {
-  let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
-  let thoughtBtns: { id: number; btn: HTMLButtonElement }[] = []
-  let soundBtns: { on: boolean; btn: HTMLButtonElement }[] = []
-  let fullBtns: { on: boolean; btn: HTMLButtonElement }[] = []
-  let fullSection: HTMLElement
-  let themeBtns: { id: string; btn: HTMLButtonElement }[] = []
-  let confirmBtns: { key: string; btn: HTMLButtonElement }[] = []
-  let currentConfirms: Record<string, boolean> = {}
-  let tickBtns: { n: number; btn: HTMLButtonElement }[] = []
-  let offlineBtns: { on: boolean; btn: HTMLButtonElement }[] = []
+  const cycles: Cycle[] = []
+  let fullCycle: Cycle
+  let tickCycle: Cycle
+  /** The last state update() saw, so paintTheme can resync outside the loop. */
+  let shown: GameState
   let io: HTMLTextAreaElement
   let status: HTMLElement
 
@@ -68,88 +108,91 @@ export function optionsPane(): Pane {
     label: 'OPTIONS',
 
     mount(root, actions: Actions) {
-      const theme = el('div', 'section')
-      const th = el('div', 'section-head')
-      th.appendChild(el('span', 'grow', 'THEME'))
-      theme.appendChild(th)
-      const themeRow = el('div', 'row')
-      for (const t of themes()) {
-        const b = el('button', 'action', t.label)
-        b.type = 'button'
-        b.addEventListener('click', () => {
-          applyTheme(t.id)
+      // Every setting that is a choice between a handful of values, one
+      // button each, in a grid. What used to be thirteen stacked bands of
+      // full-width buttons is now one screen you can read.
+      const settings = el('div', 'section')
+      const setHead = el('div', 'section-head')
+      setHead.appendChild(el('span', 'grow', 'SETTINGS'))
+      settings.appendChild(setHead)
+      const grid = el('div', 'opt-grid')
+      settings.appendChild(grid)
+
+      const add = (c: Cycle) => {
+        cycles.push(c)
+        grid.appendChild(c.root)
+        return c
+      }
+
+      // Theme lives outside the save, so it reads from the registry rather
+      // than from the state the other settings come from.
+      add(cycler(
+        'THEME',
+        themes().map((t) => ({ id: t.id, label: t.label })),
+        () => currentTheme().id,
+        (id) => {
+          applyTheme(id)
           paintTheme()
-        })
-        themeBtns.push({ id: t.id, btn: b })
-        themeRow.appendChild(b)
-      }
-      theme.appendChild(themeRow)
-
-      const notation = el('div', 'section')
-      const nh = el('div', 'section-head')
-      nh.appendChild(el('span', 'grow', 'NOTATION'))
-      notation.appendChild(nh)
-      const nRow = el('div', 'row')
-      for (const n of NOTATIONS) {
-        const b = el('button', 'action', n.label)
-        b.type = 'button'
-        b.addEventListener('click', () => actions.setNotation(n.id))
-        notationBtns.push({ id: n.id, btn: b })
-        nRow.appendChild(b)
-      }
-      notation.appendChild(nRow)
-
-      // How fast Vinci's Thoughts crawls past. Still is the old behaviour,
-      // one line held for twenty seconds.
-      const thoughts = el('div', 'section')
-      const tickerHead = el('div', 'section-head')
-      tickerHead.appendChild(el('span', 'grow', "VINCI'S THOUGHTS"))
-      thoughts.appendChild(tickerHead)
-      const tRow = el('div', 'row')
-      for (const t of THOUGHT_SPEEDS) {
-        const b = el('button', 'action', t.label)
-        b.type = 'button'
-        b.addEventListener('click', () => actions.setThoughtSpeed(t.id))
-        thoughtBtns.push({ id: t.id, btn: b })
-        tRow.appendChild(b)
-      }
-      thoughts.appendChild(tRow)
-
-      const sound = el('div', 'section')
-      const soundHead = el('div', 'section-head')
-      soundHead.appendChild(el('span', 'grow', 'SOUND'))
-      sound.appendChild(soundHead)
-      const soundRow = el('div', 'row')
-      const soundOn = el('button', 'action', 'ON')
-      const soundOff = el('button', 'action', 'OFF')
-      for (const [b, on] of [[soundOn, true], [soundOff, false]] as const) {
-        b.type = 'button'
-        b.addEventListener('click', () => actions.setSound(on))
-        soundBtns.push({ on, btn: b })
-        soundRow.appendChild(b)
-      }
-      sound.appendChild(soundRow)
-
+        },
+      ))
+      add(cycler('NOTATION', NOTATIONS, (s) => s.options.notation, (id) => actions.setNotation(id)))
+      add(cycler(
+        'THOUGHTS',
+        THOUGHT_SPEEDS,
+        (s) => s.options.thoughtSpeed,
+        (id) => actions.setThoughtSpeed(id),
+      ))
+      add(cycler(
+        'SOUND',
+        [{ id: true, label: 'ON' }, { id: false, label: 'OFF' }],
+        (s) => s.options.sound,
+        (on) => actions.setSound(on),
+      ))
       // Hidden where the browser has no Fullscreen API, which is every iPhone.
       // A switch that cannot do anything is worse than no switch.
-      fullSection = el('div', 'section')
-      const fh = el('div', 'section-head')
-      fh.appendChild(el('span', 'grow', 'FULLSCREEN'))
-      fullSection.appendChild(fh)
-      const fullRow = el('div', 'row')
-      const fullOn = el('button', 'action', 'ON')
-      const fullOff = el('button', 'action', 'OFF')
-      for (const [b, on] of [[fullOn, true], [fullOff, false]] as const) {
-        b.type = 'button'
-        b.addEventListener('click', () => actions.setFullscreen(on))
-        fullBtns.push({ on, btn: b })
-        fullRow.appendChild(b)
-      }
-      fullSection.appendChild(fullRow)
-      fullSection.hidden = !fullscreenSupported()
+      fullCycle = add(cycler(
+        'FULLSCREEN',
+        [{ id: true, label: 'ON' }, { id: false, label: 'OFF' }],
+        (s) => s.options.fullscreen,
+        (on) => actions.setFullscreen(on),
+      ))
+      fullCycle.root.hidden = !fullscreenSupported()
       // Escape and some navigations drop out of fullscreen without asking, so
       // the switch follows the browser rather than the saved preference.
       onFullscreenChange(() => actions.setFullscreen(isFullscreen(), true))
+
+      add(cycler(
+        'AWAY PROGRESS',
+        [{ id: true, label: 'ON' }, { id: false, label: 'OFF' }],
+        (s) => s.options.offline,
+        (on) => actions.setOffline(on),
+      ))
+      tickCycle = add(cycler(
+        'AWAY TICKS',
+        OFFLINE_TICK_CHOICES.map((n) => ({ id: n, label: `${n}` })),
+        (s) => s.options.offlineTicks,
+        (n) => actions.setOfflineTicks(n),
+      ))
+
+      // Each channel keeps its own save, so this navigates rather than setting
+      // anything. Pressing it moves to the other build.
+      add(cycler(
+        'CHANNEL',
+        Object.keys(CHANNEL_PATHS).map((name) => ({ id: name, label: name.toUpperCase() })),
+        () => __CHANNEL__,
+        (name) => {
+          if (name !== __CHANNEL__) location.href = CHANNEL_PATHS[name as keyof typeof CHANNEL_PATHS]
+        },
+      ))
+
+      for (const c of CONFIRM_KEYS) {
+        add(cycler(
+          c.label.toUpperCase(),
+          [{ id: true, label: 'CONFIRM' }, { id: false, label: 'STRAIGHT' }],
+          (s) => s.options.confirms[c.key] !== false,
+          (on) => actions.setConfirm(c.key, on),
+        ))
+      }
 
       const save = el('div', 'section')
       const sh = el('div', 'section-head')
@@ -348,69 +391,6 @@ export function optionsPane(): Pane {
       paintInstall()
       onInstallChange(paintInstall)
 
-      const offline = el('div', 'section')
-      const oh = el('div', 'section-head')
-      oh.appendChild(el('span', 'grow', 'AWAY PROGRESS'))
-      offline.appendChild(oh)
-      const onRow = el('div', 'row')
-      const onBtn = el('button', 'action', 'ON')
-      const offBtn = el('button', 'action', 'OFF')
-      for (const [b, on] of [[onBtn, true], [offBtn, false]] as const) {
-        b.type = 'button'
-        b.addEventListener('click', () => actions.setOffline(on))
-        offlineBtns.push({ on, btn: b })
-        onRow.appendChild(b)
-      }
-      offline.appendChild(onRow)
-      const tickRow = el('div', 'row')
-      for (const n of OFFLINE_TICK_CHOICES) {
-        const b = el('button', 'action', `${n}`)
-        b.type = 'button'
-        b.addEventListener('click', () => actions.setOfflineTicks(n))
-        tickBtns.push({ n, btn: b })
-        tickRow.appendChild(b)
-      }
-      offline.appendChild(tickRow)
-      offline.appendChild(el('div', 'empty', 'ticks to simulate a long absence in'))
-
-      // One switch per action, as AD's confirmation-types.js has.
-      const confirmSec = el('div', 'section')
-      const cfh = el('div', 'section-head')
-      cfh.appendChild(el('span', 'grow', 'CONFIRM BEFORE'))
-      confirmSec.appendChild(cfh)
-      for (const c of CONFIRM_KEYS) {
-        const row = el('div', 'row')
-        row.appendChild(el('span', 'grow dim', c.label))
-        const on = el('button', 'auto-toggle', 'ON')
-        on.type = 'button'
-        on.addEventListener('click', () =>
-          actions.setConfirm(c.key, !(currentConfirms[c.key] !== false)),
-        )
-        row.appendChild(on)
-        confirmBtns.push({ key: c.key, btn: on })
-        confirmSec.appendChild(row)
-      }
-
-      const channel = el('div', 'section')
-      const ch = el('div', 'section-head')
-      ch.appendChild(el('span', 'grow', 'CHANNEL'))
-      channel.appendChild(ch)
-      const chRow = el('div', 'row')
-      for (const [name, path] of Object.entries(CHANNEL_PATHS)) {
-        const b = el('button', 'action', name.toUpperCase())
-        b.type = 'button'
-        b.classList.toggle('buyable', name === __CHANNEL__)
-        b.addEventListener('click', () => {
-          if (name === __CHANNEL__) return
-          location.href = path
-        })
-        chRow.appendChild(b)
-      }
-      channel.appendChild(chRow)
-      channel.appendChild(
-        el('div', 'empty', 'each channel keeps its own save'),
-      )
-
       // Three slots, as AD has. Switching saves the one you are on first.
       const slots = el('div', 'section')
       const slh = el('div', 'section-head')
@@ -481,67 +461,27 @@ export function optionsPane(): Pane {
       paintBackups()
       setInterval(paintBackups, 5_000)
 
-      const about = el('div', 'section')
-      const ah = el('div', 'section-head')
-      ah.appendChild(el('span', 'grow', 'VERSION'))
-      ah.appendChild(el('span', 'num', __VERSION__))
-      about.appendChild(ah)
-      const buildRow = el('div', 'row')
-      buildRow.appendChild(el('span', 'grow dim', 'BUILD'))
-      buildRow.appendChild(el('span', 'num dim', __BUILD_ID__))
-      about.appendChild(buildRow)
-
-      root.append(
-        theme,
-        notation,
-        thoughts,
-        sound,
-        fullSection,
-        install,
-        offline,
-        confirmSec,
-        channel,
-        slots,
-        save,
-        backups,
-        about,
-      )
+      root.append(settings, install, slots, save, backups)
       paintTheme()
 
       function say(msg: string) {
         status.textContent = msg
         status.hidden = !msg
       }
+      // The theme cycler reads the registry rather than the save, so applying
+      // one has to push the new value back into the button itself.
       function paintTheme() {
-        const now = currentTheme().id
-        for (const t of themeBtns) t.btn.classList.toggle('buyable', t.id === now)
+        // Guarded: mount calls this before the first update, so there is no
+        // state to read yet and the next tick will sync everything anyway.
+        if (shown) for (const c of cycles) c.sync(shown)
       }
     },
 
     update(s: GameState) {
-      for (const b of fullBtns) {
-        b.btn.classList.toggle('buyable', b.on === s.options.fullscreen)
-      }
-      for (const b of soundBtns) {
-        b.btn.classList.toggle('buyable', b.on === s.options.sound)
-      }
-      for (const t of thoughtBtns) {
-        t.btn.classList.toggle('buyable', t.id === s.options.thoughtSpeed)
-      }
-      for (const n of notationBtns) {
-        n.btn.classList.toggle('buyable', n.id === s.options.notation)
-      }
-      for (const o of offlineBtns) o.btn.classList.toggle('buyable', o.on === s.options.offline)
-      currentConfirms = s.options.confirms
-      for (const c of confirmBtns) {
-        const on = s.options.confirms[c.key] !== false
-        c.btn.textContent = on ? 'ON' : 'OFF'
-        c.btn.classList.toggle('buyable', on)
-      }
-      for (const t of tickBtns) {
-        t.btn.classList.toggle('buyable', t.n === s.options.offlineTicks)
-        t.btn.disabled = !s.options.offline
-      }
+      shown = s
+      for (const c of cycles) c.sync(s)
+      // The tick count only means anything while away progress is on.
+      tickCycle.root.disabled = !s.options.offline
     },
   }
 }

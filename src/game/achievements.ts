@@ -4,6 +4,7 @@
 // eight, each a condition checked every tick and permanent once met. Some carry
 // a small reward. This is a smaller set of the same idea, named after the
 // notebooks rather than the genre.
+import Decimal from 'break_infinity.js'
 import type { GameState } from '../state'
 import { SOLID_COUNT } from './solids'
 import { AUTOBUYERS } from './autobuyers'
@@ -146,4 +147,20 @@ export function visibleAchievements(s: GameState): AchievementDef[] {
 
 export function byId(id: string): AchievementDef | undefined {
   return ACHIEVEMENTS.find((a) => a.id === id)
+}
+
+
+/**
+ * What the archive pays.
+ *
+ * Antimatter Dimensions gives x1.03 per achievement to every dimension, and
+ * they compound, so the whole set is 1.03^n. Their own achievements tab prints
+ * it as the header: one earned reads x1.030. Thirty-one entries here come to
+ * about x2.5 over a full run, which is a nudge rather than a lever, and that is
+ * what it is for. The entries are things you were going to do anyway.
+ */
+export const ACHIEVEMENT_STEP = 1.03
+
+export function achievementPower(s: GameState): Decimal {
+  return new Decimal(ACHIEVEMENT_STEP).pow(s.achievements.length)
 }

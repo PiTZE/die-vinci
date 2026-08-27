@@ -26,7 +26,9 @@ export type TabId =
   | 'tarot'
   | 'automation'
   | 'archive'
+  | 'stats'
   | 'options'
+  | 'about'
   | 'help'
 
 export interface GameState {

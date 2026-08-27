@@ -32,6 +32,7 @@ import { unlockedSolids, type GameState } from '../state'
 import { restrictions } from './challenges'
 import { runAutobuyers } from './autobuyers'
 import { levelOf, modifiers } from './tarot'
+import { achievementPower } from './achievements'
 
 /**
  * A study's multiplier reaches down the chain rather than across all of it.
@@ -64,6 +65,8 @@ export function solidMultiplier(s: GameState, idx: number): Decimal {
     .times(runMultiplier(s))
     .times(pairMultiplier(s, idx))
     .times(unspentMultiplier(s, idx))
+    // The archive pays, the way Antimatter Dimensions' achievements do.
+    .times(achievementPower(s))
   // XI Strength reshapes the multiplier rather than adding to it, so it
   // compounds with everything above instead of sitting beside it.
   if (m.solidExp !== 1) out = out.pow(m.solidExp)

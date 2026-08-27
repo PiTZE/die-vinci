@@ -55,7 +55,10 @@ import { tarotPane } from './ui/tarot'
 import { wagerPane } from './ui/wager'
 import { challengesPane } from './ui/challenges'
 import { automationPane } from './ui/automation'
+import { aboutPane } from './ui/about'
+import { achievementPower } from './game/achievements'
 import { archivePane } from './ui/archive'
+import { statsPane } from './ui/stats'
 import { helpPane } from './ui/help'
 import { applyTheme, currentTheme } from './ui/theme'
 import { trackViewport } from './ui/viewport'
@@ -352,7 +355,9 @@ shell.build(
     tarotPane(),
     automationPane(),
     archivePane(),
+    statsPane(),
     optionsPane(),
+    aboutPane(),
     helpPane(),
   ],
   // A pending first draft wins over the remembered tab, so closing the game
@@ -510,6 +515,10 @@ const hook: Record<string, unknown> = {
     buyFolio: () => buyFolio(st),
   }),
   weightOf,
+  // What the archive is currently paying, so a test checking the face maths
+  // can divide it back out instead of fighting it. The entries are re-earned
+  // every tick, so a test cannot simply clear them.
+  achievementPower: (st: GameState) => achievementPower(st),
   // Whether the folio section shows at all, so a test can prove that binding
   // one does not hide it.
   folioUnlocked,

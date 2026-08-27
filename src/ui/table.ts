@@ -452,11 +452,8 @@ export function tablePane(): Pane {
         const can = canBuySolid(s, def.idx)
         r.buy.disabled = !can
         r.buy.classList.toggle('buyable', can)
-        // Affordability moved off the button's border and onto the row, so
-        // nine of them read as states rather than as nine outlined rectangles.
-        r.root.classList.toggle('affordable', can)
-        // And once the row says it, the cover has nothing left to add, so it
-        // only draws while the price is still out of reach.
+        // The cover answers "how close am I", so it has nothing to say once the
+        // answer is "you can buy it now".
         const covered = can ? '0%' : `${(affordFraction(s, def.idx) * 100).toFixed(1)}%`
         if (r.cover.style.width !== covered) r.cover.style.width = covered
       }

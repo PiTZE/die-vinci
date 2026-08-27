@@ -93,7 +93,9 @@ const landed = await ev(`({
 })`)
 check('the roll lands and pays', Number(landed.ink) > Number(stillIdle), `${stillIdle} -> ${landed.ink}`)
 check('the d4 shows a face of 1 to 4', landed.face >= 1 && landed.face <= 4, `rolled ${landed.face}`)
-check('and pays count times face', Number(landed.ink) === landed.face,
+const archivePay = await ev(`window.LD.achievementPower(window.LD.state).toNumber()`)
+check('and pays count times face',
+  Math.abs(Number(landed.ink) / archivePay - landed.face) < 1e-9,
   `1 d4 rolled ${landed.face}, paid ${landed.ink}`)
 check('and the number is drawn on the die', landed.shown === String(landed.face), landed.shown)
 check('the dice come to rest', landed.spinning === false)
@@ -105,8 +107,11 @@ await ev(`for (let i = 0; i < 20; i++) ${ROLL}.click()`)
 await sleep(1300)
 const afterMash = await ev(`window.LD.state.ink.toString()`)
 const gained = Number(afterMash) - Number(beforeMash)
-// One roll of N d4 can pay at most 4N: the die's highest face.
-const oneRollMax = Number(await ev(`window.LD.state.solids[0].amount.toString()`)) * 4 + 0.001
+// One roll of N d4 can pay at most 4N: the die's highest face, times whatever
+// the archive is paying by now. Its entries are re-earned every tick, so the
+// ceiling has to be computed rather than written down.
+const oneRollMax = Number(await ev(`window.LD.state.solids[0].amount.toString()`))
+  * 4 * (await ev(`window.LD.achievementPower(window.LD.state).toNumber()`)) + 0.001
 check('mashing cannot beat the roll rate', gained <= oneRollMax,
   `gained ${gained.toFixed(3)}, one roll caps at ${oneRollMax.toFixed(3)}`)
 
@@ -366,8 +371,12 @@ const manual = await ev(`({ bar: document.querySelector('.res-rate').textContent
   row: document.querySelector('.solid-rate').textContent })`)
 check('before the automator the readouts are per roll',
   /per roll$/.test(manual.bar) && /\/roll$/.test(manual.row), JSON.stringify(manual))
+// Four d4 average 2.5 a face, so ten a roll before anything multiplies it. The
+// archive does multiply it, and its entries are re-earned every tick, so the
+// expected number is computed rather than written down.
+const pay4 = await ev(`window.LD.achievementPower(window.LD.state).toNumber()`)
 check('and a d4 you own four of pays its average, ten a roll',
-  manual.bar.startsWith('10'), manual.bar)
+  Math.abs(parseFloat(manual.bar) / pay4 - 10) < 0.05, `${manual.bar} against x${pay4.toFixed(3)}`)
 
 await ev(`window.LD.state.autoRoll = true`); await sleep(150)
 const rolling = await ev(`({ bar: document.querySelector('.res-rate').textContent,
