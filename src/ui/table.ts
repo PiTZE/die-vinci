@@ -408,9 +408,37 @@ export function tablePane(): Pane {
 
       for (const def of SOLIDS) {
         const r = rows[def.idx - 1]
-        const shown = def.idx <= open
+        // Every solid you have ever opened stays on the table. A reset drops
+        // the chain back to one row, and the rest used to vanish with it, so
+        // twenty minutes of building disappeared each time you took a study.
+        // They stay, dimmed, with what they need written where their rate goes.
+        const shown = def.idx <= Math.max(open, s.stats.solidsEver ?? 0)
         r.root.hidden = !shown
         if (!shown) continue
+        const locked = def.idx > open
+        r.root.classList.toggle('locked', locked)
+        if (locked) {
+          setText(r.mult, '')
+          setText(r.amount, '')
+          setText(r.face, '')
+          setDieRolling(r.icon, false)
+          for (const b of r.blocks) b.classList.remove('on')
+          // The next one along has a real number to give. The ones past it are
+          // a count of studies, because their requirement depends on solids
+          // that do not exist yet and any figure would be invented.
+          const away = def.idx - open
+          if (away === 1) {
+            const q = studyReq(s)
+            setText(r.rate, `${formatWhole(q.need, n)} ${SOLIDS[q.idx - 1].short} opens this`)
+          } else {
+            setText(r.rate, `${away} studies away`)
+          }
+          setText(r.buyLabel, 'LOCKED')
+          setText(r.buyCost, '')
+          r.buy.disabled = true
+          r.buy.classList.remove('buyable')
+          continue
+        }
 
         const st = s.solids[def.idx - 1]
         const mult = solidMultiplier(s, def.idx)

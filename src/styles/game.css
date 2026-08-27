@@ -191,6 +191,12 @@
   border-bottom: 0;
 }
 
+/* Opened once, not open now. Dim like anything else you do not currently have,
+   and the wireframe holds still because there is nothing on it to throw. */
+.solid.locked {
+  opacity: 0.5;
+}
+
 .solid-icon {
   grid-area: icon;
   width: 32px;

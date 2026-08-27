@@ -701,6 +701,10 @@ export function tick(s: GameState, dt: number, now: number): void {
   s.stats.playMs += dt * 1000
   s.stats.wagerMs += dt * 1000
   s.stats.sinceResetMs += dt * 1000
+  // The high-water mark the table keeps its shape by. Raised here rather than
+  // where a study is bought, so a save written before this field existed picks
+  // up its real value on the first tick instead of claiming one solid.
+  s.stats.solidsEver = Math.max(s.stats.solidsEver ?? 0, unlockedSolids(s))
 
   // Everything stops at the threshold, dice included. Letting the chain run on
   // past it would only be counting into a number the game has already declared

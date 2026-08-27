@@ -318,6 +318,38 @@ check('the table shows how far through the run you are',
   run.hidden === false && /\d/.test(run.label) && run.fill > 0 && run.fill < 100,
   JSON.stringify(run))
 
+// A solid you have opened once stays on the table. A study or a folio drops the
+// chain back to one row, and the rest used to vanish with it, so twenty minutes
+// of building disappeared each time you reset. They stay, dimmed, with what
+// they need where their rate goes.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.stats.solidsEver = 5
+  s.studies = 1
+  s.solids.forEach((d) => { d.bought = 0; d.amount = new D(0) })
+  s.solids[0] = { bought: 7, amount: new D(7) }
+  s.solids[1] = { bought: 2, amount: new D(2) }
+  s.ink = new D('4.2e4') })()`)
+await sleep(200)
+const remembered = await ev(`(() => {
+  const rows = [...document.querySelectorAll('.solid')].filter(r => !r.hidden)
+  return rows.map(r => ({
+    name: r.querySelector('.solid-name-text').textContent.split(' ')[0],
+    locked: r.classList.contains('locked'),
+    // The rate cell holds the multiplier span and a separator before the
+              // rate itself, so a locked row's text starts with the space they left.
+              rate: r.querySelector('.solid-rate').textContent.trim(),
+    buy: r.querySelector('.solid-buy-label').textContent,
+    disabled: r.querySelector('.solid-buy').disabled })) })()`)
+check('a solid opened once stays on the table after a reset',
+  remembered.length === 5, remembered.map((r) => r.name).join(' '))
+check('and the ones not open say what opens them',
+  remembered.filter((r) => r.locked).length === 3 &&
+    remembered.filter((r) => r.locked).every((r) => r.buy === 'LOCKED' && r.disabled && r.rate.length > 0),
+  JSON.stringify(remembered.filter((r) => r.locked).map((r) => r.rate)))
+check('the next one along names a real requirement, the rest count studies',
+  /^\d/.test(remembered[2].rate) && /studies away$/.test(remembered[4].rate),
+  `${remembered[2].rate} | ${remembered[4].rate}`)
+
 // FOLIO and STUDY share one header, and with nothing between them the pair
 // read as one sentence: "FOLIO 1 STUDY 8". The divider has to land on the same
 // line as the gap between the two buttons under it, or it looks like a third

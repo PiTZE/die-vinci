@@ -107,6 +107,16 @@ export interface GameState {
     melts: number
     /** Folios bound over the whole save. Never reset, unlike s.folios. */
     foliosEver: number
+    /**
+     * The deepest solid ever opened, so the table keeps its shape.
+     *
+     * A study or a folio drops the chain back to one row, and the rows below it
+     * used to vanish. The table you had spent twenty minutes building
+     * disappeared every time you reset, which reads as losing the game rather
+     * than as the reset you asked for. They stay, with what they need written
+     * under them.
+     */
+    solidsEver: number
   }
 }
 
@@ -147,7 +157,8 @@ export function newGame(now: number): GameState {
       offlineTicks: OFFLINE_TICKS_DEFAULT,
       confirms: defaultConfirms(),
     },
-    stats: { started: now, playMs: 0, wagerMs: 0, sinceResetMs: 0, melts: 0, foliosEver: 0 },
+    stats: { started: now, playMs: 0, wagerMs: 0, sinceResetMs: 0, melts: 0, foliosEver: 0,
+      solidsEver: SOLIDS_AT_START },
   }
 }
 
