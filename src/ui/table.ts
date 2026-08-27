@@ -5,7 +5,6 @@ import {
   buyPrice,
   canBuyFolio,
   canBuyRollRate,
-  affordFraction,
   canBuySolid,
   canBuyStudy,
   canMaxAll,
@@ -42,12 +41,10 @@ interface Row {
   icon: SVGSVGElement
   face: HTMLElement
   mult: HTMLElement
-  bar: HTMLElement
-  barCan: HTMLElement
   amount: HTMLElement
   rate: HTMLElement
   buy: HTMLButtonElement
-  cover: HTMLElement
+  blocks: HTMLElement[]
   buyLabel: HTMLElement
   buyCost: HTMLElement
 }
@@ -214,25 +211,30 @@ export function tablePane(): Pane {
         // part of the group of ten already owned, a second for how many more
         // the ink covers right now. It says more than a number and it stops
         // the row needing a separate bar underlining it.
-        // How much of the price the ink covers, drawn across the button.
-        // Antimatter Dimensions fills its cost button this way, so a row you
-        // cannot afford says how close you are rather than only saying no.
-        const cover = el('span', 'solid-cover')
-        const bar = el('span', 'solid-fill')
-        const barCan = el('span', 'solid-fill-can')
+        // The group of ten, as ten blocks behind the label. One block a die,
+        // shaded as you buy them, empty again when the tenth lands the
+        // doubling. A continuous bar said the same thing and never said which
+        // number it was on; ten blocks you can count.
+        const steps = el('span', 'solid-steps')
+        const blocks: HTMLElement[] = []
+        for (let i = 0; i < 10; i++) {
+          const b = el('span', 'solid-block')
+          blocks.push(b)
+          steps.appendChild(b)
+        }
         // What it does on the left, what it costs on the right. The two used
         // to be one centred string joined by a slash, which is a label that
         // floats in the middle of whatever width the button happened to get
         // and ellipsises itself when the cost grows.
         const buyLabel = el('span', 'solid-buy-label', '')
         const buyCost = el('span', 'solid-buy-cost', '')
-        buy.append(cover, bar, barCan, buyLabel, buyCost)
+        buy.append(steps, buyLabel, buyCost)
         // Shift buys a single die, the way AD's shift+1-8 does.
         holdable(buy, (m) => actions.buySolid(def.idx, m.shift))
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, icon, face, mult, cover, bar, barCan, amount, rate: flow, buy, buyLabel, buyCost })
+        rows.push({ root: r, icon, face, mult, blocks, amount, rate: flow, buy, buyLabel, buyCost })
       }
 
       const roll = el('div', 'section table-roll')
@@ -407,16 +409,8 @@ export function tablePane(): Pane {
         const mult = solidMultiplier(s, def.idx)
         setText(r.mult, `x${format(mult, n)}`)
 
-        // The group of ten reads as a rule along the bottom edge of the
-        // button now rather than as a number crammed in beside the label at
-        // 0.58rem. The exact count stays on the title for a desktop hover.
         const into = st.bought % 10
-        const pct = `${into * 10}%`
-        if (r.bar.style.width !== pct) r.bar.style.width = pct
-        const affordable = canBuySolid(s, def.idx) ? buyCount(s, def.idx) : 0
-        const canPct = `${Math.min(10 - into, affordable) * 10}%`
-        if (r.barCan.style.left !== pct) r.barCan.style.left = pct
-        if (r.barCan.style.width !== canPct) r.barCan.style.width = canPct
+        for (let i = 0; i < 10; i++) r.blocks[i].classList.toggle('on', i < into)
         setText(r.amount, formatWhole(st.amount, n))
         // A row with no dice on it sits the throw out entirely, so an empty
         // solid does not tumble and announce a number that pays nothing.
@@ -453,10 +447,6 @@ export function tablePane(): Pane {
         const can = canBuySolid(s, def.idx)
         r.buy.disabled = !can
         r.buy.classList.toggle('buyable', can)
-        // The cover answers "how close am I", so it has nothing to say once the
-        // answer is "you can buy it now".
-        const covered = can ? '0%' : `${(affordFraction(s, def.idx) * 100).toFixed(1)}%`
-        if (r.cover.style.width !== covered) r.cover.style.width = covered
       }
 
       // Gated exactly as the WAGER tab is, so the bar and the tab that explains

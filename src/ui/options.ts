@@ -108,21 +108,31 @@ export function optionsPane(): Pane {
     label: 'OPTIONS',
 
     mount(root, actions: Actions) {
-      // Every setting that is a choice between a handful of values, one
-      // button each, in a grid. What used to be thirteen stacked bands of
-      // full-width buttons is now one screen you can read.
-      const settings = el('div', 'section')
-      const setHead = el('div', 'section-head')
-      setHead.appendChild(el('span', 'grow', 'SETTINGS'))
-      settings.appendChild(setHead)
-      const grid = el('div', 'opt-grid')
-      settings.appendChild(grid)
-
-      const add = (c: Cycle) => {
-        cycles.push(c)
-        grid.appendChild(c.root)
-        return c
+      // Every setting that is a choice between a handful of values, one button
+      // each. What used to be thirteen stacked bands of full-width buttons is
+      // three grids you can read at a glance.
+      //
+      // Grouped rather than flat. Fourteen buttons in one block is a wall you
+      // have to read all of to find the one you came for, and the three groups
+      // are answers to different questions: how it looks, how it behaves, and
+      // what it asks before doing something you cannot undo.
+      const groups: HTMLElement[] = []
+      const group = (title: string) => {
+        const sec = el('div', 'section')
+        const h = el('div', 'section-head')
+        h.appendChild(el('span', 'grow', title))
+        sec.appendChild(h)
+        const grid = el('div', 'opt-grid')
+        sec.appendChild(grid)
+        groups.push(sec)
+        return (c: Cycle) => {
+          cycles.push(c)
+          grid.appendChild(c.root)
+          return c
+        }
       }
+
+      const add = group('DISPLAY')
 
       // Theme lives outside the save, so it reads from the registry rather
       // than from the state the other settings come from.
@@ -142,12 +152,6 @@ export function optionsPane(): Pane {
         (s) => s.options.thoughtSpeed,
         (id) => actions.setThoughtSpeed(id),
       ))
-      add(cycler(
-        'SOUND',
-        [{ id: true, label: 'ON' }, { id: false, label: 'OFF' }],
-        (s) => s.options.sound,
-        (on) => actions.setSound(on),
-      ))
       // Hidden where the browser has no Fullscreen API, which is every iPhone.
       // A switch that cannot do anything is worse than no switch.
       fullCycle = add(cycler(
@@ -161,13 +165,20 @@ export function optionsPane(): Pane {
       // the switch follows the browser rather than the saved preference.
       onFullscreenChange(() => actions.setFullscreen(isFullscreen(), true))
 
-      add(cycler(
+      const play = group('PLAY')
+      play(cycler(
+        'SOUND',
+        [{ id: true, label: 'ON' }, { id: false, label: 'OFF' }],
+        (s) => s.options.sound,
+        (on) => actions.setSound(on),
+      ))
+      play(cycler(
         'AWAY PROGRESS',
         [{ id: true, label: 'ON' }, { id: false, label: 'OFF' }],
         (s) => s.options.offline,
         (on) => actions.setOffline(on),
       ))
-      tickCycle = add(cycler(
+      tickCycle = play(cycler(
         'AWAY TICKS',
         OFFLINE_TICK_CHOICES.map((n) => ({ id: n, label: `${n}` })),
         (s) => s.options.offlineTicks,
@@ -176,7 +187,7 @@ export function optionsPane(): Pane {
 
       // Each channel keeps its own save, so this navigates rather than setting
       // anything. Pressing it moves to the other build.
-      add(cycler(
+      play(cycler(
         'CHANNEL',
         Object.keys(CHANNEL_PATHS).map((name) => ({ id: name, label: name.toUpperCase() })),
         () => __CHANNEL__,
@@ -185,8 +196,11 @@ export function optionsPane(): Pane {
         },
       ))
 
+      // Their own group, as they were their own section before. Every one of
+      // them guards something that cannot be undone.
+      const ask = group('CONFIRM BEFORE')
       for (const c of CONFIRM_KEYS) {
-        add(cycler(
+        ask(cycler(
           c.label.toUpperCase(),
           [{ id: true, label: 'CONFIRM' }, { id: false, label: 'STRAIGHT' }],
           (s) => s.options.confirms[c.key] !== false,
@@ -461,7 +475,7 @@ export function optionsPane(): Pane {
       paintBackups()
       setInterval(paintBackups, 5_000)
 
-      root.append(settings, install, slots, save, backups)
+      root.append(...groups, install, slots, save, backups)
       paintTheme()
 
       function say(msg: string) {

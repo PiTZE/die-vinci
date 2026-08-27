@@ -247,13 +247,19 @@ try {
 
   // touchEnd lists the point being released, so this lifts the ROLL finger.
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(1, rollAt)] })
+  // Counted straight after the release rather than before it. The repeat fires
+  // every 60ms, and the gap between the previous count and the release being
+  // processed is two CDP round trips, which under four parallel browsers is
+  // long enough for three or four more presses to land. Allowing for them made
+  // the tolerance a measure of how loaded the box was: this failed at +3 and at
+  // +4 on a busy run and passed alone. Starting the window after the release
+  // asks the real question instead, and the answer is exact.
+  const atRelease = await counts()
   await sleep(500)
   const lifted = await counts()
-  // Stopped, not silent: one last repeat can land between the final count and
-  // the release being processed. Still repeating would be a dozen over 700ms.
   check('lifting one finger stops only that button',
-    lifted.roll - two.roll <= 2 && lifted.max - two.max > 1,
-    `roll +${lifted.roll - two.roll}, max +${lifted.max - two.max}`)
+    lifted.roll === atRelease.roll && lifted.max - atRelease.max > 1,
+    `roll +${lifted.roll - atRelease.roll}, max +${lifted.max - atRelease.max}`)
 
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(2, maxAt)] })
   await sleep(400)

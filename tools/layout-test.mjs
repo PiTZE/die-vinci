@@ -189,16 +189,17 @@ const buys = await ev(`(() => {
     const b = r.querySelector('.solid-buy').getBoundingClientRect()
     const l = r.querySelector('.solid-buy-label').getBoundingClientRect()
     const c = r.querySelector('.solid-buy-cost').getBoundingClientRect()
-    const rule = r.querySelector('.solid-fill').getBoundingClientRect()
+    const blocks = [...r.querySelectorAll('.solid-block')]
     return {
       label: r.querySelector('.solid-buy-label').textContent,
       cost: r.querySelector('.solid-buy-cost').textContent,
       sameLine: Math.abs((l.top + l.bottom) / 2 - (c.top + c.bottom) / 2) < 4,
       overflows: c.right > b.right + 1 || l.left < b.left - 1,
       collides: l.right > c.left + 1,
-      // The rule reads the group of ten along the bottom edge. Above the text
-      // it would be an underline through the label instead.
-      ruleAtBottom: b.bottom - rule.bottom <= 3 && rule.top > l.bottom
+      // Ten blocks behind the label, one a die, filled up to the count in the
+      // current group of ten.
+      blocks: blocks.length,
+      filled: blocks.filter((x) => x.classList.contains('on')).length
     }
   })
 })()`)
@@ -220,9 +221,9 @@ check('every buy button is the same width and starts at the same edge',
 check('and neither overflows the button nor runs into the other',
   buys.every((r) => !r.overflows && !r.collides),
   JSON.stringify(buys.filter((r) => r.overflows || r.collides).slice(0, 2)))
-check('the group-of-ten rule sits on the bottom edge, clear of the text',
-  buys.every((r) => r.ruleAtBottom),
-  JSON.stringify(buys.filter((r) => !r.ruleAtBottom).slice(0, 2)))
+check('the buy button is ten blocks, filled to the group of ten',
+  buys.every((r) => r.blocks === 10) && buys.some((r) => r.filled > 0 && r.filled < 10),
+  JSON.stringify(buys.map((r) => `${r.filled}/${r.blocks}`)))
 
 // The buy buttons and the roll rate, folio and study buttons are drawn thin,
 // well under the 44px a finger needs. The target is restored by a pseudo
@@ -271,25 +272,30 @@ const tint = await ev(`(() => {
   const rows = [...document.querySelectorAll('.solid')].filter(r => !r.hidden)
   const read = (r) => {
     const b = r.querySelector('.solid-buy')
+    // getComputedStyle gives borders back as rgb(), and the token is a hex
+    // string, so the accent is resolved through an element rather than compared
+    // as text.
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--accent)'
+    document.body.appendChild(probe)
+    const accent = cs(probe).color
+    probe.remove()
     return { afford: b.classList.contains('buyable'),
       rowTinted: cs(r).backgroundColor !== 'rgba(0, 0, 0, 0)',
       btnFilled: cs(b).backgroundColor !== 'rgba(0, 0, 0, 0)',
-      cover: parseFloat(b.querySelector('.solid-cover').style.width) || 0 }
+      accentBorder: cs(b).borderTopColor === accent }
   }
   const all = rows.map(read)
   return { yes: all.filter(r => r.afford), no: all.filter(r => !r.afford) } })()`)
-check('an affordable buy button is filled and an unaffordable one is not',
-  tint.yes.length > 0 && tint.no.length > 0 &&
-    tint.yes.every((r) => r.btnFilled) && tint.no.every((r) => !r.btnFilled),
+// Affordable and unbought shows on the border and on the word BUY, and nowhere
+// else. Filling the button or washing the row was tried and both were wrong:
+// late in a run eight rows of nine are affordable at once, so a shade that size
+// marks nothing and the ten blocks behind the label become unreadable.
+check('an affordable buy button shows it on the border',
+  tint.yes.length > 0 && tint.no.length > 0 && tint.yes.every((r) => r.accentBorder),
   JSON.stringify({ yes: tint.yes.length, no: tint.no.length }))
-check('and the row around it is never tinted',
-  [...tint.yes, ...tint.no].every((r) => !r.rowTinted))
-// The cost fill answers "how close am I", measured in exponents. A plain ratio
-// reads 0 for almost the whole wait, because the chain steps by orders of
-// magnitude: 1e17 against 1e25 is 0.000003%.
-check('the cost fill is between the extremes on a row not yet affordable',
-  tint.no.some((r) => r.cover > 5 && r.cover < 95) && tint.yes.every((r) => r.cover === 0),
-  JSON.stringify(tint.no.map((r) => r.cover)))
+check('and neither the button nor its row is shaded',
+  [...tint.yes, ...tint.no].every((r) => !r.rowTinted && !r.btnFilled))
 
 // How far through the run you are, kept on the table rather than behind the
 // WAGER tab, because this run stops dead at the threshold.
