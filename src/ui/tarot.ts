@@ -61,14 +61,14 @@ export function tarotPane(): Pane {
       bar.appendChild(barFill)
       heldSection.appendChild(bar)
 
-      const grid = el('div', 'arcana-grid')
+      const grid = el('div', 'tile-grid')
       for (const a of ARCANA) {
-        const cell = el('div', 'arcana-cell')
-        const numeral = el('span', 'arcana-numeral', a.numeral)
-        const name = el('span', 'arcana-name', '')
-        const note = el('span', 'arcana-note', '')
-        const level = el('span', 'arcana-level', '')
-        cell.append(numeral, name, level, note)
+        const cell = el('div', 'tile')
+        const numeral = el('span', 'tile-index', a.numeral)
+        const name = el('span', 'tile-name', '')
+        const note = el('span', 'tile-note', '')
+        const level = el('span', 'tile-mark', '')
+        cell.append(numeral, name, note, level)
         grid.appendChild(cell)
         cells.set(a.id, { root: cell, numeral, name, note, level })
       }
@@ -135,9 +135,9 @@ export function tarotPane(): Pane {
           seal(cell.name, a.name)
           seal(cell.note, a.note)
         }
-        setText(cell.level, at > 0 ? `${at}` : '')
+        setText(cell.level, at > 0 ? `LEVEL ${at}` : '')
         cell.root.classList.toggle('sealed', at === 0)
-        cell.root.classList.toggle('bought', at > 0)
+        cell.root.classList.toggle('held', at > 0)
       }
     },
   }

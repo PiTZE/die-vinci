@@ -681,6 +681,80 @@
   color: var(--fg-muted);
 }
 
+/* -- one tile, four panes ------------------------------------------------ */
+
+/* An archive entry, an arcanum, a challenge and a points upgrade are the same
+   kind of object: a thing you either have or do not. They had four grids, four
+   paddings, four title sizes and four different ways of saying held, including
+   one that shaded the ones you did NOT have and left the ones you did plain.
+
+   One grammar now. Held is an accent border and an accent name. Not held is the
+   same tile at reduced opacity. Nothing else carries state. */
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-height: 56px;
+  padding: 7px 9px;
+  border: 1px solid var(--border-faint);
+  text-align: left;
+  /* Dim but legible. At 0.4 a grid of them read as switched off, which is the
+     wrong impression: most of it is things you are going to get. */
+  opacity: 0.55;
+}
+
+.tile.held {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.tile-name {
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+}
+
+.tile.held .tile-name {
+  color: var(--accent);
+}
+
+.tile-note {
+  color: var(--fg-muted);
+  font-size: 0.58rem;
+  line-height: 1.3;
+}
+
+/* A number or a word in the corner: an arcanum's level, a challenge's state,
+   an upgrade's cost. */
+.tile-mark {
+  align-self: flex-end;
+  margin-top: auto;
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tile.held .tile-mark {
+  color: var(--accent);
+}
+
+/* An index down the left, for the arcana's numerals and the challenges' count.
+   Held or not, it is the tile's address rather than its state. */
+.tile-index {
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* -- the wager and its points grid --------------------------------------- */
 
 
@@ -698,18 +772,23 @@
   min-width: 0;
 }
 
+/* The three columns are the three prerequisite chains, which is structure worth
+   keeping. The cell is a tile like any other. */
 .upgrade {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-height: 54px;
-  padding: 6px 4px;
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  text-align: center;
   line-height: 1.15;
+}
+
+/* Affordable and unbought is not the same as held, and both were reading as an
+   accent name because .buyable colours the whole button. Held keeps the border
+   and the name; affordable puts the accent on the cost, which is the number
+   you are being asked about. */
+.tile.buyable:not(.held) {
+  color: inherit;
+  opacity: 1;
+}
+
+.tile.buyable:not(.held) .tile-mark {
+  color: var(--accent);
 }
 
 .upgrade-label {

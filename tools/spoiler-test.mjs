@@ -115,14 +115,14 @@ check('it is not punctuation soup',
 check('and still has the ones it needs',
   ['ROLLING', 'THE TABLE', 'ROLL RATE', 'KEYS'].every((t) => freshHelp.includes(t)), freshHelp)
 
-const freshArchive = await shown('ARCHIVE', '.archive-cell')
+const freshArchive = await shown('ARCHIVE', '.tile')
 const freshArchiveAll = await everything('ARCHIVE')
 check('and no archive entry about anything ahead',
   !AHEAD.some((w) => freshArchive.includes(w)), freshArchive.slice(0, 100))
 check('nor anywhere in the archive document',
   !AHEAD.some((w) => freshArchiveAll.includes(w)),
   AHEAD.filter((w) => freshArchiveAll.includes(w)).join(',') || 'none present')
-const sealedAtStart = await ev(`document.querySelectorAll('.archive-cell.sealed').length`)
+const sealedAtStart = await ev(`document.querySelectorAll('.pane:not([hidden]) .tile.sealed').length`)
 check('sealed entries are redacted rather than removed', sealedAtStart > 8,
   `${sealedAtStart} sealed on a fresh save`)
 check('and the count says how many are held back',
@@ -143,13 +143,13 @@ await sleep(150)
 const lateHelp = await shown('HELP', '.help-head')
 check('a Wager opens the rest',
   ['THE WAGER', 'CHALLENGES', 'AUTOBUYERS'].every((t) => lateHelp.includes(t)), lateHelp)
-const lateArchive = await shown('ARCHIVE', '.archive-cell')
+const lateArchive = await shown('ARCHIVE', '.tile')
 // Sealed entries are on screen either way now, so the length barely moves.
 // What changes is how many are still redacted.
 // Fewer sealed than before, not below some number: entries about systems the
 // Wager did not unlock, tarot and melting among them, are still sealed and
 // should be.
-const stillSealed = await ev(`document.querySelectorAll('.archive-cell.sealed').length`)
+const stillSealed = await ev(`document.querySelectorAll('.pane:not([hidden]) .tile.sealed').length`)
 check('and the archive fills in behind it',
   lateArchive.includes('Wager') && stillSealed < sealedAtStart,
   `${sealedAtStart} sealed on a fresh save, ${stillSealed} after a Wager`)

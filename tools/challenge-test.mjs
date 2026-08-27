@@ -73,7 +73,7 @@ await ev(`${tab('CHALLENGES')}.click()`); await sleep(150)
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autobuyers.solid1.on = false
   s.studies = 5; s.solids.forEach(d => { d.bought = 20; d.amount = new D(500) }) })()`)
-await ev(`[...document.querySelectorAll('.challenge')][6].click()`)
+await ev(`[...document.querySelectorAll('.pane:not([hidden]) .tile')][6].click()`)
 await sleep(150)
 const inC7 = await ev(`({ running: window.LD.state.challengeRunning,
   studies: window.LD.state.studies, bought: window.LD.state.solids.reduce((a,d)=>a+d.bought,0) })`)

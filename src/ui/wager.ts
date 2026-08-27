@@ -69,11 +69,11 @@ export function wagerPane(): Pane {
         const col = el('div', 'upgrade-col')
         for (const id of chain) {
           const def = UPGRADES[id]
-          const btn = el('button', 'upgrade')
+          const btn = el('button', 'tile upgrade')
           btn.type = 'button'
           btn.title = def.note
-          btn.appendChild(el('span', 'upgrade-label', def.label))
-          const cost = el('span', 'upgrade-cost', String(def.cost))
+          btn.appendChild(el('span', 'tile-name', def.label))
+          const cost = el('span', 'tile-mark', String(def.cost))
           btn.appendChild(cost)
           btn.addEventListener('click', () => actions.buyUpgrade(id))
           // A title attribute is a hover, and a phone has no hover. Touching
@@ -130,7 +130,7 @@ export function wagerPane(): Pane {
         const bought = isBought(s, id)
         const affordable = canBuy(s, id)
         cell.btn.disabled = bought || !affordable
-        cell.btn.classList.toggle('bought', bought)
+        cell.btn.classList.toggle('held', bought)
         cell.btn.classList.toggle('buyable', affordable)
         cell.btn.classList.toggle('locked', !bought && !isAvailable(s, id))
         setText(cell.cost, bought ? 'HELD' : String(UPGRADES[id].cost))

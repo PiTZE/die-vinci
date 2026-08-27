@@ -40,14 +40,15 @@ export function challengesPane(): Pane {
       exitRow.appendChild(exitBtn)
       section.appendChild(exitRow)
 
-      const list = el('div', 'challenge-list')
+      const list = el('div', 'tile-grid')
       for (const c of CHALLENGES) {
-        const btn = el('button', 'challenge')
+        const btn = el('button', 'tile')
         btn.type = 'button'
-        const title = el('span', 'challenge-title', `${c.id}. ${c.label}`)
-        const note = el('span', 'challenge-note', c.note)
-        const state = el('span', 'challenge-state', '')
-        btn.append(title, note, state)
+        const index = el('span', 'tile-index', `${c.id}`)
+        const title = el('span', 'tile-name', c.label)
+        const note = el('span', 'tile-note', c.note)
+        const state = el('span', 'tile-mark', '')
+        btn.append(index, title, note, state)
         btn.addEventListener('click', () => {
           if (confirm.request('enterChallenge')) actions.enterChallenge(c.id)
         })
@@ -71,7 +72,7 @@ export function challengesPane(): Pane {
         if (!cell) continue
         const complete = isComplete(s, c.id)
         const active = isRunning(s, c.id)
-        cell.btn.classList.toggle('bought', complete)
+        cell.btn.classList.toggle('held', complete)
         cell.btn.classList.toggle('buyable', active)
         cell.btn.disabled = active
         setText(

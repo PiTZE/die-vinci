@@ -27,11 +27,11 @@ export function archivePane(): Pane {
       payLine = el('div', 'archive-pay', '')
       section.appendChild(payLine)
 
-      const grid = el('div', 'archive-grid')
+      const grid = el('div', 'tile-grid')
       for (const a of ACHIEVEMENTS) {
-        const cell = el('div', 'archive-cell')
-        const name = el('span', 'archive-name', '')
-        const note = el('span', 'archive-note', '')
+        const cell = el('div', 'tile')
+        const name = el('span', 'tile-name', '')
+        const note = el('span', 'tile-note', '')
         cell.append(name, note)
         grid.appendChild(cell)
         cells.set(a.id, { cell, name, note })
@@ -75,7 +75,7 @@ export function archivePane(): Pane {
         }
         row.cell.title = on ? a.note : ''
         row.cell.classList.toggle('sealed', !on)
-        row.cell.classList.toggle('bought', s.achievements.includes(a.id))
+        row.cell.classList.toggle('held', s.achievements.includes(a.id))
       }
       const line = held ? `${held} of these are still sealed` : ''
       if (sealed.textContent !== line) sealed.textContent = line
