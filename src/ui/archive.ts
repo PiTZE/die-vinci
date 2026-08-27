@@ -21,9 +21,9 @@ export function archivePane(): Pane {
       h.appendChild(head)
       section.appendChild(h)
 
-      // What the set is worth, stated where Antimatter Dimensions states it:
-      // at the top of the tab, before the grid. An entry you have earned is
-      // worth something, so the tab has to say so somewhere.
+      // What the set is worth, above the grid, where Antimatter Dimensions puts
+      // the same line. An entry you have earned pays, so the tab has to say so
+      // somewhere.
       payLine = el('div', 'archive-pay', '')
       section.appendChild(payLine)
 
@@ -47,9 +47,9 @@ export function archivePane(): Pane {
       const want = `${got}/${ACHIEVEMENTS.length}`
       if (head.textContent !== want) head.textContent = want
 
-      // Never large enough to need Decimal formatting: thirty-one entries at
-      // x1.03 each is about x2.5, so three places is the whole story and the
-      // third one is where a single new entry shows up.
+      // Never large enough to need Decimal formatting. Thirty-one entries at
+      // x1.03 each come to about x2.5, so three places is the whole story, and
+      // the third is where a single new entry shows up.
       const pay = `every solid x${achievementPower(s).toNumber().toFixed(3)}`
       if (payLine.textContent !== pay) payLine.textContent = pay
 

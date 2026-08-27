@@ -17,7 +17,7 @@ export interface AchievementDef {
   /**
    * When this entry is allowed to be seen at all.
    *
-   * Without it the archive is a table of contents for the whole game: someone
+   * Without it the archive is a table of contents for the whole game. Someone
    * ten minutes in could read "call the Wager", "clear a challenge" and "bind
    * a folio" and know the shape of everything ahead. An entry appears once the
    * thing it names exists, and an entry already earned always shows.
@@ -155,9 +155,10 @@ export function byId(id: string): AchievementDef | undefined {
  *
  * Antimatter Dimensions gives x1.03 per achievement to every dimension, and
  * they compound, so the whole set is 1.03^n. Their own achievements tab prints
- * it as the header: one earned reads x1.030. Thirty-one entries here come to
- * about x2.5 over a full run, which is a nudge rather than a lever, and that is
- * what it is for. The entries are things you were going to do anyway.
+ * the total as its header, and one earned reads x1.030. Thirty-one entries here
+ * come to about x2.5 over a full run. That is small on purpose. The entries are
+ * things you were going to do anyway, so paying much for them would be paying
+ * you for playing.
  */
 export const ACHIEVEMENT_STEP = 1.03
 

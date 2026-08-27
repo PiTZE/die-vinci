@@ -59,12 +59,12 @@ interface Cycle {
 }
 
 /**
- * One setting, one button: its name above its current value, and a press moves
- * to the next value.
+ * One setting, one button. Its name sits above its current value, and a press
+ * moves to the next value.
  *
  * Antimatter Dimensions' options screen is built this way, and it is why twenty
  * settings fit on a phone. A row of buttons per setting, one per choice, is
- * honest about what the choices are and costs a whole band of screen each:
+ * honest about what the choices are and costs a whole band of screen each.
  * THEME alone was 1500px by 80px to hold two words. Thirteen of those is a
  * screen you scroll through looking for the one you wanted.
  */
@@ -432,7 +432,7 @@ export function optionsPane(): Pane {
         for (const b of found) {
           const row = el('div', 'row')
           const age = formatTime((Date.now() - b.at) / 1000)
-          // Age first: it is the only thing that matters when choosing which
+          // Age first, because it is the only thing that matters when choosing which
           // copy to go back to. The label says when it is next rewritten.
           const left = el('span', 'grow')
           left.appendChild(el('span', 'num', `${age} old`))
@@ -471,8 +471,8 @@ export function optionsPane(): Pane {
       // The theme cycler reads the registry rather than the save, so applying
       // one has to push the new value back into the button itself.
       function paintTheme() {
-        // Guarded: mount calls this before the first update, so there is no
-        // state to read yet and the next tick will sync everything anyway.
+        // Guarded, because mount calls this before the first update. There is
+        // no state to read yet and the next tick syncs everything anyway.
         if (shown) for (const c of cycles) c.sync(shown)
       }
     },

@@ -61,7 +61,8 @@ export function aboutPane(): Pane {
       ], __VERSION__)
 
       // CC0 asks for nothing and the font's licence asks only that the licence
-      // travels with it, which it does. Saying so anyway is the point.
+      // travels with it, which it does. Neither needs a credit screen. They get
+      // one because someone made the dice sound I could not synthesise.
       block(root, 'BUILT FROM', [
         { label: 'DICE AUDIO', value: 'Kenney, Casino Audio, CC0', href: 'https://kenney.nl/assets/casino-audio' },
         { label: 'TYPEFACE', value: 'IBM Plex Mono, OFL', href: 'https://github.com/IBM/plex' },

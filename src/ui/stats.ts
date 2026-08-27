@@ -1,6 +1,6 @@
 // What the save has to say about itself.
 //
-// Antimatter Dimensions writes its statistics as sentences: "You have played
+// Antimatter Dimensions writes its statistics as sentences. "You have played
 // for 3 minutes and 57 seconds." That is their voice, not this one. Everything
 // here reads label on the left, value on the right, the same grammar as a buy
 // button and a section header, and the numbers line up in a column because

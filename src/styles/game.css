@@ -264,7 +264,7 @@
   background: linear-gradient(to right, var(--fill) 0%, var(--fill) 78%, transparent 100%);
 }
 
-/* Affordable and unbought: the button fills with the accent, the way Antimatter
+/* Affordable and unbought. The button fills with the accent, the way Antimatter
    Dimensions fills its cost button. The row around it stays as it is. A wash
    across the whole row was tried for one build and was wrong: late in a run
    eight rows of nine are affordable at once, so the tint covered most of the
@@ -610,7 +610,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* One button per setting: its name above its current value, pressed to move to
+/* One button per setting, its name above its current value, pressed to move to
    the next. Sized so a phone gets two columns and a desktop four or five, which
    is the whole point of the shape. */
 .opt-grid {
@@ -911,8 +911,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Denser than two columns: thirty-one entries in a two-wide list is a page you
-   scroll rather than a set you can see the shape of. */
+/* Denser than two columns. Thirty-one entries two-wide is a page you scroll
+   rather than a set you can see the shape of. */
 .archive-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
@@ -932,8 +932,8 @@
   opacity: 0.55;
 }
 
-/* Earned wears the accent, the one thing it means everywhere else in the game:
-   this one is yours. */
+/* Earned wears the accent, which means the same here as it does on a buy
+   button. This one is yours. */
 .archive-cell.bought {
   opacity: 1;
   border-color: var(--accent);

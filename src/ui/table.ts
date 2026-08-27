@@ -152,8 +152,8 @@ export function tablePane(): Pane {
       const rollText = el('span', 'bar-roll-label', 'ROLL')
       rollNow.append(rollFill, rollText)
       // Held rather than clicked, so a fast roll rate does not become a test
-      // of how quickly you can tap. It still cannot beat the roll rate: a roll
-      // refuses to start while one is in the air.
+      // of how quickly you can tap. It still cannot beat the roll rate, because
+      // a roll refuses to start while one is in the air.
       holdable(rollNow, () => actions.roll())
 
       maxBtn = el('button', 'bar-btn max', 'M')
@@ -306,8 +306,8 @@ export function tablePane(): Pane {
 
       // How far through the run you are, kept on the table rather than behind
       // the WAGER tab. Antimatter Dimensions puts its percentage to Infinity on
-      // the main screen, and it matters more here: this run does not merely
-      // slow down at the threshold, it stops dead and demands a Wager.
+      // the main screen, and it matters more here. This run does not merely slow
+      // down at the threshold. It stops dead and demands a Wager.
       //
       // On a log scale, because the run spans 308 orders of magnitude and a
       // linear bar would read zero for all but the last seconds of it.
@@ -340,7 +340,8 @@ export function tablePane(): Pane {
 
     update(s: GameState) {
       const n = s.options.notation
-      // openSolids, not unlockedSolids: a challenge can cut the chain short.
+      // openSolids, not unlockedSolids, because a challenge can cut the chain
+      // short.
       const open = openSolids(s)
       const rate = rollRate(s)
       const now = Date.now()
@@ -378,7 +379,7 @@ export function tablePane(): Pane {
       setSpinBed(duration, s.options.sound && spinning)
       lastFace = s.faces[0]
 
-      // Once the automator is in, the button has nothing left to do: it can
+      // Once the automator is in, the button has nothing left to do, since it can
       // never beat the roll rate, and the bar is better off giving the space
       // back to MAX.
       rollNow.hidden = rollingItself(s) || full
