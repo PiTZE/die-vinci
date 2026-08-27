@@ -9,7 +9,7 @@
 //
 // The dev server must already be running.
 import { spawn } from 'node:child_process'
-import { guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -57,7 +57,7 @@ async function connect() {
         return
       }
     } catch {}
-    await sleep(250)
+    await sleep(150)
   }
   throw new Error('chrome did not come up')
 }
@@ -95,7 +95,8 @@ try {
   await send('Page.enable'); await send('Runtime.enable')
   if (MOBILE) await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
 
-  await send('Page.navigate', { url: URL_ }); await sleep(2500)
+  await send('Page.navigate', { url: URL_ })
+ await appReady(evaluate)
 
   // Mutate the live state rather than seeding localStorage and reloading. The
   // game autosaves on pagehide, so a navigation would write the fresh state
@@ -113,11 +114,11 @@ try {
   check('max button exists', await evaluate(`!!document.querySelector('.max')`))
 
   const before = await evaluate(TOTAL)
-  await key('m', 'rawKeyDown'); await sleep(900); await key('m', 'keyUp')
+  await key('m', 'rawKeyDown'); await sleep(150); await key('m', 'keyUp')
   const afterHold = await evaluate(TOTAL)
   check('holding m repeats', afterHold > before + 10, `bought ${before} -> ${afterHold}`)
 
-  await sleep(600)
+  await sleep(150)
   const afterRelease = await evaluate(TOTAL)
   check('keyup stops the repeat', afterRelease === afterHold, `${afterHold} -> ${afterRelease}`)
 
@@ -140,7 +141,7 @@ try {
     s.ink = new D('1e40'); s.studies = 5; s.folios = 0
     s.solids.forEach(d => { d.bought = 0; d.amount = new D(0) })
     s.solids[8].amount = new D(300) })()`)
-  await key('m', 'rawKeyDown'); await sleep(600); await key('m', 'keyUp')
+  await key('m', 'rawKeyDown'); await sleep(150); await key('m', 'keyUp')
   const resets = await evaluate(`({ studies: window.LD.state.studies, folios: window.LD.state.folios,
     bought: window.LD.state.solids.reduce((a, d) => a + d.bought, 0) })`)
   check('max never spends a study or a folio',
@@ -158,10 +159,10 @@ try {
   // A hold interrupted by the window losing focus must not stay stuck.
   await evaluate(reset)
   const b2 = await evaluate(TOTAL)
-  await key('m', 'rawKeyDown'); await sleep(700)
+  await key('m', 'rawKeyDown'); await sleep(150)
   await evaluate(`window.dispatchEvent(new Event('blur'))`)
   const atBlur = await evaluate(TOTAL)
-  await sleep(500)
+  await sleep(150)
   check('blur releases a held key', (await evaluate(TOTAL)) === atBlur, `${b2} -> ${atBlur} -> steady`)
   await key('m', 'keyUp')
 
@@ -171,7 +172,7 @@ try {
     await tap('.max', 900)
     const t1 = await evaluate(TOTAL)
     check('touch-hold repeats', t1 > t0 + 10, `bought ${t0} -> ${t1}`)
-    await sleep(500)
+    await sleep(150)
     check('touchend stops the repeat', (await evaluate(TOTAL)) === t1)
 
     // MAX exhausts whatever it can afford on the first press, so testing a
@@ -190,19 +191,19 @@ try {
     await evaluate(flowing)
     // MAX disables itself at zero ink, and a disabled button does not start a
     // hold. Let production put something in the pile first.
-    await sleep(250)
+    await sleep(150)
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(box.x, box.y) })
-    await sleep(500)
+    await sleep(150)
     await send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(20, 200) })
     const atMove = await evaluate(TOTAL)
-    await sleep(700)
+    await sleep(150)
     const whileOff = await evaluate(TOTAL)
     check('keeps firing with the finger off it', whileOff > atMove, `${atMove} -> ${whileOff} while away`)
 
     await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
     await sleep(120)
     const atLift = await evaluate(TOTAL)
-    await sleep(700)
+    await sleep(150)
     check('lifting away from the button stops it', (await evaluate(TOTAL)) === atLift, `settled at ${atLift}`)
   }
 
@@ -232,10 +233,10 @@ try {
   const counts = () => evaluate(`({ roll: window.__roll, max: window.__max })`)
 
   await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt(1, rollAt)] })
-  await sleep(600)
+  await sleep(900)
   const one = await counts()
   await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt(1, rollAt), pt(2, maxAt)] })
-  await sleep(900)
+  await sleep(700)
   const two = await counts()
   check('MAX repeats while ROLL is held', two.max - one.max > 4,
     `max fired ${two.max - one.max} times with ROLL down`)
@@ -243,7 +244,7 @@ try {
 
   // touchEnd lists the point being released, so this lifts the ROLL finger.
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(1, rollAt)] })
-  await sleep(700)
+  await sleep(500)
   const lifted = await counts()
   // Stopped, not silent: one last repeat can land between the final count and
   // the release being processed. Still repeating would be a dozen over 700ms.
@@ -252,9 +253,9 @@ try {
     `roll +${lifted.roll - two.roll}, max +${lifted.max - two.max}`)
 
   await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(2, maxAt)] })
-  await sleep(500)
-  const done = await counts()
   await sleep(400)
+  const done = await counts()
+  await sleep(150)
   const after = await counts()
   check('and lifting the second stops that one', after.max - done.max === 0,
     `max +${after.max - done.max} after both released`)
@@ -266,7 +267,7 @@ try {
 } finally {
   ws?.close()
   chrome.kill()
-  await sleep(400)
+  await sleep(150)
   try { rmSync(profile, { recursive: true, force: true }) } catch {}
 }
 const failed = results.filter((r) => !r.ok).length

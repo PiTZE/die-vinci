@@ -5,7 +5,7 @@
 //
 //   npm run test:wager
 import { spawn } from 'node:child_process'
-import { guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -29,7 +29,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
 for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
-  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
+  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(150)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
 const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true})
   if(r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description); return r.result?.value}
@@ -37,12 +37,13 @@ await send('Emulation.setFocusEmulationEnabled',{enabled:true})
 await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
 
-await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4000)
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'})
+ await appReady(ev)
 
 // These exercise the mechanics, not the confirm-once in front of them, which
 // has its own suite. Without this every reset here would need two clicks.
 await ev(`(() => { const c = window.LD.state.options.confirms\n  for (const k of Object.keys(c)) c[k] = false })()`)
-await sleep(300)
+await sleep(150)
 
 const atThreshold = `(() => { const s = window.LD.state, D = window.LD.Decimal
   s.ink = new D('1.8e308'); s.studies = 3; s.folios = 2; s.rollUpgrades = 40
@@ -50,26 +51,26 @@ const atThreshold = `(() => { const s = window.LD.state, D = window.LD.Decimal
 
 // The tab only appears when the threshold is in sight.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.ink = new D(1000) })()`)
-await sleep(300)
+await sleep(150)
 check('wager tab hidden early',
   await ev(`![...document.querySelectorAll('.tab')].some(t => t.textContent === 'WAGER' && !t.hidden)`))
 
-await ev(atThreshold); await sleep(400)
+await ev(atThreshold); await sleep(150)
 check('wager tab appears near the threshold',
   await ev(`[...document.querySelectorAll('.tab')].some(t => t.textContent === 'WAGER' && !t.hidden)`))
 
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'WAGER').click()`)
-await sleep(500)
+await sleep(150)
 // The first Wager clears the first challenge, which awards the solid 1
 // autobuyer, which then spends the ten starting ink on a d4 within half a
 // second. That is correct, and it is not what this check is about, so the
 // autobuyers are switched off before the reset is measured.
 await ev(`(() => { const a = window.LD.state.autobuyers
   for (const k of Object.keys(a)) a[k].on = false })()`)
-await sleep(200)
+await sleep(150)
 const before = await ev(`({ points: Number(window.LD.state.points), wagers: window.LD.state.wagers })`)
 await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)
-await sleep(400)
+await sleep(150)
 const after = await ev(`({ points: Number(window.LD.state.points), wagers: window.LD.state.wagers,
   ink: window.LD.state.ink.toString(), studies: window.LD.state.studies, folios: window.LD.state.folios,
   roll: window.LD.state.rollUpgrades, bought: window.LD.state.solids.reduce((a,d)=>a+d.bought,0) })`)
@@ -83,7 +84,7 @@ check('wager clears layer 0',
 const noteBefore = await ev(`document.querySelector('.upgrade-note').textContent`)
 await ev(`document.querySelector('.upgrade').dispatchEvent(
   new PointerEvent('pointerdown', { bubbles: true }))`)
-await sleep(300)
+await sleep(150)
 const noteAfter = await ev(`document.querySelector('.upgrade-note').textContent`)
 check('touching an upgrade writes out what it does',
   noteAfter !== noteBefore && noteAfter.length > 20,
@@ -95,20 +96,20 @@ check('touching an upgrade writes out what it does',
 // check without proving the discount is actually being subtracted.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.points = new D(20); s.pointUpgrades = []; s.studies = 5 })()`)
-await sleep(300)
+await sleep(150)
 // Only the active pane updates, so the table has to be on screen to be read.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'TABLE').click()`)
-await sleep(500)
+await sleep(150)
 const studyNeedBefore = await ev(`(() => { const t = [...document.querySelectorAll('.action')]
   .find(b => b.textContent.startsWith('STUDY /')); return t ? t.textContent : 'none' })()`)
 await ev(`window.LD.state.pointUpgrades = ['timeMult','solids19','solids37','resetBoost']`)
-await sleep(600)
+await sleep(150)
 const studyNeedAfter = await ev(`(() => { const t = [...document.querySelectorAll('.action')]
   .find(b => b.textContent.startsWith('STUDY /')); return t ? t.textContent : 'none' })()`)
 check('resetBoost lowers the study requirement by 9',
   studyNeedBefore.includes('20 ') && studyNeedAfter.includes('11 '),
   `${studyNeedBefore} -> ${studyNeedAfter}`)
 
-ws.close();chrome.kill();await sleep(400);try{rmSync(profile,{recursive:true,force:true})}catch{}
+ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

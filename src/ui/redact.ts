@@ -1,61 +1,56 @@
-// Redaction, the way Bitburner does it.
+// Redaction: the real words, with their letters rolled.
 //
-// Its CorruptibleText picks a random character every so often, swaps it for
-// another from the same class, and puts the original back half a second later.
-// Letters become letters, digits become digits, and a spoiler goes further:
-// three times in four a character becomes punctuation instead. The result
-// reads as a signal that will not quite resolve, which is a better fit for
-// something being withheld than a solid bar.
+// THE WAGER becomes HET GRAWE. Every letter is the true one and not one of
+// them is where it belongs, so the text is plainly made of the thing it hides
+// without being the thing it hides. For a game about dice, letters that have
+// not settled is the right kind of unreadable.
 //
-// Two departures, both deliberate.
+// It started as Bitburner's CorruptibleText, which swaps a character for
+// another of its own class and puts the original back half a second later. The
+// mechanic here is the same shape, a shared timer disturbing a few positions
+// at a time, but the disturbance is a transposition rather than a substitution:
+// nothing is invented and nothing is lost, the letters just keep moving.
 //
-// The flicker here runs over an already-obfuscated string and restores to the
-// obfuscated character, never to the real one. Bitburner corrupts the true
-// text and lets it show through; a spoiler in this game must not be in the
-// document at all, because select-all or a look at the page source would give
-// it away.
+// Word lengths and word breaks survive, which is the point. So does the case.
 //
-// And one shared timer drives every sealed element. Bitburner mounts an
-// interval per component, which is right for React and wasteful for thirty
-// entries in an archive.
-//
-// https://github.com/bitburner-official/bitburner-src
-//   src/ui/React/CorruptibleText.tsx
-
-const CLASSES = [
-  'abcdefghijklmnopqrstuvwxyz',
-  'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-  '1234567890',
-  ' _',
-  '()[]{}<>',
-]
-
-const OTHER = '!@#$%^&*()_+|\\\';"/.,?`~'
+// The honest caveat: an anagram holds every letter of the answer, so a reader
+// who wants to work it out can. That is the trade, and it was asked for. It
+// reads as a puzzle rather than a wall, which for a help topic you have not
+// unlocked is a better feeling than a censored bar.
 
 const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)')
 
-function randFrom(s: string): string {
-  return s[Math.floor(Math.random() * s.length)]
+/** Fisher-Yates, in place. */
+function shuffled(chars: string[]): string[] {
+  const a = chars.slice()
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const t = a[i]
+    a[i] = a[j]
+    a[j] = t
+  }
+  return a
 }
 
-/** Bitburner's randomize(). Same class where there is one, punctuation
- *  otherwise, and three times in four when obfuscating outright. */
-function randomize(ch: string, obfuscate: boolean): string {
-  if (obfuscate && Math.random() < 0.75) return randFrom(OTHER)
-  for (const c of CLASSES) if (c.includes(ch)) return randFrom(c)
-  return randFrom(OTHER)
-}
-
-/** The garbled stand-in. Word lengths survive; a space may become an
- *  underscore, which blurs where one word ends and the next begins. */
+/**
+ * The letters of `text`, rolled within each word. Spaces stay put, so the
+ * shape of the phrase is intact.
+ *
+ * A short word can shuffle back to itself, so it tries again a few times. THE
+ * landing on THE would quietly hand over a third of the answer.
+ */
 export function redact(text: string): string {
-  let out = ''
-  for (const ch of text) out += randomize(ch, true)
-  return out
-}
-
-function swap(s: string, i: number, ch: string): string {
-  return s.slice(0, i) + ch + s.slice(i + 1)
+  return text
+    .split(' ')
+    .map((word) => {
+      if (word.length < 2) return word
+      for (let tries = 0; tries < 12; tries++) {
+        const out = shuffled([...word]).join('')
+        if (out !== word) return out
+      }
+      return word
+    })
+    .join(' ')
 }
 
 // -- the shared driver ----------------------------------------------------
@@ -64,53 +59,79 @@ interface Sealed {
   /** The real text, held in memory only so a repeat call can be recognised.
    *  It is never written to the element or to an attribute. */
   key: string
-  /** The obfuscated string. */
-  base: string
-  /** What is on screen, which is `base` with a character or two disturbed. */
+  /** What is on screen: the same letters, out of order. */
   shown: string
-  /** Bitburner's countdown, in ticks, before another character is disturbed. */
+  /** Ticks to wait before the letters move again. */
   counter: number
 }
 
-/** Bitburner's numbers. Faster and it is static, slower and it stops reading
- *  as a live signal. */
+/** Bitburner's tick. Faster and it is a strobe, slower and it stops moving. */
 const TICK_MS = 20
-const RESTORE_MS = 500
 
-/**
- * Bitburner disturbs one character every 50ms whatever the string, which for
- * its long augmentation names is a light shimmer and for a nine letter tab
- * heading is most of the word at once. With a 500ms restore that is ten
- * characters disturbed at any instant, so a short label reads as static rather
- * than as a flicker.
- *
- * The rate scales with length instead, so about a quarter of any string is
- * disturbed. At forty characters that works out to Bitburner's own 50ms.
- */
-const CALM_AT = 40
+/** Ticks between one letter and another trading places. */
+const GAP_TICKS_MIN = 3
+const GAP_TICKS_SPREAD = 5
+
+/** Transpositions per burst. One is a twitch; the whole word is a re-roll and
+ *  reads as static. A few keeps it restless. */
+const SWAPS = 2
 
 const live = new Map<HTMLElement, Sealed>()
 let timer = 0
+
+/** The [start, end) bounds of the word covering index `i`. */
+function wordAround(s: string, i: number): [number, number] {
+  let a = i
+  let b = i
+  while (a > 0 && s[a - 1] !== ' ') a--
+  while (b < s.length - 1 && s[b + 1] !== ' ') b++
+  return [a, b + 1]
+}
+
+/** Trades two letters within one word, so the anagram stays an anagram of
+ *  that word rather than drifting across the whole phrase. */
+function transpose(s: string): string {
+  const at = Math.floor(Math.random() * s.length)
+  if (s[at] === ' ') return s
+  const [a, b] = wordAround(s, at)
+  if (b - a < 2) return s
+  const i = a + Math.floor(Math.random() * (b - a))
+  const j = a + Math.floor(Math.random() * (b - a))
+  if (i === j) return s
+  const out = [...s]
+  const t = out[i]
+  out[i] = out[j]
+  out[j] = t
+  return out.join('')
+}
+
+/** True if any word of `shown` has settled back onto the real one. Words of
+ *  one or two letters are exempt: there is nowhere for AT or A to hide, and
+ *  refusing every move that lands on them would freeze the line. */
+function leaks(shown: string, real: string): boolean {
+  const a = shown.split(' ')
+  const b = real.split(' ')
+  for (let i = 0; i < a.length; i++) {
+    if (b[i] !== undefined && b[i].length > 2 && a[i] === b[i]) return true
+  }
+  return false
+}
 
 function tick(): void {
   if (document.hidden) return
   for (const [el, s] of live) {
     s.counter -= 1
     if (s.counter > 0) continue
-    const spread = CALM_AT / Math.max(8, s.base.length)
-    s.counter = Math.random() * 5 * spread
+    s.counter = GAP_TICKS_MIN + Math.random() * GAP_TICKS_SPREAD
 
-    const i = Math.floor(Math.random() * s.base.length)
-    const settled = s.base.charAt(i)
-    s.shown = swap(s.shown, i, randomize(settled, false))
-    el.textContent = s.shown
-
-    window.setTimeout(() => {
-      const still = live.get(el)
-      if (still !== s) return
-      still.shown = swap(still.shown, i, settled)
-      el.textContent = still.shown
-    }, RESTORE_MS)
+    let next = s.shown
+    for (let n = 0; n < SWAPS; n++) next = transpose(next)
+    // Checked word by word, not on the whole phrase. Transposing inside one
+    // word can land it back on the truth while the rest stays scrambled, and
+    // "HTE WAGER" hands over the half that matters.
+    if (leaks(next, s.key)) continue
+    s.shown = next
+    el.textContent = next
   }
 }
 
@@ -130,7 +151,7 @@ export function seal(el: HTMLElement, text: string): void {
   const held = live.get(el)
   if (held && held.key === text) return
   const base = redact(text)
-  live.set(el, { key: text, base, shown: base, counter: 5 })
+  live.set(el, { key: text, shown: base, counter: 5 })
   el.textContent = base
   ensureTimer()
 }

@@ -26,7 +26,8 @@
     "test:layout": "node tools/layout-test.mjs",
     "test:durability": "node tools/durability-test.mjs",
     "test:roll": "node tools/roll-test.mjs",
-    "test:spoilers": "node tools/spoiler-test.mjs"
+    "test:spoilers": "node tools/spoiler-test.mjs",
+    "test": "node tools/run-tests.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

@@ -31,7 +31,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
 for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
-  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
+  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(150)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
 const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true})
   if(r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description); return r.result?.value}
@@ -65,7 +65,7 @@ if (vis !== 'visible') {
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = true; s.studies = 2
   s.solids.forEach((d, i) => { if (i < 3) { d.bought = 10; d.amount = new D(100) } }) })()`)
-await sleep(400)
+await sleep(150)
 
 const a1 = await ev(shown); await sleep(1200); const a2 = await ev(shown)
 check('display updates before freezing', a1 !== a2, `${a1} -> ${a2}`)
@@ -78,7 +78,7 @@ const orig = `window.__origRaf = window.requestAnimationFrame.bind(window)`
 await ev(orig)
 await ev(`window.requestAnimationFrame = () => 0`)
 await sleep(1200)
-const dead1 = await ev(shown); await sleep(900); const dead2 = await ev(shown)
+const dead1 = await ev(shown); await sleep(150); const dead2 = await ev(shown)
 check('display stops when the frame chain dies', dead1 === dead2, `${dead1} -> ${dead2}`)
 
 await ev(`window.requestAnimationFrame = window.__origRaf`)
@@ -99,6 +99,6 @@ const f2 = await ev(stateInk)
 check('a freeze and resume is credited, not lost', Number(f2) > Number(f1),
   `${Number(f1).toExponential(2)} -> ${Number(f2).toExponential(2)}`)
 
-ws.close();chrome.kill();await sleep(400);try{rmSync(profile,{recursive:true,force:true})}catch{}
+ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

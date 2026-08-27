@@ -74,6 +74,8 @@ export interface GameState {
     thoughtSpeed: number
     /** The dice clatter. Synthesised, so there is nothing to download. */
     sound: boolean
+    /** Whether to ask the browser for the whole screen. */
+    fullscreen: boolean
     /** Whether time away from the game is credited at all. */
     offline: boolean
     /** How many ticks a long absence is simulated in. */
@@ -118,6 +120,7 @@ export function newGame(now: number): GameState {
       tab: 'table',
       thoughtSpeed: THOUGHT_SPEED_DEFAULT,
       sound: true,
+      fullscreen: false,
       offline: true,
       offlineTicks: OFFLINE_TICKS_DEFAULT,
       confirms: defaultConfirms(),

@@ -30,6 +30,34 @@ export const LEAN = [
   '--remote-debugging-port=0',
 ]
 
+/**
+ * Polls until `expr` is truthy in the page, or gives up.
+ *
+ * Every suite used to wait a fixed number of milliseconds after navigating and
+ * after each state change. That is 195 seconds of deliberate sleeping across
+ * fourteen suites, 80 of it on boot alone, and it was never a requirement:
+ * the first suite did it because a sleep was quick to write, the other
+ * thirteen inherited it by copy-paste, and each time one went flaky the number
+ * went up instead of being replaced with a condition.
+ */
+export async function waitFor(ev, expr, { timeout = 20_000, every = 40 } = {}) {
+  const until = Date.now() + timeout
+  for (;;) {
+    try {
+      if (await ev(`!!(${expr})`)) return true
+    } catch {
+      // The document is mid-navigation. Try again.
+    }
+    if (Date.now() > until) throw new Error(`waitFor timed out: ${expr}`)
+    await new Promise((r) => setTimeout(r, every))
+  }
+}
+
+/** The app has booted and its state is readable. */
+export function appReady(ev, opts) {
+  return waitFor(ev, 'window.LD && window.LD.state', opts)
+}
+
 /** Clears out whatever an earlier run died and left behind. */
 export function sweepStale() {
   let freed = 0

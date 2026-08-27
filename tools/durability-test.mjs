@@ -5,7 +5,7 @@
 // the states the OPTIONS rows can be in. persist() is stubbed to always refuse,
 // so the retry path is what runs rather than a lucky grant.
 import { spawn } from 'node:child_process'
-import { guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -29,7 +29,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
 for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
-  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
+  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(150)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
 const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true})
   if(r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description); return r.result?.value}
@@ -46,24 +46,25 @@ await send('Page.addScriptToEvaluateOnNewDocument',{source:`
   Object.defineProperty(navigator.storage, 'persisted', { configurable: true,
     value: () => Promise.resolve(false) })
 `})
-await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4000)
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'})
+ await appReady(ev)
 
 const atBoot = await ev('window.__persistCalls')
 check('it asks at boot', atBoot >= 1, `calls: ${atBoot}`)
 
 // The gesture is the moment Firefox will prompt, so the throttle that keeps the
 // background retries quiet must not eat it.
-await ev(`window.dispatchEvent(new PointerEvent('pointerdown'))`); await sleep(500)
+await ev(`window.dispatchEvent(new PointerEvent('pointerdown'))`); await sleep(150)
 const afterTap = await ev('window.__persistCalls')
 check('a tap asks again despite the throttle', afterTap > atBoot, `${atBoot} -> ${afterTap}`)
 
-await ev(`window.dispatchEvent(new PointerEvent('pointerdown'))`); await sleep(500)
+await ev(`window.dispatchEvent(new PointerEvent('pointerdown'))`); await sleep(150)
 const afterSecond = await ev('window.__persistCalls')
 check('a second tap inside the window is throttled', afterSecond === afterTap,
   `${afterTap} -> ${afterSecond}`)
 
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.includes('OPTIONS')).click()`)
-await sleep(800)
+await sleep(150)
 
 const rows = await ev(`
   (() => {
@@ -84,6 +85,6 @@ check('and offers the notification signal', rows.notify === true)
 check('the file mirror row follows picker support', rows.file === rows.picker,
   `row: ${rows.file}, picker: ${rows.picker}`)
 
-ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}
+ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

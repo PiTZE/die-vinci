@@ -71,13 +71,11 @@ export default defineConfig({
         description: 'A game about Leo.',
         start_url: BASE,
         scope: BASE,
-        // The screen, all of it. Android hides its status and gesture bars
-        // for a fullscreen app, so the game's own ground reaches every edge
-        // instead of sitting between two black bands in the wrong colour.
-        // iOS has no fullscreen mode and falls back to standalone, where the
-        // safe-area insets keep the tab bar off the home indicator.
-        display: 'fullscreen',
-        display_override: ['fullscreen', 'standalone'],
+        // Standalone, not fullscreen. A manifest's display mode is read once
+        // at install and nothing can change it afterwards, so shipping
+        // fullscreen there makes it permanent and un-toggleable. The switch in
+        // OPTIONS uses the Fullscreen API instead, which works at runtime.
+        display: 'standalone',
         orientation: 'any',
         background_color: '#000000',
         theme_color: '#000000',

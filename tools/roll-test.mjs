@@ -1,7 +1,7 @@
 // The roll loop. Nothing produces until a roll lands, a hand cannot out-roll
 // the roll rate, and the automator takes over from the finger.
 import { spawn } from 'node:child_process'
-import { guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -25,22 +25,24 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
 for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
-  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
+  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(150)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
 const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true})
   if(r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description); return r.result?.value}
 await send('Emulation.setFocusEmulationEnabled',{enabled:true})
 await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
-await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4000)
-await ev(`localStorage.clear()`); await send('Page.reload'); await sleep(3500)
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'})
+ await appReady(ev)
+await ev(`localStorage.clear()`); await send('Page.reload')
+ await appReady(ev)
 
 // The dev server compiles on first request, so a fixed sleep after navigate is
 // a guess. Wait for the app to actually exist instead.
 async function booted() {
   for (let i = 0; i < 40; i++) {
     try { if (await ev(`!!(window.LD && window.LD.state)`)) return true } catch {}
-    await sleep(500)
+    await sleep(150)
   }
   throw new Error('the app never booted')
 }
@@ -53,7 +55,7 @@ const ROLL = `[...document.querySelectorAll('.bar-roll')][0]`
 // jumps past the roll duration and lands the throw early. That is correct
 // behaviour and it makes every timing assertion here a coin flip.
 await ev(`window.LD.state.options.offline = false`)
-await sleep(200)
+await sleep(150)
 
 // The table opens with one die and nothing running.
 const start = await ev(`({
@@ -111,7 +113,7 @@ check('mashing cannot beat the roll rate', gained <= oneRollMax,
 // Space is bound to the roll, and must not also scroll the pane under it.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.rollStartedAt = 0; s.ink = new D(0) })()`)
-await sleep(300)
+await sleep(150)
 const beforeKey = await ev(`window.LD.state.ink.toString()`)
 await send('Input.dispatchKeyEvent',{type:'rawKeyDown',code:'Space',key:' ',windowsVirtualKeyCode:32})
 await sleep(80)
@@ -123,9 +125,9 @@ check('space rolls', Number(afterKey) > Number(beforeKey), `${beforeKey} -> ${af
 // The automator, and the button standing down once it is in.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.studies = 2; s.ink = new D(1e6) })()`)
-await sleep(400)
+await sleep(150)
 await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.includes('AUTOMATE')).click()`)
-await sleep(400)
+await sleep(150)
 const auto = await ev(`({ auto: window.LD.state.autoRoll,
   btn: getComputedStyle(${ROLL}).display })`)
 check('the automator can be bought', auto.auto === true)
@@ -169,7 +171,7 @@ check('a batch pays the mean face per die', got > 0.55 && got < 1.75,
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0
   s.solids.forEach((d, i) => { d.amount = new D(i === 0 ? 10 : 0) }) })()`)
-await sleep(400)
+await sleep(150)
 await ev(`(() => { window.__s = []
   const ln = document.querySelector('.solid-icon line')
   window.__t = setInterval(() => window.__s.push([
@@ -216,7 +218,7 @@ check('the hop is big enough to see', hop.lowest < -1.2, JSON.stringify(hop))
 // The face and the wireframe trade places rather than stacking.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0 })()`)
-await sleep(400)
+await sleep(150)
 await ev(`${ROLL}.click()`); await sleep(120)
 const air = await ev(`({ face: document.querySelector('.solid-face').textContent })`)
 check('a die in the air shows no face', air.face === '', JSON.stringify(air))
@@ -236,7 +238,7 @@ check('and the wireframe stays at full strength',
 
 // Too fast to read means no numbers at all, just a blur.
 await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.rollUpgrades = 60 })()`)
-await sleep(500)
+await sleep(150)
 const blur = await ev(`({ face: document.querySelector('.solid-face').textContent })`)
 check('an unreadable roll rate shows the average, as a whole number',
   blur.face === '2', JSON.stringify(blur))
@@ -246,8 +248,8 @@ check('an unreadable roll rate shows the average, as a whole number',
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0; s.studies = 2
   s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 5 : 0) }) })()`)
-await sleep(500)
-await ev(`${ROLL}.click()`); await sleep(260)
+await sleep(150)
+await ev(`${ROLL}.click()`); await sleep(150)
 const empties = await ev(`(() => {
   const rows = [...document.querySelectorAll('.solid')].filter(r => getComputedStyle(r).display !== 'none')
   return rows.map(r => ({ face: r.querySelector('.solid-face').textContent,
@@ -270,15 +272,18 @@ async function spinRate(upgrades) {
   await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
     s.autoRoll = true; s.studies = 2; s.rollUpgrades = ${upgrades}
     s.solids.forEach((d, i) => { if (i < 2) { d.bought = 10; d.amount = new D(50) } }) })()`)
-  await sleep(700)
+  await sleep(150)
   await ev(`(() => { window.__sp = []
     const ln = document.querySelector('.solid-icon line')
     window.__spt = setInterval(() => window.__sp.push([
       Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1'))]), 32) })()`)
-  // Long enough to cover several whole throws. At one roll a second an eased
-  // curve sampled for 1.4s averaged whichever part of it the samples happened
-  // to land on, and the reading swung from 0.19 to 0.37 between runs.
-  await sleep(3200)
+  // Long enough to cover several whole throws, and no longer. At one roll a
+  // second an eased curve sampled for 1.4s averaged whichever part of it the
+  // samples happened to land on, and the reading swung from 0.19 to 0.37
+  // between runs; at a hundred rolls a second, 3.2s is 3.1s of waiting for
+  // nothing. Three throws or 900ms, whichever is more.
+  const span = await ev(`window.LD.rollInterval * 1000`)
+  await sleep(Math.max(900, Math.min(3200, span * 3)))
   await ev(`clearInterval(window.__spt)`)
   return ev(`(() => { const s = window.__sp, d = []
     for (let i = 1; i < s.length; i++) d.push(Math.hypot(s[i][0]-s[i-1][0], s[i][1]-s[i-1][1]))
@@ -330,7 +335,7 @@ check('fully loaded always rolls the maximum',
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = false; s.rollUpgrades = 0; s.studies = 0
   s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 4 : 0) }) })()`)
-await sleep(600)
+await sleep(150)
 const manual = await ev(`({ bar: document.querySelector('.res-rate').textContent,
   row: document.querySelector('.solid-rate').textContent })`)
 check('before the automator the readouts are per roll',
@@ -338,7 +343,7 @@ check('before the automator the readouts are per roll',
 check('and a d4 you own four of pays its average, ten a roll',
   manual.bar.startsWith('10'), manual.bar)
 
-await ev(`window.LD.state.autoRoll = true`); await sleep(600)
+await ev(`window.LD.state.autoRoll = true`); await sleep(150)
 const rolling = await ev(`({ bar: document.querySelector('.res-rate').textContent,
   row: document.querySelector('.solid-rate').textContent })`)
 check('and per second once it is rolling for you',
@@ -358,7 +363,8 @@ await send('Page.addScriptToEvaluateOnNewDocument',{source:`
   }
   window.AudioContext.prototype = Real.prototype
 `})
-await send('Page.reload'); await sleep(1500); await booted()
+await send('Page.reload')
+ await appReady(ev); await booted()
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.options.offline = false; s.options.sound = true; s.autoRoll = true
   s.solids.forEach((d, i) => { if (i < 2) { d.bought = 10; d.amount = new D(500) } }) })()`)
@@ -385,7 +391,7 @@ check('and it stays the only one however long the bed runs',
 // The threshold stops everything and takes over the bar.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.rollUpgrades = 0; s.ink = new D('1.8e308') })()`)
-await sleep(600)
+await sleep(150)
 const halted = await ev(`({
   ink: window.LD.state.ink.toString(),
   roll: getComputedStyle(${ROLL}).display,
@@ -404,6 +410,6 @@ check('ink is pinned at the threshold',
   (await ev(`window.LD.state.ink.toString()`)) === '1.7976931348623157e+308',
   await ev(`window.LD.state.ink.toString()`))
 
-ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}
+ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

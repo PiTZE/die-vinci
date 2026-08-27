@@ -6,6 +6,7 @@ import { installState, manualHint, onInstallChange, promptInstall } from '../ins
 import { CHANNEL_PATHS, OFFLINE_TICK_CHOICES } from '../game/balance'
 import { listBackups } from '../backup'
 import { THOUGHT_SPEEDS } from './thoughts'
+import { fullscreenSupported, isFullscreen, onFullscreenChange } from './fullscreen'
 import {
   askForNotifications,
   askForPersistence,
@@ -52,6 +53,8 @@ export function optionsPane(): Pane {
   let notationBtns: { id: string; btn: HTMLButtonElement }[] = []
   let thoughtBtns: { id: number; btn: HTMLButtonElement }[] = []
   let soundBtns: { on: boolean; btn: HTMLButtonElement }[] = []
+  let fullBtns: { on: boolean; btn: HTMLButtonElement }[] = []
+  let fullSection: HTMLElement
   let themeBtns: { id: string; btn: HTMLButtonElement }[] = []
   let confirmBtns: { key: string; btn: HTMLButtonElement }[] = []
   let currentConfirms: Record<string, boolean> = {}
@@ -126,6 +129,27 @@ export function optionsPane(): Pane {
         soundRow.appendChild(b)
       }
       sound.appendChild(soundRow)
+
+      // Hidden where the browser has no Fullscreen API, which is every iPhone.
+      // A switch that cannot do anything is worse than no switch.
+      fullSection = el('div', 'section')
+      const fh = el('div', 'section-head')
+      fh.appendChild(el('span', 'grow', 'FULLSCREEN'))
+      fullSection.appendChild(fh)
+      const fullRow = el('div', 'row')
+      const fullOn = el('button', 'action', 'ON')
+      const fullOff = el('button', 'action', 'OFF')
+      for (const [b, on] of [[fullOn, true], [fullOff, false]] as const) {
+        b.type = 'button'
+        b.addEventListener('click', () => actions.setFullscreen(on))
+        fullBtns.push({ on, btn: b })
+        fullRow.appendChild(b)
+      }
+      fullSection.appendChild(fullRow)
+      fullSection.hidden = !fullscreenSupported()
+      // Escape and some navigations drop out of fullscreen without asking, so
+      // the switch follows the browser rather than the saved preference.
+      onFullscreenChange(() => actions.setFullscreen(isFullscreen(), true))
 
       const save = el('div', 'section')
       const sh = el('div', 'section-head')
@@ -472,6 +496,7 @@ export function optionsPane(): Pane {
         notation,
         thoughts,
         sound,
+        fullSection,
         install,
         offline,
         confirmSec,
@@ -494,6 +519,9 @@ export function optionsPane(): Pane {
     },
 
     update(s: GameState) {
+      for (const b of fullBtns) {
+        b.btn.classList.toggle('buyable', b.on === s.options.fullscreen)
+      }
       for (const b of soundBtns) {
         b.btn.classList.toggle('buyable', b.on === s.options.sound)
       }

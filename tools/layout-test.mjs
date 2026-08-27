@@ -2,7 +2,7 @@
 //
 //   npm run test:layout
 import { spawn } from 'node:child_process'
-import { guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -26,14 +26,15 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
 for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
-  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
+  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(150)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
 const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true})
   if(r.exceptionDetails) return 'EX '+(r.exceptionDetails.exception?.description||'').split('\n')[0]
   return r.result?.value}
 await send('Emulation.setFocusEmulationEnabled',{enabled:true})
 await send('Page.enable');await send('Runtime.enable')
-await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4000)
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'})
+ await appReady(ev)
 
 const probe = `(() => {
   const t = document.querySelector('.tabs'), a = document.querySelector('.action-bar')
@@ -54,13 +55,13 @@ check('the chrome fits on load', fits(await ev(probe)))
 // A long ticker line, which is what varies most between frames.
 await ev(`document.querySelector('.thought').textContent =
   'Pascal and Fermat solved the problem of points by letter in 1654, and probability theory begins right there in that correspondence.'`)
-await sleep(400)
+await sleep(150)
 check('a long ticker line does not push it off', fits(await ev(probe)))
 
 // Backgrounding changes the visual viewport on a phone.
 for (const h of [844, 700, 640, 844]) {
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: h, deviceScaleFactor: 2, mobile: true })
-  await sleep(500)
+  await sleep(150)
   const p = await ev(probe)
   check(`viewport at ${h}px keeps the tabs on screen`, fits(p), `app ${p.appH} of ${p.vvh}`)
 }
@@ -75,16 +76,16 @@ check('and after a freeze and resume', fits(back), `app ${back.appH} of ${back.v
 // The measured height is an enhancement. Without it the CSS still has to keep
 // the app inside the viewport, which is what svh is there for.
 await ev(`document.documentElement.style.removeProperty('--app-h')`)
-await sleep(300)
+await sleep(150)
 const noVar = await ev(probe)
 check('and with the measured height removed entirely', fits(noVar), `app ${noVar.appH} of ${noVar.vvh}`)
 // An iPhone's home indicator and status bar, which a headless browser always
 // reports as zero. Both of these were wrong on hardware and invisible here.
 await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:2,mobile:true})
-await sleep(500)
+await sleep(150)
 await ev(`document.documentElement.style.setProperty('--safe-b', '34px')`)
 await ev(`document.documentElement.style.setProperty('--safe-t', '47px')`)
-await sleep(400)
+await sleep(150)
 const inset = await ev(`(() => {
   const sel = document.querySelector('.tab[aria-selected="true"]').getBoundingClientRect()
   const bar = document.querySelector('.bar').getBoundingClientRect()
@@ -123,7 +124,7 @@ check('tabs that fit share the whole bar',
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.studies = 8; s.wagers = 2; s.autoRoll = true; s.challengesDone = [1,2]
   s.points = new D(4); s.ink = new D('1e40') })()`)
-await sleep(900)
+await sleep(150)
 const bar = await ev(`(() => {
   const tabs = [...document.querySelectorAll('.tab')].filter(t => getComputedStyle(t).display !== 'none')
   let collide = false
@@ -140,7 +141,7 @@ check('and the bar scrolls when they do not fit', bar.scrolls === true, JSON.str
 // A tab reached from anywhere but a tap on it has to be brought into view.
 await ev(`window.LD.actions.setTab && window.LD.actions.setTab('help')`)
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'HELP').click()`)
-await sleep(500)
+await sleep(150)
 const seen = await ev(`(() => {
   const t = [...document.querySelectorAll('.tab')].find(x => x.getAttribute('aria-selected') === 'true')
   const b = t.getBoundingClientRect()
@@ -154,11 +155,11 @@ check('the selected tab is scrolled into view',
 // unrelated things stacked on top of each other, and no measurement of the
 // label alone showed it: the label was perfectly centred, in a two-line box.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
-await sleep(400)
+await sleep(150)
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.studies = 8; s.autoRoll = true; s.ink = new D('1e40')
   s.solids.forEach((d, i) => { d.bought = 8 + i; d.amount = new D(1e9) }) })()`)
-await sleep(900)
+await sleep(150)
 const buys = await ev(`(() => {
   const rows = [...document.querySelectorAll('.solid')].filter(r => getComputedStyle(r).display !== 'none')
   return rows.map(r => {
@@ -182,7 +183,7 @@ check('and neither overflows the button nor runs into the other',
 
 // Back to the table, or every check below reads a hidden pane.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
-await sleep(500)
+await sleep(150)
 await ev(`document.documentElement.style.removeProperty('--safe-b')`)
 await ev(`document.documentElement.style.removeProperty('--safe-t')`)
 
@@ -190,7 +191,7 @@ await ev(`document.documentElement.style.removeProperty('--safe-t')`)
 // number was auto-placed at the end of the row, six pixels wide, under the buy
 // button. Cheap to assert, and invisible in a screenshot at a glance.
 await send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false})
-await sleep(600)
+await sleep(150)
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.studies = 4; s.autoRoll = true
   s.solids.forEach((d,i) => { if (i < 4) { d.bought = 12; d.amount = new D(500) } }) })()`)
@@ -211,6 +212,6 @@ check('the face stays left of the solid on a desktop row',
 check('the pane fills the window rather than leaving a band under it',
   wide.fill > 85 && wide.actionH < 110 && wide.deadBelow <= 2, JSON.stringify(wide))
 
-ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}
+ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

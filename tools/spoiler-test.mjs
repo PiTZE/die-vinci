@@ -3,7 +3,7 @@
 // ten minutes in you could read "call the Wager", "bind a folio" and "clear a
 // challenge" and know the shape of everything ahead.
 import { spawn } from 'node:child_process'
-import { guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -19,22 +19,24 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
 for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
-  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
+  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(150)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
 const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true})
   if(r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description); return r.result?.value}
 await send('Emulation.setFocusEmulationEnabled',{enabled:true})
 await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
-await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(4500)
-await ev(`localStorage.clear()`); await send('Page.reload'); await sleep(3500)
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'})
+ await appReady(ev)
+await ev(`localStorage.clear()`); await send('Page.reload')
+ await appReady(ev)
 
 // On screen, not merely present. getComputedStyle(child).display does not
 // inherit 'none' from a hidden ancestor, so a check on the heading alone
 // reports every topic as visible while its section is hidden.
 async function shown(tab, sel) {
   await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === '${tab}').click()`)
-  await sleep(450)
+  await sleep(150)
   return ev(`[...document.querySelectorAll('${sel}')]
     .filter(n => n.getBoundingClientRect().height > 0)
     .map(n => n.textContent.trim()).join(' | ')`)
@@ -45,7 +47,7 @@ async function shown(tab, sel) {
  *  merely out of view. */
 async function everything(tab) {
   await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === '${tab}').click()`)
-  await sleep(450)
+  await sleep(150)
   return ev(`document.querySelector('.pane:not([hidden])').textContent`)
 }
 
@@ -62,19 +64,53 @@ check('and those words are not in the document at all',
 check('sealed topics are shown, redacted, not removed',
   !freshHelp.includes('THE WAGER') && freshHelp.length > 40, freshHelp)
 
-// The blocks have to move, and to be a texture rather than one repeated glyph.
-const first = await ev(`document.querySelector('.archive-cell.sealed, .help-head.sealed')
-  ? document.querySelector('.help-head.sealed span').textContent : ''`)
-await sleep(700)
-const second = await ev(`document.querySelector('.help-head.sealed')
-  ? document.querySelector('.help-head.sealed span').textContent : ''`)
-check('the redaction animates', first !== '' && second !== '' && first !== second,
-  `${JSON.stringify(first)} -> ${JSON.stringify(second)}`)
-// A flicker, not static. Bitburner's own rate would have most of a short
-// heading disturbed at once, so the rate scales with length here.
-const moved = [...first].filter((c, i) => c !== second[i]).length
-check('a flicker rather than static', moved >= 1 && moved <= first.length * 0.6,
-  `${moved} of ${first.length} changed in 700ms`)
+// The garble has to be made of the real text without ever being it: same
+// length, same word breaks, letters where the letters were. Bitburner's other
+// branch sends three characters in four to punctuation, which is soup.
+const sealedTitle = await ev(`(() => {
+  const h = document.querySelector('.help-head.sealed span')
+  return h ? h.textContent : ''
+})()`)
+// Polled, not sampled once. A letter trades places every 60 to 160ms, so a
+// fixed 150ms wait sits right on the animation's own period, and a loaded box
+// starves the page for longer than that anyway.
+let sealedAgain = sealedTitle
+for (let i = 0; i < 40 && sealedAgain === sealedTitle; i++) {
+  await sleep(60)
+  sealedAgain = await ev(`(() => {
+    const h = document.querySelector('.help-head.sealed span')
+    return h ? h.textContent : ''
+  })()`)
+}
+check('the redaction animates', sealedTitle !== '' && sealedTitle !== sealedAgain,
+  `${JSON.stringify(sealedTitle)} -> ${JSON.stringify(sealedAgain)}`)
+
+// THE AUTOMATOR is the first sealed topic on a fresh save.
+const REAL = 'THE AUTOMATOR'
+check('it keeps the shape of the real title',
+  sealedTitle.length === REAL.length &&
+    [...REAL].every((c, i) => (c === ' ') === (sealedTitle[i] === ' ')),
+  `${JSON.stringify(sealedTitle)} against ${JSON.stringify(REAL)}`)
+check('letters stay letters, in the same case',
+  [...REAL].every((c, i) => c === ' ' || /[A-Z]/.test(sealedTitle[i])),
+  JSON.stringify(sealedTitle))
+check('and it is never the real title',
+  sealedTitle !== REAL && sealedAgain !== REAL, JSON.stringify(sealedTitle))
+// Word by word, because a single word settling back is the leak that matters.
+const anyWordSettled = await ev(`(() => {
+  const real = ['THE AUTOMATOR', 'STUDY AND FOLIO', 'THE WAGER', 'CHALLENGES', 'AUTOBUYERS']
+  const shown = [...document.querySelectorAll('.help-head.sealed span')].map(n => n.textContent)
+  for (let i = 0; i < shown.length; i++) {
+    const a = (shown[i] || '').split(' '), b = (real[i] || '').split(' ')
+    for (let w = 0; w < a.length; w++) if (b[w] && b[w].length > 2 && a[w] === b[w]) return b[w]
+  }
+  return ''
+})()`)
+check('no single word settles back onto the truth', anyWordSettled === '',
+  anyWordSettled ? `"${anyWordSettled}" was showing` : 'none')
+check('it is not punctuation soup',
+  [...sealedTitle].filter((c) => /[A-Z]/.test(c)).length >= REAL.replace(/ /g, '').length - 1,
+  JSON.stringify(sealedTitle))
 
 check('and still has the ones it needs',
   ['ROLLING', 'THE TABLE', 'ROLL RATE', 'KEYS'].every((t) => freshHelp.includes(t)), freshHelp)
@@ -93,7 +129,7 @@ check('and the count says how many are held back',
 
 // A study reveals the topics a study is about, without touching the rest.
 await ev(`(() => { const s = window.LD.state; s.studies = 3; s.autoRoll = true })()`)
-await sleep(700)
+await sleep(150)
 const midHelp = await shown('HELP', '.help-head')
 check('a study opens the automator and the resets',
   midHelp.includes('THE AUTOMATOR') && midHelp.includes('STUDY AND FOLIO'), midHelp)
@@ -102,7 +138,7 @@ check('but not the Wager, challenges or autobuyers',
   midHelp)
 
 await ev(`(() => { const s = window.LD.state; s.wagers = 1; s.challengesDone = [1] })()`)
-await sleep(700)
+await sleep(150)
 const lateHelp = await shown('HELP', '.help-head')
 check('a Wager opens the rest',
   ['THE WAGER', 'CHALLENGES', 'AUTOBUYERS'].every((t) => lateHelp.includes(t)), lateHelp)
@@ -114,6 +150,6 @@ check('and the archive fills in behind it',
   lateArchive.includes('Wager') && stillSealed < 5,
   `${stillSealed} entries still sealed after a Wager`)
 
-ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}
+ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

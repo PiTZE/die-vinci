@@ -21,6 +21,7 @@ import {
 } from './game/production'
 import { publishAway, simulateAway } from './game/offline'
 import { playThrow, THROW_ABOVE_S } from './ui/sound'
+import { setFullscreen } from './ui/fullscreen'
 import { restoreBackup } from './backup'
 import { devTools } from './dev'
 import { doWager } from './game/wager'
@@ -248,6 +249,13 @@ const actions: Actions = {
   setSound: (on) => {
     state.options.sound = on
     persistSoon()
+  },
+  setFullscreen: (on, echo) => {
+    state.options.fullscreen = on
+    persistSoon()
+    // Only a real tap asks the browser. Echoing the browser's own change back
+    // at it would fight whatever just happened.
+    if (!echo) void setFullscreen(on)
   },
   setThoughtSpeed: (px) => {
     state.options.thoughtSpeed = px

@@ -26,6 +26,8 @@ export interface Actions {
   /** Pixels a second for the thoughts ticker. 0 holds each line still. */
   setThoughtSpeed(px: number): void
   setSound(on: boolean): void
+  /** `echo` is the browser telling us it changed, not the player asking. */
+  setFullscreen(on: boolean, echo?: boolean): void
   setOffline(on: boolean): void
   setOfflineTicks(n: number): void
   setConfirm(key: string, on: boolean): void

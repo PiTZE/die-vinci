@@ -6,7 +6,7 @@
 //
 //   npm run test:away
 import { spawn } from 'node:child_process'
-import { guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -30,14 +30,15 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
 for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
-  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
+  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(150)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
 const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true})
   if(r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description); return r.result?.value}
 await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
 
-await send('Page.navigate',{url:'http://127.0.0.1:5173/seed.html'}); await sleep(4000)
+await send('Page.navigate',{url:'http://127.0.0.1:5173/seed.html'})
+ await appReady(ev)
 
 // A gap in lastTick is exactly what a throttled background tab produces.
 //
@@ -53,7 +54,7 @@ async function gap(seconds, { offline = true } = {}) {
     s.solids[0].amount = new D('1e10')
     s.ink = new D(0)
     s.lastTick = Date.now() - ${seconds} * 1000 })()`)
-  await sleep(700)
+  await sleep(150)
   return {
     ink: Number(await ev(`window.LD.state.ink.toString()`)),
     rate: Number(await ev(`window.LD.state.solids[0].amount.toString()`)),
@@ -94,6 +95,6 @@ check('no notice when away progress is off', off.notice === null, String(off.not
 const capped = await gap(24 * 3600)
 check('a day away is capped at eight hours', /capped/.test(capped.notice ?? '') && /AWAY 8h/.test(capped.notice ?? ''), String(capped.notice))
 
-ws.close();chrome.kill();await sleep(400);try{rmSync(profile,{recursive:true,force:true})}catch{}
+ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

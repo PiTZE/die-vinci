@@ -7,7 +7,7 @@
 //
 //   npm run test:backup
 import { spawn } from 'node:child_process'
-import { guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -31,7 +31,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 let ws,id=0;const pending=new Map()
 for(let i=0;i<60&&!ws;i++){try{const l=await(await fetch(`http://127.0.0.1:${devtoolsPort(profile)}/json`)).json();const p=l.find(t=>t.type==='page')
  if(p){ws=new WebSocket(p.webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j})
-  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(250)}
+  ws.onmessage=m=>{const x=JSON.parse(m.data);const q=pending.get(x.id);if(q){pending.delete(x.id);q.res(x.result)}}}}catch{} if(!ws)await sleep(150)}
 const send=(m,p={})=>new Promise(res=>{const n=++id;pending.set(n,{res});ws.send(JSON.stringify({id:n,method:m,params:p}))})
 const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true})
   if(r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description); return r.result?.value}
@@ -40,7 +40,8 @@ await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
 const KEY = 'leonardos-die-save'
 
-await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(3500)
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'})
+ await appReady(ev)
 
 // A version 1 save, which is what a player who last opened the game before the
 // chain changed would still be holding.
@@ -55,7 +56,8 @@ const OLD = JSON.stringify({
 // are stubbed out first so the planted save survives the trip.
 await ev(`(() => { localStorage.setItem('${KEY}', ${JSON.stringify(OLD)})
   localStorage.setItem = () => {} })()`)
-await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(3500)
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'})
+ await appReady(ev)
 
 const migrated = await ev(`({ ink: window.LD.state.ink.toString(), studies: window.LD.state.studies })`)
 check('the migration cleared layer 0, as designed',
@@ -74,9 +76,9 @@ check('it is listed for restore',
 
 // Round trip: restore it and confirm the old numbers come back.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.ink = new D('12345') })()`)
-await sleep(500)
+await sleep(150)
 await ev(`(() => { const b = [...document.querySelectorAll('.tab')].find(t => t.textContent === 'OPTIONS'); b && b.click() })()`)
-await sleep(600)
+await sleep(150)
 const restored = await ev(`(() => {
   const raw = localStorage.getItem('${KEY}-backup-premigration')
   localStorage.setItem('${KEY}', JSON.parse(raw).save)
@@ -86,17 +88,18 @@ const restored = await ev(`(() => {
   return back })()`)
 check('restoring puts the old save back', restored === '4.2e77', String(restored))
 
-await send('Page.navigate',{url:'http://127.0.0.1:5173/'}); await sleep(3500)
+await send('Page.navigate',{url:'http://127.0.0.1:5173/'})
+ await appReady(ev)
 const afterRestore = await ev(`window.LD.state.ink.toString()`)
 check('and loading it migrates rather than crashing', afterRestore === '10', afterRestore)
 
 // EXPORT used to call select() on the save box, which focuses it, which on a
 // phone throws the keyboard over half the screen for a box nobody types into.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.includes('OPTIONS')).click()`)
-await sleep(600)
+await sleep(150)
 await ev(`document.querySelector('textarea').blur()`)
 await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent === 'EXPORT').click()`)
-await sleep(500)
+await sleep(150)
 // Focus is the whole test. selectionEnd moves to the end just from assigning
 // value, with or without focus, and a caret in an unfocused box raises nothing.
 const io = await ev(`({
@@ -111,6 +114,6 @@ check('EXPORT fills the box without focusing it',
 check('the save box asks for no keyboard',
   (await ev(`document.querySelector('textarea').getAttribute('inputmode')`)) === 'none')
 
-ws.close();chrome.kill();await sleep(400);try{rmSync(profile,{recursive:true,force:true})}catch{}
+ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)
