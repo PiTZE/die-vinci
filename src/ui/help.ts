@@ -28,7 +28,7 @@ const SECTIONS: Section[] = [
     title: 'ROLL RATE',
     body: [
       'How long a roll takes. Faster rolls mean more of them, so it multiplies the whole chain at once. That is why it sits above the table rather than beside it.',
-      'Each upgrade costs ten times the last, and folios make each one worth more permanently.',
+      'Each upgrade costs twenty times the last, and folios make each one worth more permanently.',
     ],
   },
   {

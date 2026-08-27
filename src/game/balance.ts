@@ -102,7 +102,7 @@ export function rollIntervalMultiplier(folios: number): number {
 // AD starts with four of its eight dimensions and its first five boosts each
 // cost a flat 20 of the highest unlocked one; only once the chain is full does
 // the requirement climb, by 15 each. Nine solids with one free is the same
-// shape stretched, with the opening four discounted. See EARLY_STUDIES.
+// shape stretched, with the opening one discounted. See EARLY_STUDIES.
 
 /** Solids on the table before any study. Studies unlock the rest. */
 export const SOLIDS_AT_START = 1
