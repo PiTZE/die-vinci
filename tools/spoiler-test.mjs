@@ -122,8 +122,9 @@ check('and no archive entry about anything ahead',
 check('nor anywhere in the archive document',
   !AHEAD.some((w) => freshArchiveAll.includes(w)),
   AHEAD.filter((w) => freshArchiveAll.includes(w)).join(',') || 'none present')
-check('sealed entries are redacted rather than removed',
-  (await ev(`document.querySelectorAll('.archive-cell.sealed').length`)) > 8)
+const sealedAtStart = await ev(`document.querySelectorAll('.archive-cell.sealed').length`)
+check('sealed entries are redacted rather than removed', sealedAtStart > 8,
+  `${sealedAtStart} sealed on a fresh save`)
 check('and the count says how many are held back',
   /still sealed/.test(freshArchiveAll))
 
@@ -145,10 +146,13 @@ check('a Wager opens the rest',
 const lateArchive = await shown('ARCHIVE', '.archive-cell')
 // Sealed entries are on screen either way now, so the length barely moves.
 // What changes is how many are still redacted.
+// Fewer sealed than before, not below some number: entries about systems the
+// Wager did not unlock, tarot and melting among them, are still sealed and
+// should be.
 const stillSealed = await ev(`document.querySelectorAll('.archive-cell.sealed').length`)
 check('and the archive fills in behind it',
-  lateArchive.includes('Wager') && stillSealed < 5,
-  `${stillSealed} entries still sealed after a Wager`)
+  lateArchive.includes('Wager') && stillSealed < sealedAtStart,
+  `${sealedAtStart} sealed on a fresh save, ${stillSealed} after a Wager`)
 
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)

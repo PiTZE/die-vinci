@@ -20,6 +20,8 @@ const afterStudy = (s: GameState) => s.studies >= 1 || s.wagers > 0
 const afterAutomator = (s: GameState) => s.autoRoll || s.wagers > 0
 const nearWager = (s: GameState) => s.wagers > 0 || s.ink.gte('1e290')
 const afterWager = (s: GameState) => s.wagers > 0
+const hasTarot = (s: GameState) => s.wagers > 0
+const hasMelt = (s: GameState) => (s.tarot?.death ?? 0) > 0
 const afterAutobuyer = (s: GameState) =>
   s.challengesDone.length > 0 || Object.values(s.autobuyers).some((a) => a.unlocked)
 
@@ -92,6 +94,24 @@ const SECTIONS: Section[] = [
     body: [
       'Each buys one thing on a timer. A point spent on one cuts its interval to 0.6 of what it was, down to a floor of a tenth of a second.',
       'The mode button sets what each purchase does: one, a group of ten, or as many as the ink allows.',
+    ],
+  },
+  {
+    title: 'TAROT',
+    needs: hasTarot,
+    body: [
+      'Every Wager pays a draft. Three arcana are offered and you keep one, and every card you keep stays active, so the choice is what to take first rather than what to equip.',
+      'Draw one you already hold and it levels instead, and every effect grows with its level, so a repeat is never a wasted draw.',
+      'The arcana you have not seen are offered more often than the ones you have, and the ones worth something early are offered more often than the ones that need a full table.',
+    ],
+  },
+  {
+    title: 'MELTING',
+    needs: hasMelt,
+    body: [
+      'Death lets you melt the table. Everything below your deepest solid is destroyed, and what is left carries a multiplier for all of it.',
+      'The multiplier replaces the one you had rather than adding to it, so melting early for a small number gains you nothing. The question is when, not whether.',
+      'It is offered only when it would beat what you already hold.',
     ],
   },
   {
