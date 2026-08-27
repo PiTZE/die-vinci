@@ -15,7 +15,9 @@ ROOT=/var/www/leonard
 case "$CHANNEL" in
   stable)
     npm run build
-    rsync -a --delete --exclude='dev/' dist/ "$ROOT/"
+    # tarot/ is a hand-placed page, not part of a build, so --delete would
+    # take it. Remove the exclude and the directory together when it goes.
+    rsync -a --delete --exclude='dev/' --exclude='tarot/' dist/ "$ROOT/"
     ;;
   dev)
     CHANNEL=dev npm run build
