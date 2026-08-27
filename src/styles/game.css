@@ -364,6 +364,7 @@
 /* -- the action bar, pinned in the thumb's reach -------------------------- */
 
 .action-bar {
+  touch-action: none;
   padding: 8px var(--gap);
   background: var(--bg);
   border-top: 1px solid var(--border);
@@ -380,6 +381,10 @@
   gap: 8px;
   /* Resets hard left, MAX hard right, as far apart as the bar allows. */
   justify-content: space-between;
+  /* Two fingers landing in here are two held buttons, never a pinch. Without
+     this the browser can claim the pair as a page gesture and cancel both
+     pointers, which ends both holds at once. */
+  touch-action: none;
 }
 
 .action-side {

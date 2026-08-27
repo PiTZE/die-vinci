@@ -206,6 +206,60 @@ try {
     check('lifting away from the button stops it', (await evaluate(TOTAL)) === atLift, `settled at ${atLift}`)
   }
 
+  // Two fingers, two held buttons. The window release listener used to stop on
+  // any pointerup anywhere, which is right for one finger and wrong for two:
+  // holding ROLL and MAX together, lifting either one killed both.
+  await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
+  await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 })
+  await sleep(700)
+  // The table is cleared first: the checks above buy hundreds of dice, and
+  // against those prices MAX is disabled however much ink it is handed.
+  await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal
+    s.options.offline = false; s.autoRoll = false; s.studies = 2
+    s.rollUpgrades = 0; s.ink = new D('1e12')
+    s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i < 3 ? 100 : 0) }) })()`)
+  await sleep(600)
+  await evaluate(`(() => { window.__roll = 0; window.__max = 0
+    const a = window.LD.actions, r = a.roll.bind(a), m = a.maxAll.bind(a)
+    a.roll = (...x) => { window.__roll++; return r(...x) }
+    a.maxAll = (...x) => { window.__max++; return m(...x) } })()`)
+
+  const centre = async (sel) => evaluate(`(() => { const b = document.querySelector('${sel}').getBoundingClientRect()
+    return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) } })()`)
+  const rollAt = await centre('.bar-roll')
+  const maxAt = await centre('.bar-btn.max')
+  const pt = (id, p) => ({ x: p.x, y: p.y, id, radiusX: 12, radiusY: 12, force: 1 })
+  const counts = () => evaluate(`({ roll: window.__roll, max: window.__max })`)
+
+  await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt(1, rollAt)] })
+  await sleep(600)
+  const one = await counts()
+  await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [pt(1, rollAt), pt(2, maxAt)] })
+  await sleep(900)
+  const two = await counts()
+  check('MAX repeats while ROLL is held', two.max - one.max > 4,
+    `max fired ${two.max - one.max} times with ROLL down`)
+  check('and ROLL keeps repeating too', two.roll - one.roll > 4, `roll fired ${two.roll - one.roll} more`)
+
+  // touchEnd lists the point being released, so this lifts the ROLL finger.
+  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(1, rollAt)] })
+  await sleep(700)
+  const lifted = await counts()
+  // Stopped, not silent: one last repeat can land between the final count and
+  // the release being processed. Still repeating would be a dozen over 700ms.
+  check('lifting one finger stops only that button',
+    lifted.roll - two.roll <= 2 && lifted.max - two.max > 4,
+    `roll +${lifted.roll - two.roll}, max +${lifted.max - two.max}`)
+
+  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [pt(2, maxAt)] })
+  await sleep(500)
+  const done = await counts()
+  await sleep(400)
+  const after = await counts()
+  check('and lifting the second stops that one', after.max - done.max === 0,
+    `max +${after.max - done.max} after both released`)
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false })
+
   const shot = await send('Page.captureScreenshot', { format: 'png' })
   const { writeFileSync } = await import('node:fs')
   writeFileSync(MOBILE ? 'interaction-mobile.png' : 'interaction-desktop.png', Buffer.from(shot.data, 'base64'))

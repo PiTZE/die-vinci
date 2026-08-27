@@ -44,19 +44,41 @@ function repeat(fn: () => void): Repeater {
 export function holdable(el: HTMLElement, action: (mods: Mods) => void): void {
   let active: Repeater | null = null
   let fromPointer = false
+  /** The finger holding this button, so another one lifting cannot end it. */
+  let holding: number | null = null
 
   const stop = () => {
     active?.stop()
     active = null
+    holding = null
     el.classList.remove('held')
-    window.removeEventListener('pointerup', stop)
-    window.removeEventListener('pointercancel', stop)
+    window.removeEventListener('pointerup', onRelease)
+    window.removeEventListener('pointercancel', onRelease)
+  }
+
+  /**
+   * Only the finger that started this hold can end it.
+   *
+   * The window listener used to stop on any release anywhere, which is right
+   * for one finger and wrong for two: holding ROLL and MAX together, lifting
+   * either one stopped both. Whichever you let go of, the other went dead in
+   * your hand.
+   */
+  const onRelease = (e: PointerEvent) => {
+    if (holding !== null && e.pointerId !== holding) return
+    stop()
   }
 
   el.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return
     if ((el as HTMLButtonElement).disabled) return
     fromPointer = true
+    // Whichever finger pressed last owns the hold. Refusing a press while
+    // `holding` was set looked tidier and was worse: any pointerdown whose
+    // release never arrived latched the button shut for the rest of the
+    // session, which is a far bigger bug than the one it guarded against.
+    active?.stop()
+    holding = e.pointerId
     // Capture means a finger sliding off the button still delivers pointerup
     // here. Without it the repeat never stops.
     try {
@@ -67,16 +89,16 @@ export function holdable(el: HTMLElement, action: (mods: Mods) => void): void {
     el.classList.add('held')
     // A release anywhere ends the hold, including on an element that is not
     // this one. Dragging the finger off the button must not.
-    window.addEventListener('pointerup', stop)
-    window.addEventListener('pointercancel', stop)
+    window.addEventListener('pointerup', onRelease)
+    window.addEventListener('pointercancel', onRelease)
     active = repeat(() => action({ shift: e.shiftKey }))
   })
 
   // Deliberately not listening for pointerleave, pointerout or
   // lostpointercapture. All three fire while the finger is still down, and
   // stopping on them is what made the button quit the moment you slid off it.
-  el.addEventListener('pointerup', stop)
-  el.addEventListener('pointercancel', stop)
+  el.addEventListener('pointerup', onRelease)
+  el.addEventListener('pointercancel', onRelease)
 
   el.addEventListener('click', (e) => {
     // The pointer path already fired this press.
