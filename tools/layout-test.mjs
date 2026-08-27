@@ -149,6 +149,37 @@ const seen = await ev(`(() => {
 check('the selected tab is scrolled into view',
   seen.left >= -1 && seen.right <= seen.w + 1, JSON.stringify(seen))
 
+// The counter and the label are one control on one line. Pinned to the top
+// left corner while the label centred in a 49px button, they read as two
+// unrelated things stacked on top of each other, and no measurement of the
+// label alone showed it: the label was perfectly centred, in a two-line box.
+await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
+await sleep(400)
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 8; s.autoRoll = true; s.ink = new D('1e40')
+  s.solids.forEach((d, i) => { d.bought = 8 + i; d.amount = new D(1e9) }) })()`)
+await sleep(900)
+const buys = await ev(`(() => {
+  const rows = [...document.querySelectorAll('.solid')].filter(r => getComputedStyle(r).display !== 'none')
+  return rows.map(r => {
+    const b = r.querySelector('.solid-buy').getBoundingClientRect()
+    const l = r.querySelector('.solid-buy-label').getBoundingClientRect()
+    const c = r.querySelector('.solid-step').getBoundingClientRect()
+    return {
+      label: r.querySelector('.solid-buy-label').textContent,
+      sameLine: Math.abs((l.top + l.bottom) / 2 - (c.top + c.bottom) / 2) < 4,
+      overflows: l.right > b.right + 1 || l.left < b.left - 1,
+      collides: c.right > l.left + 1
+    }
+  })
+})()`)
+check('the counter and the label share one line on every row',
+  buys.length >= 8 && buys.every((r) => r.sameLine),
+  JSON.stringify(buys.filter((r) => !r.sameLine).slice(0, 2)))
+check('and neither overflows the button nor runs into the other',
+  buys.every((r) => !r.overflows && !r.collides),
+  JSON.stringify(buys.filter((r) => r.overflows || r.collides).slice(0, 2)))
+
 // Back to the table, or every check below reads a hidden pane.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
 await sleep(500)

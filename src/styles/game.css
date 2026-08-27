@@ -238,12 +238,15 @@
 
 /* Progress into the current group of ten, which is what earns the next x2.
    It sits in the corner of the button that completes it. */
+/* Inline, at the left of the label, on one line with it.
+   Pinned to the top left corner it read as a separate thing floating above
+   the button's own text: the label centres in the button, the button is the
+   height of the whole row, and the two ended up stacked and unrelated. */
 .solid-step {
-  position: absolute;
-  top: 3px;
-  left: 6px;
+  position: relative;
+  flex: 0 0 auto;
   color: var(--fg-muted);
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
@@ -251,6 +254,7 @@
 
 .solid-fill,
 .solid-fill-can {
+  pointer-events: none;
   position: absolute;
   top: 0;
   bottom: 0;
@@ -267,13 +271,6 @@
 /* And how many more the ink covers right now, carrying on from it. */
 .solid-fill-can {
   background: var(--fill);
-}
-
-/* The label alone needs lifting above the fills. The counter is already
-   absolutely positioned and giving it position: relative dropped it back into
-   the flow, on top of the label. */
-.solid-buy-label {
-  position: relative;
 }
 
 .solid-amount {
@@ -303,17 +300,26 @@
 .solid-buy {
   grid-area: buy;
   position: relative;
-  /* Narrower than the 9.5rem the desktop row gives it. "BUY 8 / 800.00Qa" is
-     the worst case and it fits in this; the difference goes to the name, which
-     was reading "d26 RH..." before. */
-  min-width: 7.6rem;
-  /* The floor for a touch target, and now the height of the whole row. */
+  /* Wide enough for the counter and the longest label side by side.
+     "BUY 8 / 800.00Qa" against "0/10" is the worst case. */
+  min-width: 8.7rem;
+  /* The floor for a touch target, and the height of the whole row. */
   min-height: 44px;
   align-self: stretch;
-  padding: 4px 10px;
-  font-size: 0.68rem;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 0.62rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* Centred in whatever the counter leaves, which is what makes the pair read
+   as one control rather than two. position lifts it above the two fills. */
+.solid-buy-label {
+  flex: 1 1 auto;
+  text-align: center;
+  position: relative;
 }
 
 /* The one accent in the game: you can afford this and have not bought it. */
@@ -1031,25 +1037,12 @@
     text-align: right;
   }
 
-  /* The counter sits top left on a phone, where the button is tall enough for
-     it. On a single-line desktop row it would land on the label, so it moves
-     inline and the label centres in what is left. */
+  /* Same one-line arrangement as the phone, with room to breathe. */
   .solid-buy {
-    display: flex;
-    align-items: center;
     gap: 8px;
     min-height: 38px;
     min-width: 12rem;
     padding: 0 10px;
-  }
-
-  .solid-step {
-    position: static;
-    flex: 0 0 auto;
-  }
-
-  .solid-buy-label {
-    flex: 1 1 auto;
-    text-align: center;
+    font-size: 0.68rem;
   }
 }
