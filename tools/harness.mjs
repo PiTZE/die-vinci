@@ -10,8 +10,10 @@ import { join } from 'node:path'
 
 /** Test profiles are named ld-*. Nothing else in tmpdir is touched. */
 const PREFIX = 'ld-'
-/** Old enough that no live suite could still be using it. */
-const STALE_MS = 30 * 60_000
+/** Old enough that no live suite could still be using it. Comfortably past the
+ *  hard limit below, so a slow but living run is never swept out from under
+ *  itself. */
+const STALE_MS = 12 * 60_000
 /** A suite that has not finished by now is hung, and holding a browser. */
 const HARD_LIMIT_MS = 6 * 60_000
 
@@ -60,16 +62,42 @@ export function guard(chrome, profile, getSocket) {
     done = true
     try { getSocket?.()?.close() } catch { /* already closed */ }
     try { chrome.kill('SIGKILL') } catch { /* already gone */ }
-    try { rmSync(profile, { recursive: true, force: true }) } catch { /* already gone */ }
+    // Chrome's file handles outlive the kill by a moment, and a removal in that
+    // window fails without saying so. A few tries inside the exit handler is
+    // all it takes; anything that still survives is swept by the next run.
+    for (let i = 0; i < 40; i++) {
+      try {
+        rmSync(profile, { recursive: true, force: true })
+        break
+      } catch {
+        const until = Date.now() + 25
+        while (Date.now() < until) { /* the handler cannot await */ }
+      }
+    }
   }
 
   process.on('exit', cleanup)
-  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  // SIGPIPE included: piping a suite into `head` closes the pipe and kills the
+  // process, which is how four browsers and 95MB of profiles survived a run
+  // that looked like it had finished.
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGPIPE']) {
     process.on(sig, () => {
       cleanup()
       process.exit(130)
     })
   }
+  // Node surfaces a broken pipe as an EPIPE write error rather than a signal,
+  // so the SIGPIPE handler above never runs for `npm run test:x | head`. This
+  // is the one that does.
+  for (const stream of [process.stdout, process.stderr]) {
+    stream.on('error', (e) => {
+      if (e && e.code === 'EPIPE') {
+        cleanup()
+        process.exit(0)
+      }
+    })
+  }
+
   process.on('uncaughtException', (e) => {
     console.error(e)
     cleanup()
