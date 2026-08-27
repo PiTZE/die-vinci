@@ -70,7 +70,15 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.solids.forEach((d, i) => { if (i < 3) { d.bought = 10; d.amount = new D(100) } }) })()`)
 await sleep(150)
 
-const a1 = await ev(shown); await sleep(1200); const a2 = await ev(shown)
+// Polled. The roll interval here is a second and a fixed 1200ms leaves 200ms
+// for the tick that resolves it, which is not enough on a box running four
+// browsers. Six seconds is a cap, not a delay.
+const a1 = await ev(shown)
+let a2 = a1
+for (let i = 0; i < 40 && a1 === a2; i++) {
+  await sleep(150)
+  a2 = await ev(shown)
+}
 check('display updates before freezing', a1 !== a2, `${a1} -> ${a2}`)
 
 // The real failure is a render chain that dies while the page is still
