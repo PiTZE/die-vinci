@@ -6,7 +6,7 @@
 //
 //   npm run test:freeze
 import { spawn } from 'node:child_process'
-import { guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -52,7 +52,10 @@ const stateInk = `window.LD.state.ink.toString()`
 await send('Emulation.setFocusEmulationEnabled', { enabled: true })
 await send('Page.navigate',{url:URL_})
 await send('Page.bringToFront')
-await sleep(4500)
+// Wait for the app to actually be there rather than for a number of seconds.
+// A fixed 4.5s was enough alone and not enough under `npm test`, where this
+// starts alongside the roll suite and the page gets a fraction of a core.
+await appReady(ev)
 
 // Baseline: the display should be moving.
 const vis = await ev(`document.visibilityState`)

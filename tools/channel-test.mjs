@@ -80,6 +80,28 @@ check('back on stable', c.channel === 'stable', JSON.stringify(c))
 const stableInk = await ev(`window.LD.state.ink.toString()`)
 check('stable save survived the trip', Number(stableInk) >= 1.234e5, `stable ink ${stableInk}`)
 
+// Both channels install under the same name. The suffix existed so two copies
+// could be told apart on a home screen, at the cost of every tester looking at
+// "(dev)" while testing what everyone else will see. Both channels also
+// declare the same identity, so installing from /dev/ gives you the one app
+// rather than a second icon; the channel switch in OPTIONS moves between
+// builds. Only the service worker scopes differ, which is checked above and is
+// what actually keeps the two builds' caches apart.
+//
+// Checked on scope and start_url rather than id, because a manifest without an
+// explicit id gets one derived from its start_url, so those two are the
+// identity. Stable's build predates the id field and is still the same app.
+const manifests = await Promise.all(
+  ['https://leo.generis.ir/manifest.webmanifest', 'https://leo.generis.ir/dev/manifest.webmanifest']
+    .map((u) => fetch(u).then((r) => r.json())),
+)
+check('neither channel wears a suffix',
+  manifests.every((m) => m.name === 'die Vinci' && m.short_name === 'die Vinci'),
+  manifests.map((m) => m.name).join(' | '))
+check('both install as the same single app',
+  manifests.every((m) => m.scope === '/' && m.start_url === '/'),
+  manifests.map((m) => `${m.scope} ${m.start_url}`).join(' | '))
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

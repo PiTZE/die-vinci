@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -51,6 +52,30 @@ export default defineConfig({
         })
       },
     },
+    {
+      // vite-plugin-pwa derives the manifest's scope and start_url from its
+      // base, and its base has to be /dev/ so the assets resolve. That also
+      // makes the dev build a second installable app, which is not wanted:
+      // one app, and the channel switch in OPTIONS moves between builds.
+      //
+      // Rewritten on disk at the end of the build rather than in the bundle,
+      // because the plugin writes the manifest itself instead of emitting it
+      // as an asset, so a generateBundle hook never sees it.
+      //
+      // The service worker's scope is untouched. That one does have to stay
+      // /dev/, or the dev worker answers for the stable site.
+      name: 'one-installable-app',
+      closeBundle() {
+        const out = CHANNEL === 'dev' ? 'dist-dev' : 'dist'
+        const file = resolve(out, 'manifest.webmanifest')
+        if (!existsSync(file)) return
+        const manifest = JSON.parse(readFileSync(file, 'utf8'))
+        manifest.id = '/'
+        manifest.scope = '/'
+        manifest.start_url = '/'
+        writeFileSync(file, JSON.stringify(manifest))
+      },
+    },
     VitePWA({
       // The service worker takes a new build on the next load and activates it
       // without asking. That is the self-updating part.
@@ -66,8 +91,17 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ['icon-192.png', 'icon-512.png', 'icon-512-maskable.png'],
       manifest: {
-        name: CHANNEL === 'dev' ? 'die Vinci (dev)' : 'die Vinci',
-        short_name: CHANNEL === 'dev' ? 'die Vinci dev' : 'die Vinci',
+        // One installable app, whichever channel you install from. The name,
+        // the identity, the scope and the start url are all the stable ones,
+        // so a tester who installs from /dev/ gets the same icon and the same
+        // app as everybody else and switches channel in OPTIONS.
+        //
+        // This is only the manifest. The dev service worker is still scoped to
+        // /dev/ below, which is what actually keeps the two builds apart; a
+        // dev worker scoped at / would answer for the stable site.
+        name: 'die Vinci',
+        short_name: 'die Vinci',
+
         description: 'A game about Leo.',
         start_url: BASE,
         scope: BASE,
