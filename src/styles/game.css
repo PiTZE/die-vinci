@@ -1062,19 +1062,6 @@
 
 /* -- the arcana ---------------------------------------------------------- */
 
-.arcana-bar {
-  height: 3px;
-  background: var(--sunk, var(--fill));
-  position: relative;
-  margin: 0 10px 8px;
-}
-
-.arcana-bar-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-  background: var(--accent);
-}
 
 .arcana-grid {
   display: grid;

@@ -5,7 +5,6 @@
 // already own is a choice people click past. Otherwise it is what you hold.
 import { ARCANA, ARCANA_BY_ID, draftPending, levelOf, owned } from '../game/tarot'
 import { ARCANA_ART } from './arcana-art'
-import { WAGER_AT } from '../game/balance'
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
 import { seal, unseal } from './redact'
@@ -48,8 +47,6 @@ function setText(n: HTMLElement, v: string): void {
 export function tarotPane(): Pane {
   const cells = new Map<string, Cell>()
   let head: HTMLElement
-  let bar: HTMLElement
-  let barFill: HTMLElement
   let offerSection: HTMLElement
   let offerRow: HTMLElement
   let heldSection: HTMLElement
@@ -76,14 +73,6 @@ export function tarotPane(): Pane {
       head = el('span', 'num dim', '')
       hh.appendChild(head)
       heldSection.appendChild(hh)
-
-      // How close the next draft is. One per Wager, so it is a Wager bar
-      // wearing a different name, and saying so would be more honest than
-      // useful: what the player wants to know is whether a card is coming.
-      bar = el('div', 'arcana-bar')
-      barFill = el('span', 'arcana-bar-fill')
-      bar.appendChild(barFill)
-      heldSection.appendChild(bar)
 
       const grid = el('div', 'tile-grid')
       for (const a of ARCANA) {
@@ -145,12 +134,6 @@ export function tarotPane(): Pane {
 
       const have = owned(s)
       setText(head, `${have}/${ARCANA.length}`)
-      // Ink toward the next Wager, on a log scale, because one Wager is one
-      // draft. It read 100% from the first Wager onward before this: the
-      // placeholder tested draftProgress, which counts drafts already earned
-      // and only ever climbs, so the bar filled once and stayed full.
-      const pct = `${(Math.min(1, Math.max(0, s.ink.log10()) / WAGER_AT.log10()) * 100).toFixed(1)}%`
-      if (barFill.style.width !== pct) barFill.style.width = pct
 
       for (const a of ARCANA) {
         const cell = cells.get(a.id)
