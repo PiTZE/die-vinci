@@ -8,6 +8,9 @@ import { STUDIES_THAT_UNLOCK } from './game/balance'
 import { simulateAway } from './game/offline'
 import { buyFolio, buyStudy, studyReq } from './game/production'
 import { UPGRADES, buyUpgrade, canBuy, type UpgradeId } from './game/upgrades'
+import { ARCANA } from './game/tarot'
+import { CHALLENGES } from './game/challenges'
+import { unlock } from './game/autobuyers'
 import { doWager } from './game/wager'
 import { listBackups } from './backup'
 import type { GameState } from './state'
@@ -39,6 +42,8 @@ const LINES = [
   'LD.wager()           call the Wager regardless of the threshold',
   'LD.upgrades()        buy every affordable Points upgrade, cheapest first',
   'LD.upgrade("resetBoost")   buy one by id. LD.upgradeIds() lists them',
+  'LD.arcana(3)         hold all 22 arcana, at that level. LD.arcana(0) drops them',
+  'LD.challenges()      clear all 12 and take the autobuyers they award',
   'LD.skip("2h")        simulate time away. also 90, "30m", "3d"',
   'LD.rich()            enough of everything to poke at the late game',
   'LD.backups()         what could be restored, and how old',
@@ -145,6 +150,49 @@ export function devTools(d: DevDeps): Record<string, unknown> {
       }
       touch()
       return `${n} bought, ${s().pointUpgrades.length}/${Object.keys(UPGRADES).length} held`
+    },
+    /**
+     * Every arcanum at once, at whatever level. The draft is one card a Wager,
+     * so reaching all 22 legitimately is 22 Wagers, and a card's effect scales
+     * with its level on top of that.
+     *
+     * Level 0 clears them, which is the only way back to a table without them.
+     */
+    arcana(level = 1) {
+      const st = s()
+      if (level <= 0) {
+        st.tarot = {}
+        st.pendingDraft = []
+        touch()
+        return 'all arcana dropped'
+      }
+      for (const a of ARCANA) st.tarot[a.id] = level
+      // A draft left waiting would open over the grid on the next frame and
+      // offer a card that is already held.
+      st.pendingDraft = []
+      touch()
+      return `${ARCANA.length} arcana at level ${level}`
+    },
+    /**
+     * Clearing a challenge does two things: it marks the challenge done and it
+     * unlocks the autobuyer that challenge awards. Setting the first without
+     * the second gives a tab that reads as finished and hands out nothing.
+     */
+    challenges() {
+      const st = s()
+      let cleared = 0
+      for (const c of CHALLENGES) {
+        if (!st.challengesDone.includes(c.id)) {
+          st.challengesDone.push(c.id)
+          cleared++
+        }
+        unlock(st, c.awards as never)
+      }
+      st.challengeRunning = 0
+      st.haltMs = 0
+      touch()
+      const autos = Object.values(st.autobuyers).filter((a) => a.unlocked).length
+      return `${cleared} cleared, ${st.challengesDone.length}/${CHALLENGES.length} done, ${autos} autobuyers`
     },
     skip(v: number | string) {
       const secs = seconds(v)
