@@ -154,6 +154,26 @@ check('and the archive fills in behind it',
   lateArchive.includes('Wager') && stillSealed < sealedAtStart,
   `${sealedAtStart} sealed on a fresh save, ${stillSealed} after a Wager`)
 
+// An arcanum you have not held has its name and its note redacted, and its
+// picture has to go too. A sun drawn beside a redacted name says which card it
+// is as plainly as the name would. It leaked once: `hidden` is defined on
+// HTMLElement and an <svg> is not one, so assigning to the property set
+// something nothing reads and every card showed its picture.
+await ev(`(() => { const s = window.LD.state
+  s.wagers = 2; s.tarot = { sun: 1 }; s.pendingDraft = [] })()`)
+await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TAROT').click()`)
+await sleep(250)
+const art = await ev(`(() => {
+  const cells = [...document.querySelectorAll('.pane:not([hidden]) .tile')]
+  const shown = cells.filter(c => {
+    const svg = c.querySelector('.tile-art')
+    return svg && !svg.hasAttribute('hidden') && getComputedStyle(svg).display !== 'none'
+  })
+  return { cells: cells.length, held: cells.filter(c => c.classList.contains('held')).length,
+    drawn: shown.length } })()`)
+check('only the arcana you hold show their picture',
+  art.cells === 22 && art.held === 1 && art.drawn === 1, JSON.stringify(art))
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

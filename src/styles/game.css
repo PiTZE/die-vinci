@@ -752,6 +752,24 @@
   color: var(--accent);
 }
 
+/* A card's picture beside its numeral. */
+.tile-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tile-art {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--fg-muted);
+}
+
+.tile.held .tile-art {
+  color: var(--accent);
+}
+
 /* An index down the left, for the arcana's numerals and the challenges' count.
    Held or not, it is the tile's address rather than its state. */
 .tile-index {

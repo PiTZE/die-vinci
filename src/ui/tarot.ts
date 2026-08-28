@@ -4,6 +4,7 @@
 // cards and nothing else, because a choice competing with a grid of things you
 // already own is a choice people click past. Otherwise it is what you hold.
 import { ARCANA, ARCANA_BY_ID, draftPending, levelOf, owned } from '../game/tarot'
+import { ARCANA_ART } from './arcana-art'
 import { WAGER_AT } from '../game/balance'
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
@@ -11,10 +12,33 @@ import { seal, unseal } from './redact'
 
 interface Cell {
   root: HTMLElement
+  art: SVGElement
   numeral: HTMLElement
   name: HTMLElement
   note: HTMLElement
   level: HTMLElement
+}
+
+/**
+ * One arcanum's picture, as an inline SVG.
+ *
+ * Each icon keeps the viewBox it arrived with rather than being squeezed into a
+ * square. They are all different shapes, and a shared box would stretch most of
+ * them. Filled with currentColor, so a card takes the theme's foreground.
+ */
+function artFor(id: string): SVGElement {
+  const art = ARCANA_ART[id]
+  const box = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  box.setAttribute('class', 'tile-art')
+  box.setAttribute('viewBox', art ? art.box : '0 0 48 48')
+  box.setAttribute('fill', 'currentColor')
+  box.setAttribute('aria-hidden', 'true')
+  if (art) {
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    path.setAttribute('d', art.d)
+    box.appendChild(path)
+  }
+  return box
 }
 
 function setText(n: HTMLElement, v: string): void {
@@ -64,13 +88,19 @@ export function tarotPane(): Pane {
       const grid = el('div', 'tile-grid')
       for (const a of ARCANA) {
         const cell = el('div', 'tile')
+        // The card's own picture, next to its numeral. Hidden until the card is
+        // held: an unowned arcanum has its name and its note redacted, and a
+        // sun drawn beside the redaction would give away which one it is.
+        const head = el('span', 'tile-head')
+        const art = artFor(a.id)
         const numeral = el('span', 'tile-index', a.numeral)
         const name = el('span', 'tile-name', '')
         const note = el('span', 'tile-note', '')
         const level = el('span', 'tile-mark', '')
-        cell.append(numeral, name, note, level)
+        head.append(art, numeral)
+        cell.append(head, name, note, level)
         grid.appendChild(cell)
-        cells.set(a.id, { root: cell, numeral, name, note, level })
+        cells.set(a.id, { root: cell, art, numeral, name, note, level })
       }
       heldSection.appendChild(grid)
       root.appendChild(heldSection)
@@ -135,6 +165,11 @@ export function tarotPane(): Pane {
           seal(cell.name, a.name)
           seal(cell.note, a.note)
         }
+        // The attribute, not the property. `hidden` is defined on HTMLElement and
+        // an <svg> is not one, so assigning to it set a property nothing reads
+        // and every unheld card showed its picture beside its redacted name.
+        if (at > 0) cell.art.removeAttribute('hidden')
+        else cell.art.setAttribute('hidden', '')
         setText(cell.level, at > 0 ? `LEVEL ${at}` : '')
         cell.root.classList.toggle('sealed', at === 0)
         cell.root.classList.toggle('held', at > 0)
