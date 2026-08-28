@@ -7,10 +7,7 @@
 # Stable lives at the root and dev in the dev/ subdirectory, so the stable
 # rsync has to exclude dev/ or --delete would take the whole dev channel with
 # it. That is the one dangerous line here.
-#
-# tarot/ is excluded for the same reason. It is a temporary comparison sheet,
-# not part of either channel, and a stable deploy would otherwise delete it out
-# from under whoever is looking at it. Delete the directory by hand when done.
+
 set -euo pipefail
 
 CHANNEL="${1:-}"
@@ -19,7 +16,7 @@ ROOT=/var/www/leonard
 case "$CHANNEL" in
   stable)
     npm run build
-    rsync -a --delete --exclude='dev/' --exclude='tarot/' dist/ "$ROOT/"
+    rsync -a --delete --exclude='dev/' dist/ "$ROOT/"
     ;;
   dev)
     CHANNEL=dev npm run build
