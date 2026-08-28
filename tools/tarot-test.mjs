@@ -121,6 +121,38 @@ check('melting pays the top solid and empties the rest',
   Number(melt.after) > Number(melt.before) && melt.lowerCleared === '0',
   JSON.stringify(melt))
 
+// A card that is full is not offered. Drafting one was a Wager spent on a level
+// that changed nothing, and four of the caps fall out of the effects themselves:
+// the Magician's skip clamps at 0.8 and the World cannot open more than the
+// eight solids a study would have, so both stop at eight.
+const caps = await ev(`(() => {
+  const s = window.LD.state
+  const out = {}
+  s.tarot = {}
+  for (const a of window.LD.ARCANA) s.tarot[a.id] = a.max
+  s.pendingDraft = []
+  out.offerWhenAllFull = window.LD.drawOffer(s, 3, () => 0.5).length
+  s.tarot = { sun: 9 }; out.offeredAtNine = window.LD.weightOf(s, 'sun') > 0
+  s.tarot = { sun: 10 }; out.offeredAtTen = window.LD.weightOf(s, 'sun') > 0
+  const by = Object.fromEntries(window.LD.ARCANA.map(a => [a.id, a.max]))
+  out.derived = [by.magician, by.world, by.hermit, by.hanged]
+  // A level past the cap cannot outrun it, which covers saves written before
+  // the caps existed and anything the dev cheat handed out.
+  s.tarot = { magician: 40 }
+  out.overCapReadsAs = window.LD.levelOf(s, 'magician')
+  // And taking one is refused even if a stale draft still offers it.
+  s.tarot = { sun: 10 }; s.pendingDraft = ['sun']
+  out.tookWhenFull = window.LD.state.tarot.sun
+  return out })()`)
+check('a full card is not offered', caps.offeredAtNine === true && caps.offeredAtTen === false,
+  JSON.stringify({ nine: caps.offeredAtNine, ten: caps.offeredAtTen }))
+check('and with every card full there is nothing to draft',
+  caps.offerWhenAllFull === 0, `${caps.offerWhenAllFull} offered`)
+check('the four caps that fall out of the effects are 8, 8, 10, 10',
+  JSON.stringify(caps.derived) === '[8,8,10,10]', JSON.stringify(caps.derived))
+check('a level past the cap is read as the cap',
+  caps.overCapReadsAs === 8, `40 reads as ${caps.overCapReadsAs}`)
+
 // The first draft has to interrupt. draftInterrupts existed and nothing ever
 // called it, so the very first card sat behind a tab a new player had no
 // reason to open and the mechanic simply never happened for them.

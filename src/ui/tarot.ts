@@ -3,7 +3,7 @@
 // Two states in one pane. With a draft waiting it is a choice between three
 // cards and nothing else, because a choice competing with a grid of things you
 // already own is a choice people click past. Otherwise it is what you hold.
-import { ARCANA, ARCANA_BY_ID, draftPending, levelOf, owned } from '../game/tarot'
+import { ARCANA, ARCANA_BY_ID, draftPending, isFull, levelOf, owned } from '../game/tarot'
 import { ARCANA_ART } from './arcana-art'
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
@@ -153,7 +153,9 @@ export function tarotPane(): Pane {
         // and every unheld card showed its picture beside its redacted name.
         if (at > 0) cell.art.removeAttribute('hidden')
         else cell.art.setAttribute('hidden', '')
-        setText(cell.level, at > 0 ? `LEVEL ${at}` : '')
+        // A full card says so. Nothing more can be drafted into it, and the
+        // draft will not offer it again.
+        setText(cell.level, at > 0 ? (isFull(s, a.id) ? `LEVEL ${at}  FULL` : `LEVEL ${at}`) : '')
         cell.root.classList.toggle('sealed', at === 0)
         cell.root.classList.toggle('held', at > 0)
       }

@@ -32,7 +32,14 @@ import { setFullscreen } from './ui/fullscreen'
 import { restoreBackup } from './backup'
 import { devTools } from './dev'
 import { doWager } from './game/wager'
-import { draftInterrupts, drawOffer, takeCard, weightOf } from './game/tarot'
+import {
+  ARCANA,
+  draftInterrupts,
+  drawOffer,
+  levelOf,
+  takeCard,
+  weightOf,
+} from './game/tarot'
 import { buyUpgrade } from './game/upgrades'
 import { enterChallenge, exitChallenge } from './game/challenges'
 import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode, runAutobuyers as rawRunAutobuyers } from './game/autobuyers'
@@ -544,6 +551,10 @@ const hook: Record<string, unknown> = {
     buyFolio: () => buyFolio(st),
   }),
   weightOf,
+  // The card table and its level read, so a test can assert the caps rather
+  // than restate them. Both pure.
+  ARCANA,
+  levelOf,
   // What the archive is currently paying, so a test checking the face maths
   // can divide it back out instead of fighting it. The entries are re-earned
   // every tick, so a test cannot simply clear them.

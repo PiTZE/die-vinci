@@ -33,11 +33,28 @@ export interface TarotDef {
   /** One line, shown under the name. Written for a player, not for me. */
   note: string
   tier: Tier
+  /**
+   * The last level that does anything.
+   *
+   * Four of these fall out of the effect itself: the Magician's skip clamps at
+   * 0.8, which is level 8; the Hermit's cost floor and the Hanged Man's kept
+   * fraction both land at level 10; and the World cannot open more than the
+   * eight solids a study would have. Past those, a level was a draft spent on
+   * nothing.
+   *
+   * The rest had no ceiling at all, so they take 10. That is a decision rather
+   * than a derivation, and it is what makes "full" mean the same thing on every
+   * card, which is what lets a full card step out of the draft.
+   */
+  max: number
   /** Present and unused. Repentance gave every arcanum a reversed form, and
    *  that is where the physics theme picks up later: a card in superposition
    *  until observed. v1 ships upright only. */
   reversed?: string
 }
+
+/** Ten unless the card's own formula stops paying sooner. */
+export const MAX_LEVEL = 10
 
 const T = (
   id: ArcanaId,
@@ -45,14 +62,15 @@ const T = (
   name: string,
   tier: Tier,
   note: string,
-): TarotDef => ({ id, numeral, name, tier, note })
+  max: number = MAX_LEVEL,
+): TarotDef => ({ id, numeral, name, tier, note, max })
 
 /** In order. The Fool's Journey is also roughly the order they matter in. */
 export const ARCANA: TarotDef[] = [
   T('fool', '0', 'The Fool', 'mid',
     'a folio keeps your studies'),
   T('magician', 'I', 'The Magician', 'mid',
-    'each solid also feeds the one two below it'),
+    'each solid also feeds the one two below it', 8),
   T('priestess', 'II', 'The High Priestess', 'late',
     'your largest solid pays ink of its own'),
   T('empress', 'III', 'The Empress', 'early',
@@ -68,13 +86,13 @@ export const ARCANA: TarotDef[] = [
   T('justice', 'VIII', 'Justice', 'early',
     'a reset leaves you some of every solid'),
   T('hermit', 'IX', 'The Hermit', 'early',
-    'every solid costs less'),
+    'every solid costs less', 10),
   T('wheel', 'X', 'Wheel of Fortune', 'mid',
     'every die is rolled twice and keeps the better face'),
   T('strength', 'XI', 'Strength', 'mid',
     'solid multipliers gain an exponent'),
   T('hanged', 'XII', 'The Hanged Man', 'mid',
-    'a study no longer clears your roll rate'),
+    'a study no longer clears your roll rate', 10),
   T('death', 'XIII', 'Death', 'late',
     'melt the chain into the solid at the top of it'),
   T('temperance', 'XIV', 'Temperance', 'mid',
@@ -92,15 +110,24 @@ export const ARCANA: TarotDef[] = [
   T('judgement', 'XX', 'Judgement', 'late',
     'points you have not spent multiply production'),
   T('world', 'XXI', 'The World', 'late',
-    'a run begins with more of the table already open'),
+    'a run begins with more of the table already open', 8),
 ]
 
 export const ARCANA_BY_ID: Record<string, TarotDef> = Object.fromEntries(
   ARCANA.map((a) => [a.id, a]),
 )
 
+/**
+ * A card's effective level, never above its cap.
+ *
+ * Clamped at the read rather than at the write, so a save that already holds a
+ * level past the cap cannot outrun it. That covers saves written before the
+ * caps existed and anything LD.arcana handed out.
+ */
 export function levelOf(s: GameState, id: ArcanaId): number {
-  return s.tarot[id] ?? 0
+  const held = s.tarot[id] ?? 0
+  const def = ARCANA_BY_ID[id]
+  return def ? Math.min(held, def.max) : held
 }
 
 export function owned(s: GameState): number {
@@ -128,10 +155,20 @@ const UNSEEN = 2
 /** How many are offered. The Stars adds to this. */
 export const OFFER = 3
 
+/** True once a card has nothing left to give. */
+export function isFull(s: GameState, id: ArcanaId): boolean {
+  const def = ARCANA_BY_ID[id]
+  return !!def && levelOf(s, id) >= def.max
+}
+
 export function weightOf(s: GameState, id: ArcanaId): number {
   const def = ARCANA_BY_ID[id]
   if (!def) return 0
   const level = levelOf(s, id)
+  // A full card is not offered. Drafting one was a Wager spent on a level that
+  // changed nothing, and the draft already declines to offer what it cannot
+  // improve: drawOffer filters on this weight being above zero.
+  if (level >= def.max) return 0
   const unseen = unseenBonus(s)
   return BASE[def.tier] * (level === 0 ? unseen : Math.pow(DECAY, level))
 }
@@ -333,7 +370,11 @@ export function draftInterrupts(s: GameState): boolean {
 
 export function takeCard(s: GameState, id: string): boolean {
   if (!s.pendingDraft.includes(id)) return false
-  if (!ARCANA_BY_ID[id]) return false
+  const def = ARCANA_BY_ID[id]
+  if (!def) return false
+  // Guarded here too, not only in the weighting. A draft written to the save
+  // before a card's cap existed could still be offering a full one.
+  if ((s.tarot[id] ?? 0) >= def.max) return false
   s.tarot[id] = (s.tarot[id] ?? 0) + 1
   s.pendingDraft = []
   return true

@@ -42,7 +42,8 @@ const LINES = [
   'LD.wager()           call the Wager regardless of the threshold',
   'LD.upgrades()        buy every affordable Points upgrade, cheapest first',
   'LD.upgrade("resetBoost")   buy one by id. LD.upgradeIds() lists them',
-  'LD.arcana(3)         hold all 22 arcana, at that level. LD.arcana(0) drops them',
+  'LD.arcana(3)         hold all 22 arcana, at that level or their cap, whichever',
+  '                     is lower. LD.arcana(0) drops them',
   'LD.challenges()      clear all 12 and take the autobuyers they award',
   'LD.skip("2h")        simulate time away. also 90, "30m", "3d"',
   'LD.rich()            enough of everything to poke at the late game',
@@ -166,12 +167,15 @@ export function devTools(d: DevDeps): Record<string, unknown> {
         touch()
         return 'all arcana dropped'
       }
-      for (const a of ARCANA) st.tarot[a.id] = level
+      // Clamped per card, because each has its own cap and a level above it
+      // is simply ignored. Asking for 30 gives every card whatever its most is.
+      for (const a of ARCANA) st.tarot[a.id] = Math.min(level, a.max)
       // A draft left waiting would open over the grid on the next frame and
       // offer a card that is already held.
       st.pendingDraft = []
       touch()
-      return `${ARCANA.length} arcana at level ${level}`
+      const at = [...new Set(ARCANA.map((a) => Math.min(level, a.max)))].sort((x, y) => x - y)
+      return `${ARCANA.length} arcana, levels ${at.join('/')}`
     },
     /**
      * Clearing a challenge does two things: it marks the challenge done and it
