@@ -431,8 +431,11 @@ const seq = await ev(`(() => {
   const got = [first]
   for (let i = 0; i < 7; i++) got.push(window.LD.pickThought(s, got[got.length - 1]))
   const after = window.LD.pickThought(s, got[got.length - 1])
+  // Compared against the sequence's own second line, not against anything
+  // starting with "Cardano": the loose pool has a Cardano line of its own, and
+  // drawing it made this read as a sequence that had not handed back.
   return { drawn: true, heads: got.map(l => l.split(':')[0]),
-    resumed: !after.startsWith('Cardano') } })()`)
+    resumed: after !== got[1] } })()`)
 // A sequence can be held back until the game has given it something to be
 // about. This one is about the reset, so it waits until a reset has happened.
 const gated = await ev(`(() => {
