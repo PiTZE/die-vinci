@@ -433,6 +433,36 @@ const seq = await ev(`(() => {
   const after = window.LD.pickThought(s, got[got.length - 1])
   return { drawn: true, heads: got.map(l => l.split(':')[0]),
     resumed: !after.startsWith('Cardano') } })()`)
+// A sequence can be held back until the game has given it something to be
+// about. This one is about the reset, so it waits until a reset has happened.
+const gated = await ev(`(() => {
+  const s = window.LD.state
+  s.wagers = 0
+  for (let i = 0; i < 6000; i++) {
+    window.LD.resetThoughts()
+    if (window.LD.pickThought(s, '').startsWith('Ink and bone')) return { leaked: true }
+  }
+  s.wagers = 1
+  let first = null
+  for (let i = 0; i < 8000 && !first; i++) {
+    window.LD.resetThoughts()
+    const l = window.LD.pickThought(s, '')
+    if (l.startsWith('Ink and bone')) first = l
+  }
+  if (!first) return { leaked: false, drawn: false }
+  const got = [first]
+  for (let i = 0; i < 13; i++) got.push(window.LD.pickThought(s, got[got.length - 1]))
+  return { leaked: false, drawn: true, n: got.length,
+    // Deliberate repeats have to survive: the no-repeats rule is suspended
+    // inside a sequence, or a refrain would be silently dropped.
+    repeats: got.filter(l => l === 'Tell me it was never chance.').length,
+    last: got[got.length - 1] } })()`)
+check('a gated sequence stays out until its condition is met',
+  gated.leaked === false, gated.leaked ? 'appeared before any Wager' : 'held back')
+check('and then plays whole, repeats included',
+  gated.drawn && gated.n === 14 && gated.repeats === 2 && /Cold and even/.test(gated.last),
+  JSON.stringify({ n: gated.n, repeats: gated.repeats }))
+
 check('an ordered sequence plays in order and then hands back',
   seq.drawn && seq.heads.length === 8 &&
     seq.heads[0].startsWith('Pacioli') && seq.heads[7].startsWith('Aspect') &&

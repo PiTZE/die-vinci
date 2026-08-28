@@ -62,6 +62,8 @@ const LINES: Line[] = [
 interface Sequence {
   id: string
   lines: string[]
+  /** Held back until the game has given it something to be about. */
+  when?: (s: GameState) => boolean
 }
 
 const SEQUENCES: Sequence[] = [
@@ -77,6 +79,30 @@ const SEQUENCES: Sequence[] = [
       'Einstein: God does not play dice with the universe.',
       'Bell, 1964: whether He does or not is a question you can put to an experiment.',
       'Aspect, 1982: the experiment was done. The dice are real.',
+    ],
+  },
+  {
+    // Held until the first Wager, because it is about the reset and the reset
+    // has to have happened to you first. The hook lines are folded into one
+    // line each: at 75 pixels a second a three-word line is gone in about a
+    // second, and this one is meant to land.
+    id: 'cold-and-even',
+    when: (s) => s.wagers > 0,
+    lines: [
+      'Ink and bone, the tetrahedron turns. No favourite, no debt.',
+      'Nothing loaded, nothing learned. Nothing here forgets.',
+      'Roll, roll, roll. Cold and even.',
+      'I have thrown this ten thousand times. The table does not know my name.',
+      'I have thrown this ten thousand times. It never once comes out kind.',
+      'Break the run, unbuild the chain. Every solid back to none.',
+      'Keep the multiplier, lose the hand. That was the only bargain.',
+      'Roll, roll, roll. Cold and even.',
+      'Tell me it was never chance.',
+      'Tell me it was never chance.',
+      'Tell me it was never chance. We only ever lacked the measure.',
+      'I have thrown this ten thousand times. The table does not know my name.',
+      'And Bell says the dice are real.',
+      'Roll, roll, roll. Cold and even.',
     ],
   },
 ]
@@ -103,7 +129,8 @@ export function pickThought(s: GameState, avoid: string): string {
 
   // Each sequence is one candidate among the loose lines, not one candidate per
   // line it holds, or a long sequence would crowd out everything else.
-  const pool: (string | Sequence)[] = [...usable, ...SEQUENCES]
+  const ready = SEQUENCES.filter((q) => !q.when || q.when(s))
+  const pool: (string | Sequence)[] = [...usable, ...ready]
   if (!pool.length) return avoid
 
   const picked = pool[Math.floor(Math.random() * pool.length)]
