@@ -64,6 +64,7 @@ import { challengesPane } from './ui/challenges'
 import { automationPane } from './ui/automation'
 import { aboutPane } from './ui/about'
 import { achievementPower } from './game/achievements'
+import { pickThought, resetThoughts } from './ui/thoughts'
 import { archivePane } from './ui/archive'
 import { statsPane } from './ui/stats'
 import { helpPane } from './ui/help'
@@ -551,6 +552,10 @@ const hook: Record<string, unknown> = {
     buyFolio: () => buyFolio(st),
   }),
   weightOf,
+  // The ticker's line picker, so a test can assert that an ordered sequence
+  // comes out in order rather than watch a crawling bar for a minute.
+  pickThought,
+  resetThoughts,
   // The card table and its level read, so a test can assert the caps rather
   // than restate them. Both pure.
   ARCANA,

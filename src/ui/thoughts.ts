@@ -51,12 +51,63 @@ const LINES: Line[] = [
   (s) => (s.stats.playMs > 3600_000 ? 'An hour at the table. Leonardo would have moved on by now.' : null),
 ]
 
+/**
+ * Lines that only mean anything in order.
+ *
+ * The pool above is shuffled, which is right for remarks but wrong for a story:
+ * Bell answering Einstein lands as nothing if you saw the answer first. A
+ * sequence is drawn as a single candidate, and once drawn it plays to the end,
+ * one line per turn of the ticker, before the pool resumes.
+ */
+interface Sequence {
+  id: string
+  lines: string[]
+}
+
+const SEQUENCES: Sequence[] = [
+  {
+    // The whole arc the game is built on, told in the order it happened.
+    id: 'the-argument',
+    lines: [
+      'Pacioli, 1494: two players, a game cut short, and no way to divide the stakes.',
+      'Cardano, around 1564: the first arithmetic of dice, written by a man who could not stop playing them.',
+      'Pascal and Fermat, 1654: six letters, and the problem of points is solved. Probability exists.',
+      'Laplace, 1814: nothing was ever random. We only lacked the measurements.',
+      'Boltzmann: then let randomness be bookkeeping, and count the ways a thing can be arranged.',
+      'Einstein: God does not play dice with the universe.',
+      'Bell, 1964: whether He does or not is a question you can put to an experiment.',
+      'Aspect, 1982: the experiment was done. The dice are real.',
+    ],
+  },
+]
+
+/** What is left of a sequence that is mid-play. */
+let queue: string[] = []
+
+/** Starts every sequence over. For a test, and for a fresh load. */
+export function resetThoughts(): void {
+  queue = []
+}
+
 export function pickThought(s: GameState, avoid: string): string {
+  // A sequence in progress owns the ticker until it finishes. Nothing is drawn
+  // against it, including the no-repeats rule: a sequence that repeats a line
+  // is a sequence that meant to.
+  if (queue.length) return queue.shift() as string
+
   const usable: string[] = []
   for (const l of LINES) {
     const text = typeof l === 'string' ? l : l(s)
     if (text && text !== avoid) usable.push(text)
   }
-  if (!usable.length) return avoid
-  return usable[Math.floor(Math.random() * usable.length)]
+
+  // Each sequence is one candidate among the loose lines, not one candidate per
+  // line it holds, or a long sequence would crowd out everything else.
+  const pool: (string | Sequence)[] = [...usable, ...SEQUENCES]
+  if (!pool.length) return avoid
+
+  const picked = pool[Math.floor(Math.random() * pool.length)]
+  if (typeof picked === 'string') return picked
+  queue = picked.lines.slice(1)
+  return picked.lines[0]
 }

@@ -265,7 +265,9 @@ check('and roll rate, folio and study keep most of theirs',
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.studies = 8; s.folios = 1; s.stats.foliosEver = 1; s.wagers = 1
   s.solids.forEach((d, i) => { d.bought = 14 + i; d.amount = new D(10).pow(12 - i) })
-  s.ink = new D('3.3e17') })()`)
+  // Both. The run bar reads what this run has earned, not what it holds, so a
+  // study cannot throw the bar away with the table.
+  s.ink = new D('3.3e17'); s.inkThisWager = new D('3.3e17') })()`)
 await sleep(200)
 const tint = await ev(`(() => {
   const cs = getComputedStyle
@@ -413,6 +415,29 @@ check('the face stays left of the solid on a desktop row',
   wide.faceRight <= wide.iconLeft, JSON.stringify(wide))
 check('the pane fills the window rather than leaving a band under it',
   wide.fill > 85 && wide.actionH < 110 && wide.deadBelow <= 2, JSON.stringify(wide))
+
+// The ticker shuffles, which is right for remarks and wrong for a story: Bell
+// answering Einstein lands as nothing if you saw the answer first. A sequence is
+// drawn as one candidate and then owns the ticker until it finishes.
+const seq = await ev(`(() => {
+  const s = window.LD.state
+  let first = null
+  for (let i = 0; i < 4000 && !first; i++) {
+    window.LD.resetThoughts()
+    const line = window.LD.pickThought(s, '')
+    if (line.startsWith('Pacioli, 1494')) first = line
+  }
+  if (!first) return { drawn: false }
+  const got = [first]
+  for (let i = 0; i < 7; i++) got.push(window.LD.pickThought(s, got[got.length - 1]))
+  const after = window.LD.pickThought(s, got[got.length - 1])
+  return { drawn: true, heads: got.map(l => l.split(':')[0]),
+    resumed: !after.startsWith('Cardano') } })()`)
+check('an ordered sequence plays in order and then hands back',
+  seq.drawn && seq.heads.length === 8 &&
+    seq.heads[0].startsWith('Pacioli') && seq.heads[7].startsWith('Aspect') &&
+    seq.resumed === true,
+  JSON.stringify(seq.heads))
 
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
