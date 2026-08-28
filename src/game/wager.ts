@@ -15,10 +15,23 @@ import { START_INK, WAGER_AT } from './balance'
 import { unlock } from './autobuyers'
 import { byId } from './challenges'
 import { drawOffer } from './tarot'
+import { seedForAutomator } from './production'
 import type { GameState } from '../state'
 
+/**
+ * Measured on what this run has earned, not on what it is holding.
+ *
+ * A study clears the ink, so progress toward the Wager used to be thrown away
+ * with it. At 77% of the way there, with nothing left to buy, the only move was
+ * a study that reset the bar to nothing: a stretch with no good play in it.
+ * inkThisWager only accrues and only clears at a Wager, so a reset costs you
+ * the table and the time, which is the point of a reset, but not the run.
+ *
+ * The halt is deliberately still measured on ink held, over in mustWager. The
+ * table is full when the table is full; that is a different statement.
+ */
 export function canWager(s: GameState): boolean {
-  return s.ink.gte(WAGER_AT)
+  return s.inkThisWager.gte(WAGER_AT)
 }
 
 export function pointsFromWager(): Decimal {
@@ -27,8 +40,8 @@ export function pointsFromWager(): Decimal {
 
 /** How close this run is to the threshold, 0 to 1, on a log scale. */
 export function wagerProgress(s: GameState): number {
-  if (s.ink.lte(1)) return 0
-  const p = s.ink.log10() / WAGER_AT.log10()
+  if (s.inkThisWager.lte(1)) return 0
+  const p = s.inkThisWager.log10() / WAGER_AT.log10()
   return Math.max(0, Math.min(1, p))
 }
 
@@ -69,6 +82,9 @@ export function doWager(s: GameState): boolean {
   s.rollStartedAt = 0
   s.rollAccum = 0
   s.faces = s.faces.map(() => 0)
+  // The automator leaves a run something to roll, or its own autobuyer waits
+  // for ten times a price the empty table can never pay for.
+  seedForAutomator(s)
   s.stats.wagerMs = 0
   s.stats.sinceResetMs = 0
 

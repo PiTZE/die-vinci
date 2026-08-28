@@ -81,6 +81,15 @@ export const ROLL_INTERVAL_BASE = 1
  * automate everything" arc, and it is where Antimatter Dimensions puts its
  * autobuyers too.
  */
+/**
+ * The dice a run starts with once the automator is owned.
+ *
+ * Ten, because ten is the group the x2 sits on and because the solid1 autobuyer
+ * defaults to its ten mode, which will not buy until it can afford all ten. A
+ * smaller seed leaves that autobuyer still waiting.
+ */
+export const AUTOMATOR_SEED = 10
+
 export const AUTOMATOR_COST = 1
 
 export const ROLLS_DRAWN_INDIVIDUALLY = 12

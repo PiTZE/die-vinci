@@ -54,7 +54,9 @@ check('challenges hidden before the first wager',
   await ev(`!${tab('CHALLENGES')} || ${tab('CHALLENGES')}.hidden`))
 
 // Reach the threshold and take the Wager.
-await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.ink = new D('1.8e308') })()`)
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  // Both, because the Wager is measured on what the run earned.
+  s.ink = new D('1.8e308'); s.inkThisWager = new D('1.8e308') })()`)
 await sleep(150)
 await ev(`${tab('WAGER')}.click()`); await sleep(150)
 await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)
@@ -88,7 +90,9 @@ const shown = await ev(`[...document.querySelectorAll('.solid')].filter(r => !r.
 check('challenge 7 cuts the chain to six solids', shown === 6, `${shown} rows shown`)
 
 // Clear it by reaching the threshold inside it.
-await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.ink = new D('1.8e308') })()`)
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  // Both, because the Wager is measured on what the run earned.
+  s.ink = new D('1.8e308'); s.inkThisWager = new D('1.8e308') })()`)
 await sleep(150)
 await ev(`${tab('WAGER')}.click()`); await sleep(150)
 await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)

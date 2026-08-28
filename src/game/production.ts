@@ -14,6 +14,7 @@ import {
 } from './upgrades'
 import {
   AUTOMATOR_COST,
+  AUTOMATOR_SEED,
   ROLLS_DRAWN_INDIVIDUALLY,
   ROLL_COST_BASE,
   ROLL_COST_MULT,
@@ -265,6 +266,25 @@ export function canBuyStudy(s: GameState): boolean {
  * free: you kept the pile and got the multiplier, so there was never a reason
  * not to take one the instant it was affordable.
  */
+/**
+ * What the automator leaves on the table so a run can start itself.
+ *
+ * Without this a reset hands back one solid and START_INK, and the solid1
+ * autobuyer defaults to its ten mode, which waits for ten times the unit price.
+ * A table with no dice makes no ink, so it waits forever: the automator you had
+ * just paid a point for sat there doing nothing until you bought a die by hand.
+ *
+ * Only once the automator is owned, because before that the opening is supposed
+ * to be a button you press.
+ */
+export function seedForAutomator(s: GameState): void {
+  if (!s.autoRoll) return
+  const first = s.solids[0]
+  if (first.amount.gte(AUTOMATOR_SEED)) return
+  first.amount = new Decimal(AUTOMATOR_SEED)
+  first.bought = Math.max(first.bought, AUTOMATOR_SEED)
+}
+
 function resetTable(s: GameState): void {
   // VIII Justice leaves some of every solid, V The Hierophant leaves ink.
   const m = modifiers(s)
@@ -274,6 +294,7 @@ function resetTable(s: GameState): void {
     st.bought = 0
     st.amount = new Decimal(m.keepSolids > 0 && i < open ? m.keepSolids : 0)
   }
+  seedForAutomator(s)
   s.ink = Decimal.max(new Decimal(START_INK), m.keepInk)
   s.stats.sinceResetMs = 0
   // A spin in the air would otherwise land onto the fresh table and pay out
@@ -367,27 +388,30 @@ export function canMaxAll(s: GameState): boolean {
  */
 export function maxAll(s: GameState): void {
   const open = openSolids(s)
-  for (let steps = 0; steps < MAX_ALL_STEPS; steps++) {
-    let best: { price: Decimal; buy: () => boolean } | null = null
+  for (let pass = 0; pass < MAX_ALL_STEPS; pass++) {
+    let did = false
 
-    // Roll rate multiplies what the dice pay, so with no dice on the table it
-    // multiplies nothing. MAX buys the most expensive affordable thing, and
-    // that used to include roll rate on an empty table: V The Hierophant leaves
-    // exactly 1000 ink after a reset, which is exactly ROLL_COST_BASE, so one
-    // press bought a faster roll, spent the last of the ink and left nothing to
-    // roll. Ink can only come from a die, so that run could never recover.
+    // Deepest first. A doubling on a deep solid compounds through every tier
+    // below it; the same ink at the shallow end only multiplies the last step.
     //
-    // A player pressing R deliberately can still do it. This is only about the
-    // button that decides for them.
-    const canProduce = s.solids.slice(0, open).some((d) => d.amount.gt(0))
-    if (canProduce && canBuyRollRate(s)) best = { price: rollCost(s), buy: () => buyRollRate(s) }
-    for (let idx = 1; idx <= open; idx++) {
+    // Each tier takes only what fills its current group of ten, because that is
+    // where the x2 is, and then the pass moves on. Antimatter Dimensions does
+    // the same in buyMaxDimension: buy until ten, then consider bulk. Picking
+    // the single most expensive affordable row instead was what emptied the
+    // wallet into one tier: at 1e7 ink with four solids open it bought ten d12
+    // and left d4, d6 and d8 at zero, so nothing made ink at all.
+    for (let idx = open; idx >= 1; idx--) {
       if (!canBuySolid(s, idx)) continue
-      const price = buyPrice(s, idx)
-      if (!best || price.gt(best.price)) best = { price, buy: () => buySolid(s, idx) }
+      if (buySolid(s, idx)) did = true
     }
 
-    if (!best || !best.buy()) return
+    // Roll rate last, after the chain, which is where AD buys tickspeed. And
+    // never onto an empty table: roll rate multiplies what the dice pay, so
+    // with no dice it multiplies nothing, and ink can only come from a die.
+    const canProduce = s.solids.slice(0, open).some((d) => d.amount.gt(0))
+    if (canProduce && canBuyRollRate(s) && buyRollRate(s)) did = true
+
+    if (!did) return
   }
 }
 
@@ -661,6 +685,10 @@ export function buyAutomator(s: GameState): boolean {
   s.autoRoll = true
   s.autoRollOn = true
   s.rollStartedAt = 0
+  // Bought straight after a Wager, onto a table that was just cleared. Without
+  // this the thing you spent your only point on has nothing to roll, and its
+  // own autobuyer waits for a price an empty table can never pay.
+  seedForAutomator(s)
   return true
 }
 

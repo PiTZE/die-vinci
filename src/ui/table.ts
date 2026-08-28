@@ -28,6 +28,7 @@ import {
   FACE_READABLE_S,
 } from '../game/production'
 import { WAGER_AT } from '../game/balance'
+import { wagerProgress } from '../game/wager'
 import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
@@ -508,7 +509,7 @@ export function tablePane(): Pane {
 
       // Gated exactly as the WAGER tab is, so the bar and the tab that explains
       // it arrive together and neither gives the other away early.
-      const showRun = s.wagers > 0 || s.ink.gte(WAGER_AT.div(1e60))
+      const showRun = s.wagers > 0 || s.inkThisWager.gte(WAGER_AT.div(1e60))
       runBar.hidden = !showRun
       // Emptied rather than merely hidden. Before the first Wager this gate can
       // close again, when a study drops the ink back under the threshold, and
@@ -516,7 +517,10 @@ export function tablePane(): Pane {
       // label left behind would name the Wager to someone who has not met it.
       if (!showRun) setText(runLabel, '')
       if (showRun) {
-        const pct = Math.min(100, (Math.max(0, s.ink.log10()) / WAGER_AT.log10()) * 100)
+        // wagerProgress, not a second copy of the maths. It measures what the
+        // run has earned rather than what it is holding, so a study no longer
+        // throws the bar away along with the table.
+        const pct = wagerProgress(s) * 100
         setText(runLabel, `TO THE WAGER  ${pct.toFixed(2)}%`)
         const w = `${pct.toFixed(2)}%`
         if (runFill.style.width !== w) runFill.style.width = w

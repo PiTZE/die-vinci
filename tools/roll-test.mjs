@@ -471,7 +471,7 @@ check('and it stays the only one however long the bed runs',
 
 // The threshold stops everything and takes over the bar.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.rollUpgrades = 0; s.ink = new D('1.8e308') })()`)
+  s.rollUpgrades = 0; s.ink = new D('1.8e308'); s.inkThisWager = new D('1.8e308') })()`)
 await sleep(150)
 const halted = await ev(`({
   ink: window.LD.state.ink.toString(),

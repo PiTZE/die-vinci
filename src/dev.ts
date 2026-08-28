@@ -126,7 +126,10 @@ export function devTools(d: DevDeps): Record<string, unknown> {
       return `${took} bound, now ${s().folios}`
     },
     wager() {
+      // Both. The Wager is measured on what the run has earned, not on what it
+      // is holding, so setting the ink alone no longer qualifies.
       s().ink = new Decimal('1.8e308')
+      s().inkThisWager = new Decimal('1.8e308')
       const ok = doWager(s())
       touch()
       return ok ? `wager ${s().wagers}, points ${s().points}` : 'refused'

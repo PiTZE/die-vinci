@@ -46,7 +46,8 @@ await ev(`(() => { const c = window.LD.state.options.confirms\n  for (const k of
 await sleep(150)
 
 const atThreshold = `(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.ink = new D('1.8e308'); s.studies = 3; s.folios = 2; s.rollUpgrades = 40
+  s.ink = new D('1.8e308'); s.inkThisWager = new D('1.8e308')
+  s.studies = 3; s.folios = 2; s.rollUpgrades = 40
   s.solids.forEach(d => { d.bought = 30; d.amount = new D(1000) }) })()`
 
 // The tab only appears when the threshold is in sight.

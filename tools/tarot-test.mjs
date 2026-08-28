@@ -34,7 +34,8 @@ check('no tarot tab before the first Wager',
 
 // A Wager pays a draft, and the first one interrupts.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.ink = new D('1.8e308'); s.solids.forEach(d => { d.bought = 30; d.amount = new D(1000) })
+  s.ink = new D('1.8e308'); s.inkThisWager = new D('1.8e308')
+  s.solids.forEach(d => { d.bought = 30; d.amount = new D(1000) })
   s.studies = 8; s.options.confirms.wager = false })()`)
 await sleep(300)
 await ev(`window.LD.actions.wager()`)
