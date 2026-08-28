@@ -80,7 +80,7 @@ export function challengesPane(): Pane {
           confirm.isArmed('enterChallenge') && active === false && !complete
             ? 'SURE? THIS RESETS'
             : active
-            ? `RUNNING  ${format(s.ink, s.options.notation)} / ${format(WAGER_AT, s.options.notation)}`
+            ? `RUNNING  ${format(s.inkThisWager, s.options.notation)} / ${format(WAGER_AT, s.options.notation)}`
             : complete
               ? 'CLEARED'
               : 'ENTER',

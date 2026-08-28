@@ -35,10 +35,10 @@ export function wagerPane(): Pane {
 
     // Hidden until the threshold is in sight, so it does not sit there empty
     // for the whole first run.
-    visible: (s) => s.wagers > 0 || s.ink.gte(WAGER_AT.div(1e60)),
+    visible: (s) => s.wagers > 0 || s.inkThisWager.gte(WAGER_AT.div(1e60)),
 
     mount(root, actions: Actions) {
-      confirm = new Confirmer((k) => confirmSettings[k] !== false)
+      confirm = new Confirmer((k) => confirmSettings[k.split(':')[0]] !== false)
       const call = el('div', 'section')
       const ch = el('div', 'section-head')
       ch.appendChild(el('span', 'grow', 'THE WAGER'))
@@ -75,7 +75,12 @@ export function wagerPane(): Pane {
           btn.appendChild(el('span', 'tile-name', def.label))
           const cost = el('span', 'tile-mark', String(def.cost))
           btn.appendChild(cost)
-          btn.addEventListener('click', () => actions.buyUpgrade(id))
+          // Armed per upgrade, not once for all of them: a shared key would
+          // let you arm one tile and fire a different one with the next tap,
+          // which is the mis-tap this is here to stop.
+          btn.addEventListener('click', () => {
+            if (def.cost <= 1 || confirm.request(`upgrade:${id}`)) actions.buyUpgrade(id)
+          })
           // A title attribute is a hover, and a phone has no hover. Touching
           // one writes it out below the grid instead, which also means an
           // upgrade you cannot yet afford can be read before you commit to
@@ -120,7 +125,7 @@ export function wagerPane(): Pane {
           ? 'SURE? THIS RESETS EVERYTHING'
           : ready
           ? `CALL THE WAGER  +${format(pointsFromWager(), n)}`
-          : `${format(s.ink, n)} / ${format(WAGER_AT, n)} INK`,
+          : `${format(s.inkThisWager, n)} / ${format(WAGER_AT, n)} INK`,
       )
       callBtn.disabled = !ready
       callBtn.classList.toggle('buyable', ready)
@@ -133,7 +138,14 @@ export function wagerPane(): Pane {
         cell.btn.classList.toggle('held', bought)
         cell.btn.classList.toggle('buyable', affordable)
         cell.btn.classList.toggle('locked', !bought && !isAvailable(s, id))
-        setText(cell.cost, bought ? 'HELD' : String(UPGRADES[id].cost))
+        setText(
+          cell.cost,
+          bought
+            ? 'HELD'
+            : confirm.isArmed(`upgrade:${id}`)
+            ? 'SURE?'
+            : String(UPGRADES[id].cost),
+        )
       }
     },
   }

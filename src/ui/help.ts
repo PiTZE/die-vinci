@@ -18,7 +18,7 @@ interface Section {
 
 const afterStudy = (s: GameState) => s.studies >= 1 || s.wagers > 0
 const afterAutomator = (s: GameState) => s.autoRoll || s.wagers > 0
-const nearWager = (s: GameState) => s.wagers > 0 || s.ink.gte('1e290')
+const nearWager = (s: GameState) => s.wagers > 0 || s.inkThisWager.gte('1e290')
 const afterWager = (s: GameState) => s.wagers > 0
 const hasTarot = (s: GameState) => s.wagers > 0
 const hasMelt = (s: GameState) => (s.tarot?.death ?? 0) > 0
@@ -101,6 +101,9 @@ const SECTIONS: Section[] = [
     needs: hasTarot,
     body: [
       'Every Wager pays a draft. Three arcana are offered and you keep one, and every card you keep stays active, so the choice is what to take first rather than what to equip.',
+      // Named only once you hold it. Written into the line above it would say
+      // there is a card that widens the draft before you have met one.
+      { text: 'The Stars makes that four.', needs: (s: GameState) => (s.tarot?.stars ?? 0) > 0 },
       'Draw one you already hold and it levels instead, and every effect grows with its level, so a repeat is never a wasted draw.',
       'The arcana you have not seen are offered more often than the ones you have, and the ones worth something early are offered more often than the ones that need a full table.',
     ],

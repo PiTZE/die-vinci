@@ -18,6 +18,12 @@ export const CONFIRM_KEYS = [
   { key: 'wager', label: 'THE WAGER' },
   { key: 'enterChallenge', label: 'ENTER A CHALLENGE' },
   { key: 'exitChallenge', label: 'LEAVE A CHALLENGE' },
+  // Only the ones that cost more than a single Point ask. A Wager pays one
+  // Point, so the seven-Point upgrade is seven Wagers, and a mis-tap on a
+  // phone spends them on whatever the thumb landed on. The one-Point tiles
+  // stay a single tap, because asking about a purchase you can make again
+  // after the next Wager is noise.
+  { key: 'upgrade', label: 'A POINT UPGRADE OVER 1' },
 ] as const
 
 export type ConfirmKey = (typeof CONFIRM_KEYS)[number]['key']

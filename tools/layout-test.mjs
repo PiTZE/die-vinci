@@ -62,7 +62,15 @@ check('a long ticker line does not push it off', fits(await ev(probe)))
 for (const h of [844, 700, 640, 844]) {
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: h, deviceScaleFactor: 2, mobile: true })
   await sleep(150)
-  const p = await ev(probe)
+  // Polled. --app-h is set from a resize handler, so the app is one frame
+  // behind the new metrics, and a fixed wait measured the box rather than the
+  // layout: inside `npm test` this read the previous step's 701px against a
+  // 640px viewport and called it an overflow. Three seconds is a cap.
+  let p = await ev(probe)
+  for (let i = 0; i < 20 && !fits(p); i++) {
+    await sleep(150)
+    p = await ev(probe)
+  }
   check(`viewport at ${h}px keeps the tabs on screen`, fits(p), `app ${p.appH} of ${p.vvh}`)
 }
 await send('Emulation.clearDeviceMetricsOverride')

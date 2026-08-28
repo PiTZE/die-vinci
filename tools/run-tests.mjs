@@ -39,7 +39,7 @@ function run(name) {
     child.on('close', (code) => {
       const line = out.split('\n').reverse().find((l) => /^\d+\/\d+ passed/.test(l.trim()))
       const fails = out.split('\n').filter((l) => l.startsWith('FAIL'))
-      results.set(name, { code, line: line?.trim() ?? 'no result line', fails, secs: (Date.now() - at) / 1000 })
+      results.set(name, { code, line: line?.trim() ?? "no result line", fails, out, secs: (Date.now() - at) / 1000 })
       const mark = code === 0 ? 'ok  ' : 'FAIL'
       console.log(`${mark} ${name.padEnd(12)} ${((Date.now() - at) / 1000).toFixed(1)}s   ${line?.trim() ?? ''}`)
       resolve()
@@ -56,6 +56,13 @@ await Promise.all(Array.from({ length: Math.min(LIMIT, SUITES.length) }, worker)
 const failed = [...results.entries()].filter(([, r]) => r.code !== 0)
 for (const [name, r] of failed) {
   for (const f of r.fails) console.log(`  ${name}: ${f}`)
+  // A suite that dies rather than failing a check has no FAIL line to print,
+  // and the reporter used to swallow the whole thing: one word, no reason.
+  // The last few lines of its output are the only place the reason exists.
+  if (!r.fails.length) {
+    const tail = r.out.split('\n').filter((l) => l.trim()).slice(-6)
+    for (const l of tail) console.log(`  ${name}: ${l}`)
+  }
 }
 const checks = [...results.values()].reduce((a, r) => {
   const m = /^(\d+)\/(\d+) passed/.exec(r.line)

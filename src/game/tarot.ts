@@ -234,8 +234,6 @@ export interface Modifiers {
   keepRollFrac: number
   /** Multiplies the eight hour away cap. */
   awayCapMult: number
-  /** Solids open before the first study. */
-  extraTiers: number
 }
 
 const NONE: Modifiers = {
@@ -253,7 +251,6 @@ const NONE: Modifiers = {
   keepSolids: 0,
   keepRollFrac: 0,
   awayCapMult: 1,
-  extraTiers: 0,
 }
 
 /** How long after a reset the Chariot is still surging, in seconds. */
@@ -346,9 +343,10 @@ export function modifiers(s: GameState): Modifiers {
   m.keepSolids = L('justice') * 2
   m.keepRollFrac = Math.min(1, L('hanged') * 0.1)
 
-  // XVIII The Moon, XXI The World.
+  // XVIII The Moon. The World is read straight from the card level over in
+  // unlockedSolids, so there is nothing to put on the modifiers here; there
+  // used to be a second copy of it that nothing read.
   if (L('moon')) m.awayCapMult = 1 + L('moon')
-  m.extraTiers = L('world')
 
   return m
 }

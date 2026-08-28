@@ -29,6 +29,7 @@ import {
 } from '../game/production'
 import { WAGER_AT } from '../game/balance'
 import { wagerProgress } from '../game/wager'
+import { modifiers } from '../game/tarot'
 import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
@@ -384,6 +385,7 @@ export function tablePane(): Pane {
       // short.
       const open = openSolids(s)
       const rate = rollRate(s)
+      const globalMult = modifiers(s).globalMult
 
       // The dice only turn while a roll is in the air. Under the automator
       // that is always, which is exactly the difference the purchase buys.
@@ -492,7 +494,15 @@ export function tablePane(): Pane {
         // Averaged over the faces, because that is what the row actually pays
         // over any run of rolls. Per second only once the automator is rolling:
         // before it, a rate per second is a claim about how fast you press.
-        const each = st.amount.times(mult).times(meanFace(def.faces, faceBias(s)))
+        //
+        // globalMult belongs here for the same reason produce() applies it to
+        // every tier and not to the ink alone. Left out, the Tower's x100
+        // window moved the header rate and left every row it was multiplying
+        // sitting still, which reads as the card not working.
+        const each = st.amount
+          .times(mult)
+          .times(meanFace(def.faces, faceBias(s)))
+          .times(globalMult)
         const per = rollingItself(s) ? each.times(rate) : each
         const unit = def.idx === 1 ? 'ink' : SOLIDS[def.idx - 2].short
         setText(r.rate, `+${format(per, n)} ${unit}${rollingItself(s) ? '/s' : '/roll'}`)

@@ -524,9 +524,17 @@ export function rolling(s: GameState): boolean {
  * to count, and Antimatter Dimensions stops there too: production halts and
  * the only thing left to do is crunch. Nothing here grows past it either. The
  * run is over and it is waiting on you.
+ *
+ * Measured on what the run has earned, the same field canWager reads. It used
+ * to halt on ink held, and the two are only the same while ink never runs
+ * ahead of the run's total. The Hierophant breaks that: a reset hands you up
+ * to 1e21 of ink without crediting the run for it, so ink reached the
+ * threshold first and production stopped a hair short of the gate. The bar
+ * read full, the CALL button stayed dead, and nothing produced. It cleared
+ * itself on the next study, but there was no way to know that from the screen.
  */
 export function mustWager(s: GameState): boolean {
-  return s.ink.gte(WAGER_AT)
+  return s.inkThisWager.gte(WAGER_AT)
 }
 
 export function startRoll(s: GameState, now: number): boolean {
@@ -733,6 +741,12 @@ export function tick(s: GameState, dt: number, now: number): void {
   // where a study is bought, so a save written before this field existed picks
   // up its real value on the first tick instead of claiming one solid.
   s.stats.solidsEver = Math.max(s.stats.solidsEver ?? 0, unlockedSolids(s))
+
+  // Ink held is clamped whether or not the run is over, because ink held can
+  // exceed what the run has earned and a double has nowhere left to put it.
+  // The clamp is a clamp and nothing more; what ends the run is the line
+  // below, which asks what the run earned.
+  if (s.ink.gt(WAGER_AT)) s.ink = WAGER_AT
 
   // Everything stops at the threshold, dice included. Letting the chain run on
   // past it would only be counting into a number the game has already declared

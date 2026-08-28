@@ -338,8 +338,15 @@ try {
   check('a slower refresh rate redraws the readouts less often',
     refresh.slow < refresh.fast && refresh.slow <= 6,
     `every frame ${refresh.fast} redraws, 500ms ${refresh.slow}`)
+  // As a share of the frames each sweep actually got, not as a raw count. The
+  // two sweeps run one after the other and the box does not hand them the same
+  // number of frames: inside `npm test`, with four browsers up, this read 53 of
+  // 54 frames against 19 of 25 and failed. Nineteen of twenty-five is the
+  // behaviour the check is looking for. The raw comparison was measuring how
+  // busy the machine was between the two sweeps.
+  const moved = (r) => (r.frames ? r.widths / r.frames : 0)
   check('but the ROLL fill moves the same at any refresh rate',
-    refresh.fillSlow.widths >= refresh.fillFast.widths * 0.6 && refresh.fillSlow.widths > 2,
+    moved(refresh.fillSlow) >= moved(refresh.fillFast) * 0.6 && refresh.fillSlow.widths > 2,
     `every frame ${refresh.fillFast.widths}/${refresh.fillFast.frames} frames, ` +
       `500ms ${refresh.fillSlow.widths}/${refresh.fillSlow.frames}`)
   check('and a purchase lands without waiting for the next redraw', refresh.pressed === true)

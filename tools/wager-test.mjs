@@ -114,6 +114,32 @@ check('resetBoost lowers the study requirement by 9',
   studyNeedBefore.includes('20 ') && studyNeedAfter.includes('11 '),
   `${studyNeedBefore} -> ${studyNeedAfter}`)
 
+// Ink held can run ahead of what the run has earned: The Hierophant pays ink
+// at a reset without crediting the run for it. Production used to halt on ink
+// held, so that player hit the cap with the gate still short of it, and got a
+// full bar, a dead CALL button and a table that had stopped producing. It
+// read as a hang. Production has to keep going until the run itself qualifies.
+await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'WAGER').click()`)
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = true; s.studies = 3; s.rollUpgrades = 25
+  s.solids.forEach((d, i) => { if (i < 4) { d.bought = 20; d.amount = new D('1e8') } })
+  s.ink = new D('1e309'); s.inkThisWager = new D(0) })()`)
+await sleep(150)
+const stuck0 = await ev(`window.LD.state.inkThisWager.toString()`)
+let stuck1 = stuck0
+for (let i = 0; i < 40 && stuck0 === stuck1; i++) {
+  await sleep(150)
+  stuck1 = await ev(`window.LD.state.inkThisWager.toString()`)
+}
+check('ink over the cap does not stop the run', stuck0 !== stuck1, `${stuck0} -> ${stuck1}`)
+check('ink held is clamped to the threshold',
+  await ev(`window.LD.state.ink.lte(new window.LD.Decimal('1.8e308'))`),
+  await ev(`window.LD.state.ink.toString()`))
+check('the CALL button stays shut until the run has earned it',
+  await ev(`(() => { const b = [...document.querySelectorAll('.action')]
+    .find(x => x.title === 'Call the Wager  (w)')
+    return !!b && b.disabled })()`))
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

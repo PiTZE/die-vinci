@@ -58,14 +58,25 @@ async function gap(seconds, { offline = true } = {}) {
     s.ink = new D(0)
     s.lastTick = Date.now() - ${seconds} * 1000 })()`)
   await sleep(150)
-  return {
-    ink: Number(await ev(`window.LD.state.ink.toString()`)),
-    rate: Number(await ev(`window.LD.state.solids[0].amount.toString()`)),
-    notice: await ev(`(() => { const t = document.querySelector('.toast')
+  const readNotice = `(() => { const t = document.querySelector('.toast')
       // The toast is shared with archive announcements now, so only an AWAY
       // line counts here.
       const text = t && t.classList.contains('show') ? t.textContent : null
-      return text && text.startsWith('AWAY') ? text : null })()`),
+      return text && text.startsWith('AWAY') ? text : null })()`
+  // Polled. The catch-up runs on the next tick and the toast on the frame
+  // after that, and a fixed 150ms was really a claim about how loaded the box
+  // is: this passed alone and failed inside `npm test`. Two seconds is a cap,
+  // not a delay, and a short gap that correctly shows nothing still costs the
+  // full two seconds only once.
+  let notice = await ev(readNotice)
+  for (let i = 0; i < 13 && notice === null; i++) {
+    await sleep(150)
+    notice = await ev(readNotice)
+  }
+  return {
+    ink: Number(await ev(`window.LD.state.ink.toString()`)),
+    rate: Number(await ev(`window.LD.state.solids[0].amount.toString()`)),
+    notice,
   }
 }
 

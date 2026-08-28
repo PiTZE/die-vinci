@@ -7,6 +7,7 @@ import { SOLIDS, SOLID_COUNT } from './game/solids'
 import { STUDIES_THAT_UNLOCK } from './game/balance'
 import { simulateAway } from './game/offline'
 import { buyFolio, buyStudy, studyReq } from './game/production'
+import { unlockedSolids } from './state'
 import { UPGRADES, buyUpgrade, canBuy, type UpgradeId } from './game/upgrades'
 import { ARCANA } from './game/tarot'
 import { CHALLENGES } from './game/challenges'
@@ -84,9 +85,15 @@ export function devTools(d: DevDeps): Record<string, unknown> {
     },
     dice(v: number | string) {
       const amount = new Decimal(v)
-      for (const st of s().solids) st.amount = amount
+      // Only the ones on the table, which is what the help line has always
+      // claimed. Stocking a locked solid put an amount on a row that does not
+      // render and could fire the achievement for reaching it.
+      const open = unlockedSolids(s())
+      s().solids.forEach((st, i) => {
+        if (i < open) st.amount = amount
+      })
       touch()
-      return `every solid set to ${amount.toString()}`
+      return `${open} unlocked solids set to ${amount.toString()}`
     },
     bought(v: number) {
       for (const st of s().solids) st.bought = v
@@ -204,9 +211,14 @@ export function devTools(d: DevDeps): Record<string, unknown> {
     skip(v: number | string) {
       const secs = seconds(v)
       const before = s().ink
-      simulateAway(s(), secs, s().options.offlineTicks)
+      // What was credited, not what was asked for. The Moon's cap truncates a
+      // long skip and the ink reflects that, so reporting the request made the
+      // line disagree with the number beside it.
+      const away = simulateAway(s(), secs, s().options.offlineTicks)
       touch()
-      return `${secs}s simulated, ink ${before.toString()} -> ${s().ink.toString()}`
+      const got = away ? away.seconds : 0
+      const note = away?.capped ? ` (asked for ${secs}s, capped)` : ''
+      return `${got}s simulated${note}, ink ${before.toString()} -> ${s().ink.toString()}`
     },
     rich() {
       const st = s()
