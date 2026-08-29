@@ -412,6 +412,57 @@ try {
     JSON.stringify(oneTap))
 
 
+  // A late run flips these many times a second and every flip is true: MAX
+  // spends the ink, the next roll replaces it, and a roll is in the air for a
+  // fraction of a millisecond. Rendered honestly the two buttons strobe. This
+  // measured 43 and 45 changes in two seconds before the states were held.
+  const strobe = await evaluate(`(async () => {
+    const s = window.LD.state, D = window.LD.Decimal
+    s.studies = 10; s.autoRoll = false; s.rollUpgrades = 75; s.options.uiMs = 16
+    s.solids.forEach((d, i) => { d.bought = 30; d.amount = new D(10).pow(70 - i * 8) })
+    s.ink = new D('1e60')
+    await new Promise(r => setTimeout(r, 400))
+    const max = document.querySelector('.bar-btn.max')
+    const roll = document.querySelector('.bar-roll')
+    const fill = document.querySelector('.bar-roll-fill')
+    const m = [], r_ = [], f = []
+    for (let i = 0; i < 120; i++) {
+      window.LD.actions.roll(); window.LD.actions.maxAll()
+      m.push(max.className + (max.disabled ? ' off' : ''))
+      r_.push(roll.className)
+      f.push(fill.style.width)
+      await new Promise(r => requestAnimationFrame(r))
+    }
+    const flips = a => { let n = 0; for (let i = 1; i < a.length; i++) if (a[i] !== a[i-1]) n++; return n }
+    return { max: flips(m), roll: flips(r_), fill: flips(f) } })()`)
+  check('MAX and ROLL hold still at a late-game roll rate',
+    strobe.max <= 2 && strobe.roll <= 2 && strobe.fill <= 2, JSON.stringify(strobe))
+
+  // And the hold is a beat, not a latch: a button that really cannot be
+  // pressed has to go dark, or it is lying rather than steadying.
+  const goesDark = await evaluate(`(async () => {
+    const s = window.LD.state, D = window.LD.Decimal
+    s.autoRoll = false; s.rollUpgrades = 0
+    s.solids.forEach((d) => { d.bought = 0; d.amount = new D(0) })
+    s.ink = new D(0)
+    await new Promise(r => setTimeout(r, 700))
+    const max = document.querySelector('.bar-btn.max')
+    return { cls: max.className, off: max.disabled } })()`)
+  check('a button that truly cannot be pressed still goes dark',
+    goesDark.off === true && !goesDark.cls.includes('buyable'), JSON.stringify(goesDark))
+
+  // The refresh rate a new save starts on.
+  //
+  // Cleared before the document runs rather than from the page and reloaded:
+  // a reload fires pagehide, the game saves on pagehide, and the save it wrote
+  // landed after the clear. That read the state this suite had just been
+  // poking at and called it a fresh game.
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: 'localStorage.clear()' })
+  await send('Page.navigate', { url: URL_ })
+  await appReady(evaluate)
+  const freshMs = await evaluate(`window.LD.state.options.uiMs`)
+  check('a new save refreshes ten times a second', freshMs === 100, String(freshMs))
+
   const shot = await send('Page.captureScreenshot', { format: 'png' })
   const { writeFileSync } = await import('node:fs')
   writeFileSync(MOBILE ? 'interaction-mobile.png' : 'interaction-desktop.png', Buffer.from(shot.data, 'base64'))

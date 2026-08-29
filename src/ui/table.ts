@@ -80,6 +80,36 @@ function setText(n: HTMLElement, v: string): void {
   if (n.textContent !== v) n.textContent = v
 }
 
+/**
+ * A button's state, held long enough to be worth looking at.
+ *
+ * Late in a run these flip many times a second and every flip is true. MAX
+ * spends the ink and the next roll replaces it; a roll is in the air for a
+ * fraction of a millisecond and ROLL is briefly not pressable. Rendered
+ * honestly, both buttons strobe. Measured at 6.6K rolls a second, ROLL changed
+ * state 45 times in two seconds and MAX 43.
+ *
+ * So a "yes" is held for a beat. A gap shorter than you could have acted on
+ * never reaches the screen, and a state that is really gone still shows up
+ * within the window. The lie is small and always in the direction of the
+ * button being live, which is the direction a player can test for themselves
+ * by pressing it.
+ */
+const STEADY_MS = 350
+
+class Steady {
+  private at = new Map<string, number>()
+
+  on(key: string, live: boolean, now: number): boolean {
+    if (live) {
+      this.at.set(key, now)
+      return true
+    }
+    const last = this.at.get(key)
+    return last !== undefined && now - last < STEADY_MS
+  }
+}
+
 export function tablePane(): Pane {
   let confirm: Confirmer
   const rows: Row[] = []
@@ -116,6 +146,7 @@ export function tablePane(): Pane {
   let runFill: HTMLElement
   let runLabel: HTMLElement
   let lastFace = 0
+  const steady = new Steady()
 
 
   return {
@@ -370,8 +401,14 @@ export function tablePane(): Pane {
       else if (readable) setThrow(rollProgress(s, now), duration)
 
       // And the fill crossing the ROLL button, which is one sweep a roll.
+      //
+      // Only while a sweep is something you could watch. Past that the roll is
+      // over inside a frame and the fill lands on an unrelated percentage every
+      // time it is read: at 6.6K rolls a second the button is a strobe rather
+      // than a bar. It sits full instead, which is the same thing the dice do
+      // when they stop being throws and become one continuous turn.
       if (s.autoRoll || rollNow.hidden) return
-      const pct = `${Math.round(rollProgress(s, now) * 100)}%`
+      const pct = readable ? `${Math.round(rollProgress(s, now) * 100)}%` : '100%'
       if (rollFill.style.width !== pct) rollFill.style.width = pct
     },
 
@@ -381,6 +418,7 @@ export function tablePane(): Pane {
 
     update(s: GameState) {
       const n = s.options.notation
+      const now = Date.now()
       // openSolids, not unlockedSolids, because a challenge can cut the chain
       // short.
       const open = openSolids(s)
@@ -421,9 +459,16 @@ export function tablePane(): Pane {
       // back to MAX.
       rollNow.hidden = rollingItself(s) || full
       if (!s.autoRoll) {
-        rollNow.classList.toggle('buyable', !s.rollStartedAt && s.haltMs <= 0)
+        rollNow.classList.toggle(
+          'buyable',
+          steady.on('roll', !s.rollStartedAt && s.haltMs <= 0, now),
+        )
       }
-      const canMax = canMaxAll(s)
+      // Both the look and the disabled flag come off the held value. A press
+      // during one of those gaps buys nothing and costs nothing, and leaving
+      // the button live means a held finger keeps its repeat instead of being
+      // dropped and restarted several times a second.
+      const canMax = steady.on('max', canMaxAll(s), now)
       maxBtn.disabled = !canMax
       maxBtn.classList.toggle('buyable', canMax)
 
@@ -512,7 +557,10 @@ export function tablePane(): Pane {
         setText(r.buyLabel, `BUY ${count}`)
         setText(r.buyCost, format(price, n))
         r.buy.title = `${into}/10 toward the next doubling`
-        const can = canBuySolid(s, def.idx)
+        // Held steady per row. Under a fast roll rate the ink crosses a
+        // price several times a second, and nine rows blinking together is the
+        // whole table strobing.
+        const can = steady.on(`buy${def.idx}`, canBuySolid(s, def.idx), now)
         r.buy.disabled = !can
         r.buy.classList.toggle('buyable', can)
       }
@@ -539,7 +587,7 @@ export function tablePane(): Pane {
       setText(rollLine, `${format(new Decimal(rate), n)}/s`)
       const rc = rollCost(s)
       duo(rollBtn, 'FASTER', `${format(rc, n)} INK`)
-      const canRoll = canBuyRollRate(s)
+      const canRoll = steady.on('faster', canBuyRollRate(s), now)
       rollBtn.disabled = !canRoll
       rollBtn.classList.toggle('buyable', canRoll)
 

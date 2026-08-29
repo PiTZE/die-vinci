@@ -277,7 +277,7 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   // study cannot throw the bar away with the table.
   s.ink = new D('3.3e17'); s.inkThisWager = new D('3.3e17') })()`)
 await sleep(200)
-const tint = await ev(`(() => {
+const TINT = (`(() => {
   const cs = getComputedStyle
   const rows = [...document.querySelectorAll('.solid')].filter(r => !r.hidden)
   const read = (r) => {
@@ -306,6 +306,14 @@ const tint = await ev(`(() => {
   return { yes: all.filter(r => r.afford), no: all.filter(r => !r.afford),
     fillColour,
     filledAccent: ch.length === 3 && !(ch[0] === ch[1] && ch[1] === ch[2]) } })()`)
+// Polled past the hold on a button's state. A row that was affordable a moment
+// ago keeps its accent for 350ms, so a fixed 200ms read every row as
+// affordable and left this check with nothing unaffordable to compare against.
+let tint = await ev(TINT)
+for (let i = 0; i < 12 && tint.no.length === 0; i++) {
+  await sleep(100)
+  tint = await ev(TINT)
+}
 // The accent on this button belongs to the group-of-ten fill and to nothing
 // else. It was on the border and the label for a build, which made an
 // affordable row three shades of one colour, and washing the whole row was

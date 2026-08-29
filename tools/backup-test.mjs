@@ -114,6 +114,25 @@ check('EXPORT fills the box without focusing it',
 check('the save box asks for no keyboard',
   (await ev(`document.querySelector('textarea').getAttribute('inputmode')`)) === 'none')
 
+// 5 -> 6 moves a save still sitting on the old every-frame default onto 100ms,
+// and leaves any other rate where the player put it. A version 5 save is
+// planted the same way, with writes stubbed so it survives the navigation.
+for (const [was, want] of [[16, 100], [500, 500]]) {
+  const V5 = JSON.stringify({
+    version: 5, lastTick: Date.now(), ink: '1e40', inkThisWager: '1e40',
+    solids: Array.from({ length: 9 }, () => ({ bought: 20, amount: '1e10' })),
+    rollUpgrades: 20, studies: 8, folios: 1, points: '0', wagers: 1, tarot: {},
+    options: { notation: 'mixed', tab: 'table', uiMs: was }, stats: { started: Date.now() },
+  })
+  await ev(`(() => { localStorage.setItem('${KEY}', ${JSON.stringify(V5)})
+    localStorage.setItem = () => {} })()`)
+  await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+  await appReady(ev)
+  const got = await ev(`window.LD.state.options.uiMs`)
+  check(`a version 5 save on ${was}ms loads on ${want}ms`, got === want, String(got))
+}
+
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

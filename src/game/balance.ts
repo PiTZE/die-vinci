@@ -15,7 +15,7 @@ export const CHANNEL_PATHS = { stable: '/', dev: '/dev/' } as const
 export const THEME_KEY = 'leonardos-die-theme'
 /** Inline tokens for a theme registered at runtime, so it survives a reload. */
 export const THEME_VARS_KEY = 'leonardos-die-theme-vars'
-export const SAVE_VERSION = 5
+export const SAVE_VERSION = 6
 export const AUTOSAVE_MS = 10_000
 
 /** Time away is credited up to this, then stops accruing. */
@@ -35,13 +35,21 @@ export const OFFLINE_TICK_CHOICES = [500, 2000, 10000] as const
  *
  * The game ticks, the dice tumble and the ticker crawls at full frame rate
  * whatever this says. This is only about how often the numbers on screen are
- * rewritten. It defaults to every frame; the slower settings are there for
- * anyone who finds a table of changing digits too busy to read, which is what
- * Antimatter Dimensions offers the same setting for.
+ * rewritten, which is what Antimatter Dimensions offers the same setting for.
  */
 export const UI_MS_CHOICES = [16, 50, 100, 250, 500] as const
-/** Every frame. The setting is there for anyone who wants it slower. */
-export const UI_MS_DEFAULT = 16
+/**
+ * Ten times a second.
+ *
+ * It defaulted to every frame, which is fine for the first hour and wrong for
+ * the rest of the game. Measured at ten studies and 6.6K rolls a second, on a
+ * table of nine: at every frame the ninetieth-percentile frame took 35ms and
+ * the worst 99ms, so the dice hitched roughly once every ten frames. At 100ms
+ * the same state gives 20ms and 51ms. The numbers themselves are also past
+ * reading at that speed, and a phone has less to spend than the box those were
+ * measured on. Every frame is still a choice, one step away in OPTIONS.
+ */
+export const UI_MS_DEFAULT = 100
 export const OFFLINE_TICKS_DEFAULT = 2000
 
 /**

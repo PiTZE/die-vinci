@@ -1,6 +1,6 @@
 import Decimal from 'break_infinity.js'
 import { rollBackups, writeBackup } from './backup'
-import { SAVE_KEY, SAVE_VERSION } from './game/balance'
+import { SAVE_KEY, SAVE_VERSION, UI_MS_DEFAULT } from './game/balance'
 
 // Three save slots, as Antimatter Dimensions has. Each is its own key, and the
 // chosen one is remembered separately. A save written before slots existed is
@@ -61,6 +61,17 @@ function encode(s: GameState): Raw {
  * tarot field later should not cost anyone their save.
  */
 const MIGRATIONS: Record<number, (r: Raw) => Raw> = {
+  // 5 -> 6: the refresh rate defaulted to every frame, which at a late-game
+  // roll rate is a table of digits nobody can read and a frame budget the dice
+  // then have to share. The default is 100ms now, and a save sitting on 16
+  // moves with it. The setting does not record whether 16 was chosen or
+  // inherited, so this does move someone who picked it deliberately; the
+  // setting is one step away in OPTIONS and every other rate is left alone.
+  5: (r) => {
+    const o = (r as { options?: Record<string, unknown> }).options
+    if (!o || o.uiMs !== 16) return r
+    return { ...r, options: { ...o, uiMs: UI_MS_DEFAULT } }
+  },
   // 4 -> 5: repairs a meltPower of 0. Melting multiplies up from 1 and can
   // never legitimately land on zero, so any save holding one got it from the
   // decode bug above rather than from playing.
