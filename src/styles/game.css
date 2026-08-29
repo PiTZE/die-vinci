@@ -43,11 +43,20 @@
   display: none;
 }
 
+/* Each readout keeps a column of its own width, so the one beside it does not
+   move when this one grows.
+   The ink block is between 39px and 100px depending on the number, the
+   notation, and whether the second line reads "/s" or "per roll", so CHIPS was
+   sliding across five to eight different positions as a run went on. A number
+   that shifts its neighbour every time it gains a digit is a number you cannot
+   read at a glance, which is the only thing this bar is for. Seven rem covers
+   the widest of those hundred pixels with room over. */
 .res {
   display: flex;
   flex-direction: column;
   line-height: 1.25;
   flex-shrink: 0;
+  min-width: 7rem;
 }
 
 .res-label {
