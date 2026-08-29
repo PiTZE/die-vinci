@@ -20,6 +20,9 @@ import {
 } from '../durability'
 import { SLOT_COUNT, currentSlot, slotSummary } from '../save'
 import { CONFIRM_KEYS } from './confirm'
+import { WAGER_AT } from '../game/balance'
+import { isUnlocked } from '../game/autobuyers'
+import { WAGER_AUTOBUYER } from '../game/breaks'
 import { formatTime } from '../format'
 
 /**
@@ -94,8 +97,26 @@ function cycler<T>(
   }
 }
 
+/**
+ * When each confirmation is worth offering, which is when its action exists.
+ *
+ * The tests are the same ones the help section and the archive already use, so
+ * a switch appears on the screen at the moment the thing it guards does. STUDY
+ * has none because the study button is on the table from the first second.
+ */
+const CONFIRM_WHEN: Partial<Record<string, (s: GameState) => boolean>> = {
+  folio: (s) => s.folios > 0 || s.wagers > 0 || (s.stats.foliosEver ?? 0) > 0,
+  melt: (s) => (s.tarot?.death ?? 0) > 0,
+  wager: (s) => s.wagers > 0 || s.inkThisWager.gte(WAGER_AT.div(1e60)),
+  enterChallenge: (s) => s.wagers > 0,
+  exitChallenge: (s) => s.wagers > 0,
+  upgrade: (s) => s.wagers > 0,
+  break: (s) => s.broke || isUnlocked(s, WAGER_AUTOBUYER),
+}
+
 export function optionsPane(): Pane {
   const cycles: Cycle[] = []
+  const confirmGates: { root: HTMLElement; when: (s: GameState) => boolean }[] = []
   let fullCycle: Cycle
   let tickCycle: Cycle
   /** The last state update() saw, so paintTheme can resync outside the loop. */
@@ -206,14 +227,23 @@ export function optionsPane(): Pane {
 
       // Their own group, as they were their own section before. Every one of
       // them guards something that cannot be undone.
+      //
+      // And each one waits for the thing it guards. Eight switches on a fresh
+      // save named folios, melting, the Wager, challenges, chips and breaking
+      // the Wager: six systems a player ten minutes in has not met, listed on
+      // the settings screen where the archive and the help section are so
+      // carefully gated. A setting for an action you cannot take is a spoiler
+      // wearing a toggle.
       const ask = group('CONFIRM BEFORE')
       for (const c of CONFIRM_KEYS) {
-        ask(cycler(
+        const cycle = ask(cycler(
           c.label.toUpperCase(),
           [{ id: true, label: 'CONFIRM' }, { id: false, label: 'STRAIGHT' }],
           (s) => s.options.confirms[c.key] !== false,
           (on) => actions.setConfirm(c.key, on),
         ))
+        const when = CONFIRM_WHEN[c.key]
+        if (when) confirmGates.push({ root: cycle.root, when })
       }
 
       const save = el('div', 'section')
@@ -502,6 +532,9 @@ export function optionsPane(): Pane {
     update(s: GameState) {
       shown = s
       for (const c of cycles) c.sync(s)
+      // Hidden rather than disabled: a greyed-out switch still names its
+      // action.
+      for (const g of confirmGates) g.root.hidden = !g.when(s)
       // The tick count only means anything while away progress is on.
       tickCycle.root.disabled = !s.options.offline
     },

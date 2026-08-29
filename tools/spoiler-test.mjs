@@ -125,6 +125,27 @@ const breakWords = await ev(`(() => { const t = document.documentElement.innerHT
 check('nothing about breaking the Wager on a fresh save',
   breakWords.length === 0, breakWords.join(', '))
 
+// The settings screen too. Eight confirmation switches on a fresh save named
+// folios, melting, the Wager, challenges, chips and breaking the Wager: six
+// systems in a list that sat beside a carefully gated archive and help.
+// The tab this suite was already on, put back afterwards: the archive checks
+// below read a pane that only redraws while it is the active one.
+const wasOn = await ev(`document.querySelector('.tab[aria-selected=\"true\"]').textContent`)
+await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'OPTIONS').click()`)
+await sleep(300)
+const OPT_AHEAD = ['FOLIO', 'MELT', 'THE WAGER', 'ENTER A CHALLENGE', 'LEAVE A CHALLENGE',
+  'A CHIP UPGRADE OVER 1', 'BREAKING THE WAGER']
+const settings = await ev(`[...document.querySelectorAll('.opt')].filter(n => !n.hidden)
+  .map(n => n.querySelector('.opt-name').textContent)`)
+const ahead = OPT_AHEAD.filter((w) => settings.includes(w))
+check('no confirmation switch for anything not yet met',
+  ahead.length === 0, ahead.join(', '))
+// And the one for the thing you can do from the first second is there.
+check('the study switch is, because a study is on the table from the start',
+  settings.includes('STUDY'), settings.join(', '))
+await ev(`(() => { const t = [...document.querySelectorAll('.tab')].find(x => x.textContent === ${JSON.stringify(wasOn)}); if (t) t.click() })()`)
+await sleep(300)
+
 check('and no archive entry about anything ahead',
   !AHEAD.some((w) => freshArchive.includes(w)), freshArchive.slice(0, 100))
 check('nor anywhere in the archive document',

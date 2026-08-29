@@ -23,6 +23,7 @@ function svg(view: number): SVGSVGElement {
 
 function line(a: [number, number], b: [number, number], opacity: number): SVGLineElement {
   const n = document.createElementNS(NS, 'line')
+  n.setAttribute('vector-effect', 'non-scaling-stroke')
   n.setAttribute('x1', a[0].toFixed(2))
   n.setAttribute('y1', a[1].toFixed(2))
   n.setAttribute('x2', b[0].toFixed(2))
@@ -34,6 +35,7 @@ function line(a: [number, number], b: [number, number], opacity: number): SVGLin
 
 function circle(c: [number, number], r: number, opacity: number): SVGCircleElement {
   const n = document.createElementNS(NS, 'circle')
+  n.setAttribute('vector-effect', 'non-scaling-stroke')
   n.setAttribute('cx', c[0].toFixed(2))
   n.setAttribute('cy', c[1].toFixed(2))
   n.setAttribute('r', r.toFixed(2))
@@ -70,8 +72,13 @@ export function metatron(size = 240): SVGSVGElement {
   const root = svg(size)
   root.classList.add('geo', 'geo-metatron')
   const mid = size / 2
-  // The figure spans four radii of centre offset plus one of circle, each way.
-  const r = size / 10
+  // The figure is ten radii tall: a centre sits four out along the vertical
+  // bearing and carries its own circle on top of that. It is only 8.93 wide,
+  // because the widest centres sit at 4r*cos(30). At r = size/10 the top and
+  // bottom circles landed exactly on the edge of the viewBox and lost the
+  // outer half of their stroke to it, which reads as chopped and thinner than
+  // the other eleven. A radius of size/11 leaves half a radius of air.
+  const r = size / 11
   const centres: [number, number][] = []
   for (const ring of [2, 4]) {
     for (let i = 0; i < 6; i++) {
@@ -154,10 +161,11 @@ export function vesica(w = 200): Vesica {
   root.appendChild(fill)
 
   for (const c of [left, right]) {
-    const n = circle(c, r, 0.5)
+    const n = circle(c, r, 0.78)
     root.appendChild(n)
   }
   const lens = document.createElementNS(NS, 'path')
+  lens.setAttribute('vector-effect', 'non-scaling-stroke')
   lens.setAttribute('d', lensPath)
   lens.setAttribute('stroke-width', '1')
   lens.setAttribute('opacity', '0.9')
