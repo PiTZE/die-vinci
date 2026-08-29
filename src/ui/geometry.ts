@@ -43,44 +43,55 @@ function circle(c: [number, number], r: number, opacity: number): SVGCircleEleme
 }
 
 /**
- * The thirteen circles of Metatron's Cube, and every chord between their
- * centres.
+ * Metatron's Cube: the thirteen circles of the Fruit of Life, and every chord
+ * between the twelve that ring the middle.
  *
- * The centres are one at the middle, six at radius r around it, and six more
- * at radius 2r on the same six bearings, which is the Fruit of Life. Joining
- * all seventy-eight pairs is the Cube, and the reason it belongs on this
- * screen in particular is that its construction contains all five Platonic
- * solids in projection: the same five Leonardo drew for Pacioli, and five of
- * the nine on the table.
+ * Measured off the reference at
+ * commons.wikimedia.org/wiki/File:Metatrons_cube.svg rather than eyeballed.
+ * Its circles have radius r and its centres sit at exactly two distances:
+ * six at 2r and six more at 4r, all twelve on the same six bearings, 30
+ * degrees off vertical. That makes every circle tangent to its neighbours and
+ * none of them overlap.
  *
- * Drawn at 1px like everything else in this game. The chords carry most of the
- * ink, so they are dimmed hard and the circles sit just above them, which
- * keeps the figure readable at 160px on a phone.
+ * The first version here had the rings at r and 2r, which is the same
+ * arrangement with the circles four times too big for it: they overlapped into
+ * a flower and the figure read as the Flower of Life with some scribble on it.
+ *
+ * The chords run between the twelve ring centres and not to the middle one,
+ * which is what the reference draws. All sixty-six of them, and the ones that
+ * pass through a third centre simply lie on top of each other, as they do on
+ * paper.
+ *
+ * It belongs on the break screen because its construction contains all five
+ * Platonic solids in projection: the five Leonardo drew for Pacioli, and five
+ * of the nine on the table.
  */
 export function metatron(size = 240): SVGSVGElement {
   const root = svg(size)
   root.classList.add('geo', 'geo-metatron')
   const mid = size / 2
-  // Six around one, then six more at twice the radius. r is chosen so the
-  // outer circles' own edges just reach the viewBox.
-  const r = size / 6
-  const centres: [number, number][] = [[mid, mid]]
-  for (const ring of [1, 2]) {
+  // The figure spans four radii of centre offset plus one of circle, each way.
+  const r = size / 10
+  const centres: [number, number][] = []
+  for (const ring of [2, 4]) {
     for (let i = 0; i < 6; i++) {
-      // Flat-topped, so the figure sits square in a rectangular panel rather
-      // than balancing on a point.
-      const a = (Math.PI / 3) * i
+      // Thirty degrees off vertical, so the hexagon stands on a point the way
+      // the reference does.
+      const a = (Math.PI / 3) * i - Math.PI / 2
       centres.push([mid + Math.cos(a) * r * ring, mid + Math.sin(a) * r * ring])
     }
   }
 
-  // Every pair, which is what makes it the Cube rather than the Fruit.
   for (let i = 0; i < centres.length; i++) {
     for (let j = i + 1; j < centres.length; j++) {
-      root.appendChild(line(centres[i], centres[j], 0.18))
+      root.appendChild(line(centres[i], centres[j], 0.3))
     }
   }
-  for (const c of centres) root.appendChild(circle(c, r, 0.55))
+  // The middle circle is drawn but nothing connects to it, which is how the
+  // reference has it.
+  for (const c of [[mid, mid] as [number, number], ...centres]) {
+    root.appendChild(circle(c, r, 0.55))
+  }
   return root
 }
 

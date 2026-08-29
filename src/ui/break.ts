@@ -34,6 +34,7 @@ export function breakPane(): Pane {
   let btn: HTMLButtonElement
   let note: HTMLElement
   let grid: HTMLElement
+  let gridSection: HTMLElement
   let cube: SVGSVGElement
   let title: HTMLElement
   let gridTitle: HTMLElement
@@ -81,7 +82,7 @@ export function breakPane(): Pane {
       row.appendChild(btn)
       head.appendChild(row)
 
-      const gridSection = el('div', 'section')
+      gridSection = el('div', 'section')
       const gh = el('div', 'section-head')
       gridTitle = el('span', 'grow', '')
       gh.appendChild(gridTitle)
@@ -114,13 +115,14 @@ export function breakPane(): Pane {
       // automated there is nothing in this subtree to read.
       const open = s.broke || isUnlocked(s, WAGER_AUTOBUYER)
       setText(title, open ? 'BREAK THE WAGER' : '')
-      setText(gridTitle, open && s.broke ? 'WHAT THE OVERSHOOT BUYS' : '')
+      setText(gridTitle, s.broke ? 'WHAT THE OVERSHOOT BUYS' : '')
+      // The section, not just its contents. Hiding the grid and the note left
+      // the box around them drawing its own border under an empty heading.
+      gridSection.hidden = !s.broke
       if (!open) {
         setText(gate, '')
         setText(btn, '')
         btn.hidden = true
-        grid.hidden = true
-        note.hidden = true
         cube.style.visibility = 'hidden'
         return
       }
@@ -153,8 +155,6 @@ export function breakPane(): Pane {
       )
       cube.classList.toggle('lit', s.broke)
 
-      grid.hidden = !s.broke
-      note.hidden = !s.broke
       if (!s.broke) return
 
       let described = ''

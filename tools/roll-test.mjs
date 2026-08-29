@@ -517,6 +517,53 @@ check('ink is pinned at the threshold',
   (await ev(`window.LD.state.ink.toString()`)) === '1.7976931348623157e+308',
   await ev(`window.LD.state.ink.toString()`))
 
+// Every solid drawn against its published vertex and edge count. These come
+// out of formulas rather than out of eight hand-written edge tables, so a
+// change to the shared vertex code could quietly turn a rhombicuboctahedron
+// into something with the wrong number of edges and nothing would say so.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 8; s.solids.forEach(d => { d.amount = new D(10) }) })()`)
+await sleep(300)
+const counts = await ev(`(() => {
+  const out = {}
+  const ids = ['d4','d6','d8','d12','d14','d20','d26','d32','d72']
+  document.querySelectorAll('.solid').forEach((row, i) => {
+    const svg = row.querySelector('.solid-icon')
+    if (!svg) return
+    const verts = new Set()
+    let edges = 0
+    const eat = (d) => {
+      for (const seg of d.split('M').filter(Boolean)) {
+        const nums = (seg.match(/-?\\d+\\.?\\d*/g) || []).map(Number)
+        for (let k = 0; k + 1 < nums.length; k += 2) verts.add(nums[k].toFixed(2) + ',' + nums[k+1].toFixed(2))
+        if (nums.length >= 4) edges += 1
+      }
+    }
+    svg.querySelectorAll('path').forEach(p => { if (p.getAttribute('d')) eat(p.getAttribute('d')) })
+    svg.querySelectorAll('line').forEach(l => {
+      edges += 1
+      verts.add(Number(l.getAttribute('x1')).toFixed(2) + ',' + Number(l.getAttribute('y1')).toFixed(2))
+      verts.add(Number(l.getAttribute('x2')).toFixed(2) + ',' + Number(l.getAttribute('y2')).toFixed(2))
+    })
+    out[ids[i]] = [verts.size, edges]
+  })
+  return out })()`)
+// Vertices and edges, from the literature.
+const SOLID_FIGURES = {
+  d4: [4, 6], d6: [8, 12], d8: [6, 12], d12: [20, 30], d14: [24, 36],
+  d20: [12, 30], d26: [24, 48], d32: [30, 60],
+  // A twelve by six wireframe globe: sixty points on five rings plus two
+  // poles, and seventy-two meridian segments plus sixty of latitude.
+  d72: [62, 132],
+}
+const wrong = Object.entries(SOLID_FIGURES).filter(([k, [v, e]]) => {
+  const got = counts[k]
+  return !got || got[0] !== v || got[1] !== e
+})
+check('every solid has the vertices and edges it should',
+  wrong.length === 0,
+  wrong.map(([k, want]) => `${k} drew ${JSON.stringify(counts[k])} not ${JSON.stringify(want)}`).join('; '))
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

@@ -81,6 +81,14 @@ const ready = await ev(`({
 check('at the floor the button opens', ready.disabled === false && ready.ms === 100,
   JSON.stringify(ready))
 
+// And nothing else is on screen yet. The grid section used to draw its own
+// border under an empty heading for the whole time before the wall came down.
+// Scoped to the pane on screen. Every pane is mounted, so an unscoped count
+// is every section in the game.
+const boxes = await ev(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => !p.hidden)
+  return pane ? [...pane.querySelectorAll('.section')].filter(n => !n.hidden).length : -1 })()`)
+check('with no empty box under it', boxes === 1, `${boxes} sections on screen`)
+
 // AD's payout, both sides of the switch. A run that earned exactly the
 // threshold pays 10^(308/308 - 0.75) = 1.78, floored to 1, so the check is on
 // a run that went well past it.
@@ -167,6 +175,33 @@ check('the chip multiplier opens once the grid is bought', mult.open === true)
 check('costs ten, then a hundred', Number(mult.first) === 10 && Number(mult.second) === 100,
   JSON.stringify(mult))
 check('and doubles the payout', Number(mult.factor) === 2, mult.factor)
+
+// Metatron's Cube, against commons.wikimedia.org/wiki/File:Metatrons_cube.svg.
+// Thirteen circles of one radius, six centres at twice it and six at four
+// times it, all on the same six bearings, so every circle is tangent and none
+// overlap. The first version had the rings at r and 2r, which is the same
+// arrangement with the circles four times too big: they overlapped into a
+// flower with scribble over it.
+const cube = await ev(`(() => {
+  const svg = document.querySelector('.geo-metatron')
+  if (!svg) return null
+  const cs = [...svg.querySelectorAll('circle')].map(c => ({
+    x: Number(c.getAttribute('cx')), y: Number(c.getAttribute('cy')), r: Number(c.getAttribute('r')) }))
+  const r = cs[0].r
+  const mid = cs.find(c => cs.every(o => Math.hypot(o.x - c.x, o.y - c.y) < 4.01 * r))
+  const rings = cs.filter(c => c !== mid)
+    .map(c => +(Math.hypot(c.x - mid.x, c.y - mid.y) / r).toFixed(2))
+  const counts = {}
+  for (const d of rings) counts[d] = (counts[d] || 0) + 1
+  return { circles: cs.length, radii: [...new Set(cs.map(c => c.r))].length,
+    rings: counts, chords: svg.querySelectorAll('line').length } })()`)
+check("Metatron's Cube has thirteen circles of one radius",
+  cube && cube.circles === 13 && cube.radii === 1, JSON.stringify(cube))
+check('six centres at twice the radius and six at four times',
+  cube && cube.rings['2'] === 6 && cube.rings['4'] === 6, JSON.stringify(cube?.rings))
+// Every pair of the twelve that ring the middle: 12 choose 2.
+check('and a chord between every pair of the twelve',
+  cube && cube.chords === 66, `${cube?.chords} chords`)
 
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
