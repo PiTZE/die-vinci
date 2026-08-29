@@ -1592,3 +1592,39 @@
   color: var(--fg-muted);
   text-align: center;
 }
+
+/* The landed face.
+   It used to arrive as a 120ms opacity fade on a 0.95rem digit in a 26px
+   column: the loudest number in the game announced by the quietest thing on
+   the screen. It arrives now, and then gets out of the way. */
+@keyframes face-land {
+  0% {
+    transform: scale(0.6);
+    color: var(--accent);
+  }
+  55% {
+    transform: scale(1.18);
+    color: var(--accent);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--fg);
+  }
+}
+
+.solid-face.landed {
+  font-weight: 600;
+  animation: face-land 260ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* Mid-throw, the previous face waits rather than the column going blank. It is
+   the number you last rolled, so it is dimmed to say so. */
+.solid-face.stale {
+  opacity: 0.3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .solid-face.landed {
+    animation: none;
+  }
+}

@@ -276,14 +276,40 @@ const hop = await ev(`(() => {
 })()`)
 check('the hop is big enough to see', hop.lowest < -1.2, JSON.stringify(hop))
 
-// The face and the wireframe trade places rather than stacking.
+// A die in the air holds the face it last landed on, dimmed, rather than
+// emptying the column for the whole roll. In a game whose feedback is numbers,
+// a blank column for a second reads as the panel going out.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0 })()`)
 await sleep(150)
+// Land one first, so there is something for the next throw to hold.
+await ev(`${ROLL}.click()`); await sleep(1300)
+const heldFace = await ev(`document.querySelector('.solid-face').textContent`)
 await ev(`${ROLL}.click()`); await sleep(120)
-const air = await ev(`({ face: document.querySelector('.solid-face').textContent })`)
-check('a die in the air shows no face', air.face === '', JSON.stringify(air))
-await sleep(1200)
+const air = await ev(`(() => { const f = document.querySelector('.solid-face')
+  return { face: f.textContent, stale: f.classList.contains('stale') } })()`)
+check('a die in the air holds its last face, dimmed',
+  air.face === heldFace && heldFace !== "" && air.stale === true,
+  JSON.stringify({ heldFace, ...air }))
+
+// And a die that has never landed shows nothing, because there is nothing to
+// hold on to yet.
+await ev(`(() => { const s = window.LD.state
+  s.faces = s.faces.map(() => 0); s.rollStartedAt = 0 })()`)
+await ev(`document.querySelectorAll('.solid-face').forEach(f => {
+  f.textContent = ''; f.classList.remove('stale') })`)
+await sleep(150)
+await ev(`(() => { const s = window.LD.state; s.solids[0].amount = new window.LD.Decimal(0) })()`)
+await sleep(250)
+check('a die with nothing on it shows nothing',
+  (await ev(`document.querySelector('.solid-face').textContent`)) === '')
+// Put the dice back. Everything after this reads the same row.
+await ev(`(() => { const s = window.LD.state; s.solids[0].amount = new window.LD.Decimal(40) })()`)
+await sleep(200)
+// And land one, because the column holds the last face it saw and there has
+// not been a face since the row was emptied.
+await ev(`${ROLL}.click()`)
+await sleep(1400)
 const rest = await ev(`(() => {
   const row = document.querySelector('.solid')
   const face = row.querySelector('.solid-face').getBoundingClientRect()

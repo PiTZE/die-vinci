@@ -50,6 +50,8 @@ interface Row {
   blocks: HTMLElement[]
   buyLabel: HTMLElement
   buyCost: HTMLElement
+  /** The last face this die actually landed on, so the column never blanks. */
+  lastFace: number
 }
 
 /**
@@ -79,6 +81,20 @@ function duo(btn: HTMLElement, verb: string, cost = ''): void {
 
 function setText(n: HTMLElement, v: string): void {
   if (n.textContent !== v) n.textContent = v
+}
+
+/**
+ * Restarts the landing animation on a node that may already be running it.
+ *
+ * Removing the class and adding it back in the same task does nothing: the
+ * style never resolves in between, so the browser sees no change. Reading a
+ * layout property forces it to, which is the standard way and the only way
+ * that does not need a second frame.
+ */
+function land(n: HTMLElement): void {
+  n.classList.remove('landed')
+  void n.offsetWidth
+  n.classList.add('landed')
 }
 
 /**
@@ -275,7 +291,7 @@ export function tablePane(): Pane {
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, icon, face, mult, blocks, amount, rate: flow, buy, buyLabel, buyCost })
+        rows.push({ root: r, icon, face, mult, blocks, amount, rate: flow, buy, buyLabel, buyCost, lastFace: 0 })
       }
 
       const roll = el('div', 'section table-roll')
@@ -531,11 +547,32 @@ export function tablePane(): Pane {
         // than that, the digit was blanked, so the column emptied exactly when
         // the table got interesting. It holds the die's average instead, which
         // is what a run of rolls that fast actually pays.
-        if (!rolling) setText(r.face, '')
-        else if (readable) {
+        if (!rolling) {
+          setText(r.face, '')
+          r.lastFace = 0
+        } else if (readable) {
           const face = s.faces[def.idx - 1]
-          setText(r.face, face ? String(face) : '')
+          if (face) {
+            // A new landing. The number is the whole point of the roll and it
+            // used to arrive as a 120ms opacity fade on a 0.95rem digit, which
+            // is the quietest thing on the screen announcing the loudest.
+            if (face !== r.lastFace) land(r.face)
+            r.lastFace = face
+            setText(r.face, String(face))
+            r.face.classList.remove('stale')
+          } else {
+            // Mid-throw. The column used to empty for the whole roll, which in
+            // a game whose feedback is numbers reads as the panel going out.
+            // The last face stays, dimmed, until this one lands on top of it.
+            if (r.lastFace) {
+              setText(r.face, String(r.lastFace))
+              r.face.classList.add('stale')
+            } else {
+              setText(r.face, '')
+            }
+          }
         } else {
+          r.face.classList.remove('stale')
           // Whole numbers. A die never lands on 10.5, and printing it in the
           // same column that shows a landed face the rest of the time reads as
           // a broken number rather than as an average.

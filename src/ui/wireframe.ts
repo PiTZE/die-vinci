@@ -210,6 +210,8 @@ class Wire {
   private wx = 0.42
   /** Each die leaves the hand a little differently. */
   private speed = 1
+  /** Revolutions this throw, picked against this solid's own ceiling. */
+  private turns = 1
   /** Keeps the nine tumbles out of phase with each other. */
   private phase = Math.random() * Math.PI * 2
   /** And the nine bounces, so they do not all hit the table together. */
@@ -224,7 +226,7 @@ class Wire {
   }
 
   /** A new throw. Fresh axis, fresh rate. */
-  throw(): void {
+  throw(duration: number): void {
     // Kept away from zero on both axes, or the solid spins flat about one axis
     // and reads as a wheel rather than a tumble.
     const a = Math.random() * Math.PI * 2
@@ -234,6 +236,9 @@ class Wire {
     this.speed = 0.8 + Math.random() * 0.45
     this.phase = Math.random() * Math.PI * 2
     this.hopPhase = Math.random() * 0.4
+    // The variance rides inside the budget rather than on top of it, or a die
+    // drawn at 1.25 speed would sit a quarter over its own ceiling.
+    this.turns = turnsFor(this.id, duration) * this.speed
   }
 
   constructor(id: SolidId) {
@@ -277,17 +282,22 @@ class Wire {
    * finish, and integrating a rate towards it drifts, so a die that should
    * land square lands a few degrees off and the last frame snaps.
    */
-  render(turns: number, progress: number): void {
-    this.t = turns * Math.PI * 2 * this.speed + this.phase
+  render(eased: number, progress: number): void {
+    this.t = eased * this.turns * Math.PI * 2 + this.phase
     this.bounce(progress)
     this.draw()
   }
 
-  step(dt: number, rate: number): void {
+  step(dt: number): void {
+    // Its own ceiling, the same one its throws are budgeted against, so
+    // crossing from a throw into the blur is a change of behaviour and not a
+    // change of speed. One global number meant the tetrahedron blurred at the
+    // rate the sphere needs, which is four times slower than it can manage.
+    const rate = ceilingFor(this.id) * Math.PI * 2
     this.t += dt * rate * this.speed
     // Rolling too fast to watch. A light constant wobble, no bounce: there is
     // no landing to settle onto.
-    const j = Math.min(1, rate / MAX_SPIN)
+    const j = Math.min(1, rate / (MAX_SPIN * 2))
     this.place(
       Math.sin(this.t * 0.6 + this.phase * 2) * 0.9 * j,
       Math.sin(this.t * 0.9 + this.phase) * 1.4 * j,
@@ -303,22 +313,40 @@ class Wire {
    * that read as the icon drifting.
    */
   private bounce(p: number): void {
-    const fade = Math.pow(1 - p, 1.4)
-    // Negative is up. abs() makes each half-cycle a hop rather than a dip.
-    const hop = -Math.abs(Math.sin((p * BOUNCES + this.hopPhase) * Math.PI)) * 3.1 * fade
-    const side = Math.sin((p * 2 + this.hopPhase) * Math.PI) * 1.5 * (1 - p)
-    const tilt = Math.sin((p * 4 + this.hopPhase) * Math.PI) * 7 * fade
-    this.place(side, hop, tilt)
+    if (p < LAND_AT) {
+      // Still in the air. A little drift and tilt so the spin does not look
+      // like it is happening on a pin, and nothing else.
+      const k = p / LAND_AT
+      const side = Math.sin((k + this.hopPhase) * Math.PI) * 1.2
+      const tilt = Math.sin((k * 2 + this.hopPhase) * Math.PI) * 6
+      this.place(side, -1.5 * Math.sin(k * Math.PI), tilt, 1, 1)
+      return
+    }
+
+    // The landing. Two decaying hops and a squash on each contact, which is
+    // the part that reads as weight.
+    const q = (p - LAND_AT) / (1 - LAND_AT)
+    const fade = Math.pow(1 - q, 1.6)
+    const cycle = q * BOUNCES + this.hopPhase * 0.15
+    const hop = -Math.abs(Math.sin(cycle * Math.PI)) * HOP_PX * fade
+    // Flattest at the instant of contact, which is where the sine is zero.
+    const contact = Math.pow(1 - Math.abs(Math.sin(cycle * Math.PI)), 3) * fade
+    const sx = 1 + SQUASH * contact
+    const sy = 1 - SQUASH * contact
+    const tilt = Math.sin(cycle * 2 * Math.PI) * 5 * fade
+    this.place(0, hop, tilt, sx, sy)
   }
 
-  private place(x: number, y: number, deg: number): void {
-    if (Math.abs(x) < 0.02 && Math.abs(y) < 0.02 && Math.abs(deg) < 0.05) {
+  private place(x: number, y: number, deg: number, sx = 1, sy = 1): void {
+    const flat = Math.abs(sx - 1) < 0.004 && Math.abs(sy - 1) < 0.004
+    if (Math.abs(x) < 0.02 && Math.abs(y) < 0.02 && Math.abs(deg) < 0.05 && flat) {
       // Square, and cleared rather than left at a hundredth of a degree.
       if (this.el.style.transform) this.el.style.transform = ''
       return
     }
     this.el.style.transform =
-      `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${deg.toFixed(2)}deg)`
+      `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${deg.toFixed(2)}deg)` +
+      (flat ? '' : ` scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`)
   }
 
   private draw(): void {
@@ -398,12 +426,72 @@ const byEl = new Map<SVGSVGElement, Wire>()
 //
 // Revolutions are per throw and per die, so nine solids do not arrive together
 // like a row of gears.
-const TURNS_MIN = 1.15
-const TURNS_SPREAD = 0.7
+/**
+ * As far as the solid can honestly go, up to this.
+ *
+ * It used to be a flat 1.15 to 1.85 revolutions for all nine, which is a
+ * number the sphere could just about survive and every other solid was bored
+ * by. Each one now takes what its own geometry allows and stops here, so a
+ * tetrahedron turns more than three times in a one second throw where it used
+ * to turn one and a half.
+ */
+const TURNS_MAX = 3.2
 
 /**
- * The ceiling on how fast a die turns, in radians a second. About 4.8
- * revolutions, which at 60fps is 29 degrees a frame.
+ * How far each solid can turn between two frames before it stops reading as
+ * turning, in degrees.
+ *
+ * A shape carried through one of its own symmetry steps in a single frame
+ * arrives looking exactly as it left, so the eye has nothing to tell it apart
+ * from standing still, and a little past that it reads as turning backwards.
+ * The step is the highest rotation order the solid has: three for the
+ * tetrahedron, four for the cube and everything octahedral, five for
+ * everything icosahedral, and one per meridian for the sphere.
+ *
+ * The tumble axis is picked at random on every throw rather than being one of
+ * these symmetry axes, so the true repeat is a full turn and this is a floor
+ * rather than the exact figure. It is the right floor to hold: a solid with
+ * twelve near-identical meridians goes ambiguous long before a tetrahedron
+ * does, and one global ceiling for all nine had to be set by the sphere.
+ */
+const SYMMETRY_STEP: Record<SolidId, number> = {
+  tetra: 120,
+  hexa: 90,
+  octa: 90,
+  dodeca: 72,
+  trunccube: 90,
+  icosa: 72,
+  rhombi: 90,
+  icosidodeca: 72,
+  // Twelve meridians, so the sphere repeats every thirtieth of a turn. It is
+  // four times as fussy as the tetrahedron and used to set the limit for it.
+  sphaera: 30,
+}
+
+const FRAME_HZ = 60
+
+/**
+ * The fastest this solid can turn and still read as turning, in revolutions a
+ * second: one symmetry step a frame, which is the rule the old global ceiling
+ * was set by. Past it the shape arrives looking as it left.
+ */
+function ceilingFor(id: SolidId): number {
+  return ((SYMMETRY_STEP[id] ?? 30) / 360) * FRAME_HZ
+}
+
+/**
+ * The easing's steepest moment, as a multiple of its average.
+ *
+ * The ceiling used to be applied to the average rate, and the easing opens far
+ * faster than its average, so the first frames of every short throw ran well
+ * past the limit the comment above so carefully derived. That is the strobe,
+ * and it was never only a blur-mode problem.
+ */
+const EASE_PEAK = 2
+
+/**
+ * The old global ceiling, in radians a second, kept only to scale the wobble
+ * amplitude in the blur. Each solid has its own now; see ceilingFor.
  *
  * The limit is aliasing, not taste. A shape turning more than one symmetry
  * step per frame reads as turning backwards, or as standing still. The
@@ -417,19 +505,47 @@ const TURNS_SPREAD = 0.7
  */
 const MAX_SPIN = 30
 
-/** Hops per throw. Three is a die landing; one is a heave. */
-const BOUNCES = 3
+/**
+ * Where the throw stops being a spin and becomes a landing.
+ *
+ * The hops used to be spread across the whole roll, three of them at 3.1px on
+ * a 32px icon, fading as it went. Nine percent of an icon, smeared over a
+ * second, is not a bounce; it is a drift nobody could see at native size and
+ * nobody could find at two and a half times it either. They are packed into
+ * the last quarter now, where a die actually meets the table.
+ */
+const LAND_AT = 0.75
+
+/** Hops in that last quarter. Two is a die landing; one is a drop. */
+const BOUNCES = 2
+
+/** How high, as a share of the icon. A fifth of it reads at 32px. */
+const HOP_PX = 6.4
+
+/** The squash on contact, and how long it holds before springing back. */
+const SQUASH = 0.14
 
 type Mode = 'rest' | 'throw' | 'blur'
 let mode: Mode = 'rest'
 let progress = 1
 let lastProgress = 1
-let turns = TURNS_MIN
 
-/** Fast out, slow in. Cubic: gentler than the quartic a die's last bounce
- *  really has, and a hard brake at this size reads as a dropped frame. */
+/**
+ * Fast out, slow in. Quadratic.
+ *
+ * It was cubic, which spends 49% of the rotation in the first fifth of the
+ * throw and 87% in the first half: a flick, and then most of a second of a
+ * shape barely moving. Quadratic holds the average rate all the way to the
+ * midpoint, so the part of the throw you actually watch is the part that
+ * moves. It also opens at twice its average rather than three times, which
+ * buys every solid more total revolutions under the same ceiling.
+ *
+ * Cubic was chosen over quartic because a hard stop at this size read as a
+ * dropped frame. That reasoning held when the throw ended by simply arriving;
+ * it ends on two hops and a squash now, which is something to stop against.
+ */
 function easeOut(p: number): number {
-  return 1 - Math.pow(1 - p, 3)
+  return 1 - Math.pow(1 - p, 2)
 }
 
 /**
@@ -445,17 +561,19 @@ function easeOut(p: number): number {
  * strobe. Past the point where the ceiling binds, the throw covers less ground
  * instead of turning faster, so it stays a legible flick.
  */
-function turnsFor(duration: number): number {
-  const wanted = TURNS_MIN + Math.random() * TURNS_SPREAD
+function turnsFor(id: SolidId, duration: number): number {
+  const wanted = TURNS_MAX
   if (duration <= 0) return wanted
-  return Math.min(wanted, (MAX_SPIN * duration) / (Math.PI * 2))
+  // Against the peak rather than the average, and against this solid's own
+  // ceiling rather than the sphere's. A tetrahedron can honestly cover four
+  // times the ground a sphere can in the same throw, and it now does.
+  return Math.min(wanted, (ceilingFor(id) * duration) / EASE_PEAK)
 }
 
 export function setThrow(p: number, duration: number): void {
   const clamped = Math.max(0, Math.min(1, p))
   if (clamped < lastProgress - 0.02) {
-    turns = turnsFor(duration)
-    for (const w of live) w.throw()
+    for (const w of live) w.throw(duration)
   }
   lastProgress = clamped
   progress = clamped
@@ -463,7 +581,7 @@ export function setThrow(p: number, duration: number): void {
   if (next === 'rest' && mode !== 'rest') {
     // Coming to rest stops the loop, so the settled frame has to be drawn
     // here or the die keeps whatever tilt it happened to be at.
-    for (const w of live) if (w.rolls) w.render(turns, 1)
+    for (const w of live) if (w.rolls) w.render(1, 1)
   }
   mode = next
   if (mode === 'throw') ensureLoop()
@@ -492,12 +610,12 @@ function frame(now: number): void {
 
   if (mode === 'throw') {
     const e = easeOut(progress)
-    for (const w of live) if (w.visible && w.rolls) w.render(turns * e, progress)
+    for (const w of live) if (w.visible && w.rolls) w.render(e, progress)
     return
   }
 
   if (mode === 'blur') {
-    for (const w of live) if (w.visible && w.rolls) w.step(dt, MAX_SPIN)
+    for (const w of live) if (w.visible && w.rolls) w.step(dt)
     return
   }
 
