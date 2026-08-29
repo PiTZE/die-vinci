@@ -19,7 +19,7 @@
 import Decimal from 'break_infinity.js'
 import type { GameState } from '../state'
 import { AUTOBUYERS, INTERVAL_FLOOR, isMaxed, upgrade } from './autobuyers'
-import { chipsPerSecondFromGrid } from './upgrades'
+import { UPGRADES, chipsPerSecondFromGrid, wagerChipMultiplier } from './upgrades'
 
 /** The autobuyer that calls the Wager for you. Challenge 13 awards it. */
 export const WAGER_AUTOBUYER = 'wager'
@@ -45,7 +45,7 @@ export function chipsFrom(s: GameState): Decimal {
   const base = s.broke
     ? Decimal.pow10(Math.max(0, s.inkThisWager.log10()) / DIVISOR - OFFSET).floor().max(1)
     : new Decimal(1)
-  return base.times(chipMultiplier(s))
+  return base.times(chipMultiplier(s)).times(wagerChipMultiplier(s)).floor().max(1)
 }
 
 /**
@@ -78,12 +78,8 @@ export function chipMultUnlocked(s: GameState): boolean {
   return s.wagers > 0 && s.chipUpgrades.length >= CHIP_GRID_SIZE
 }
 
-/** Set by upgrades.ts at load, so breaks.ts does not import the grid. */
-export let CHIP_GRID_SIZE = 16
-
-export function setChipGridSize(n: number): void {
-  CHIP_GRID_SIZE = n
-}
+/** However many the grid holds, counted rather than remembered. */
+export const CHIP_GRID_SIZE = Object.keys(UPGRADES).length
 
 export function buyChipMult(s: GameState): boolean {
   if (!canBuyChipMult(s)) return false

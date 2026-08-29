@@ -263,7 +263,7 @@ while (t < HOURS * 3600 && done < WAGERS) {
     console.log(
       `\nWAGER ${done}  after ${hms(t - lastWager)}  (total ${hms(t)})  ` +
         `chips=${s.chips}  upgrades=${s.chipUpgrades.length}/${Object.keys(UPGRADES).length}  ` +
-        `archive=${s.achievements.length}/${ACHIEVEMENTS.length} x${achievementPower(s).toNumber().toFixed(3)}  ` +
+        `chal=${s.challengesDone.length}/13 auto=${s.autobuyers.wager?.unlocked?"y":"n"}${s.autobuyers.wager?.level ?? 0} archive=${s.achievements.length}/${ACHIEVEMENTS.length} x${achievementPower(s).toNumber().toFixed(3)}  ` +
         `arcana=${owned(s)}`,
     )
     dump()

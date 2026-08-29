@@ -22,6 +22,7 @@ export type UpgradeId =
   | 'wagerTimeMult'
   | 'unspentMult'
   | 'studyPower'
+  | 'wagerChips'
   | 'chipGen'
   | 'skipStudy1'
   | 'skipStudy2'
@@ -41,7 +42,7 @@ export interface UpgradeDef {
 export const UPGRADE_CHAINS: UpgradeId[][] = [
   ['timeMult', 'solids19', 'solids37', 'resetBoost'],
   ['buyTenMult', 'solids28', 'solids456', 'folioBoost'],
-  ['wagerTimeMult', 'unspentMult', 'studyPower'],
+  ['wagerTimeMult', 'unspentMult', 'studyPower', 'wagerChips'],
   // AD's grid does not stop at eleven either. Its last five cost 10, 20, 40,
   // 80 and 300, and four of them are the same idea: begin the run further
   // along than the last one began. That is what changes the pace, rather than
@@ -124,9 +125,17 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
     label: 'STUDIES',
     note: 'studies multiply by 2.5 instead of 2',
   },
+  wagerChips: {
+    id: 'wagerChips',
+    cost: 9,
+    needs: 'studyPower',
+    label: 'THE COUNT',
+    note: 'every Wager pays more chips the more of them you have called',
+  },
   chipGen: {
     id: 'chipGen',
     cost: 10,
+    needs: 'wagerChips',
     label: 'THE FLOAT',
     note: 'chips arrive on their own, ten times slower than your fastest Wager',
   },
@@ -243,6 +252,23 @@ export function folioStrength(s: GameState): number {
 /** AD's resetBoost takes 9 off both requirements. */
 export function requirementDiscount(s: GameState): number {
   return isBought(s, 'resetBoost') ? 9 : 0
+}
+
+/**
+ * What a Wager pays, scaled by how many you have called.
+ *
+ * Antimatter Dimensions' infinitiedMult shape, 1 + log10(count) * k, which it
+ * uses to multiply dimensions by Infinities completed. Here it multiplies the
+ * payout instead, because the payout is what the break layer is paced by.
+ *
+ * Its own k is 10, and that is too generous: modelled against a Wager that
+ * settles at 56 seconds, ten brings breaking inside two hours where the flat
+ * payout takes thirty. Four lands it near three and a half, which is an
+ * evening rather than a working week and still asks for a few hundred Wagers.
+ */
+export function wagerChipMultiplier(s: GameState): Decimal {
+  if (!isBought(s, 'wagerChips')) return new Decimal(1)
+  return new Decimal(1 + Math.log10(Math.max(1, s.wagers)) * 4)
 }
 
 /**

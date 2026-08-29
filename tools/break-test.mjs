@@ -176,6 +176,22 @@ check('costs ten, then a hundred', Number(mult.first) === 10 && Number(mult.seco
   JSON.stringify(mult))
 check('and doubles the payout', Number(mult.factor) === 2, mult.factor)
 
+// THE COUNT, which is what makes this layer reachable at all. Antimatter
+// Dimensions' infinitiedMult shape, 1 + log10(count) * 4, applied to the
+// payout rather than to production. Without it a Wager pays a flat one and the
+// grind to the 0.1 second autobuyer is thirty hours of an unchanging minute;
+// with it the simulation breaks at four hours and nineteen minutes.
+const count = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.broke = false; s.chipMult = 0; s.wagers = 100
+  s.chipUpgrades = window.LD.upgradeIds().filter(id => id !== 'wagerChips')
+  const off = window.LD.chipsFrom(s).toString()
+  s.chipUpgrades = window.LD.upgradeIds()
+  const on = window.LD.chipsFrom(s).toString()
+  return { off, on } })()`)
+// 1 + log10(100) * 4 = 9, and the payout floors to a whole chip.
+check('THE COUNT pays by Wagers called',
+  Number(count.off) === 1 && Number(count.on) === 9, JSON.stringify(count))
+
 // Metatron's Cube, against commons.wikimedia.org/wiki/File:Metatrons_cube.svg.
 // Thirteen circles of one radius, six centres at twice it and six at four
 // times it, all on the same six bearings, so every circle is tangent and none
