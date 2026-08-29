@@ -114,7 +114,7 @@ export function automationPane(): Pane {
         onBtn.addEventListener('click', () => actions.toggleAutobuyer(a.id))
 
         // Single, a group of ten, or as much as the ink allows. AD's modes.
-        const modeBtn = el('button', 'auto-toggle', '10')
+        const modeBtn = el('button', 'auto-toggle auto-mode', '10')
         modeBtn.type = 'button'
         modeBtn.title = 'What each purchase buys'
         modeBtn.addEventListener('click', () => actions.cycleAutobuyerMode(a.id))

@@ -914,12 +914,54 @@
   color: var(--fg);
 }
 
-.auto-row {
-  display: flex;
+/* One grid for every row in this pane, rules included.
+   It was a flex row, and the mode button only exists on the nine solids, so on
+   every other row the ON button slid into the space it left and no two columns
+   below the ninth die lined up with the ones above it. A grid keeps the column
+   whether or not anything is standing in it. */
+.auto-row,
+.auto-rule {
+  display: grid;
+  /* Sized for a 390px phone with four fixed columns to fit around: the two
+     switches, the wide button, and whatever is left for the name and the
+     interval. THE WAGER and its 12.96s is the widest pair and it decides
+     these numbers. */
+  grid-template-columns: minmax(0, 1fr) auto 3rem 3rem 7.4rem;
   align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
+  gap: 7px;
+  padding: 7px 8px;
+}
+
+/* Names do not wrap. A two-line ROLL RATE beside a one-line d4 is a ragged
+   column of rows that are all supposed to be the same height. */
+.auto-label,
+.auto-rule-label {
+  white-space: nowrap;
+}
+
+.auto-row {
   border-bottom: 1px solid var(--border-faint);
+}
+
+.auto-label {
+  grid-column: 1;
+}
+
+.auto-every {
+  grid-column: 2;
+}
+
+/* Every switch in the pane, in one column. */
+.auto-toggle {
+  grid-column: 3;
+}
+
+.auto-mode {
+  grid-column: 4;
+}
+
+.auto-up {
+  grid-column: 5;
 }
 
 .auto-row:last-child {
@@ -927,28 +969,28 @@
 }
 
 .auto-label {
-  flex: 1 1 auto;
   min-width: 0;
   font-size: 0.74rem;
 }
 
 .auto-every {
-  flex: 0 0 auto;
-  font-size: 0.66rem;
+  font-size: 0.62rem;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .auto-toggle {
-  flex: 0 0 auto;
-  min-width: 3.4rem;
   min-height: 34px;
-  font-size: 0.62rem;
+  padding-left: 2px;
+  padding-right: 2px;
+  font-size: 0.6rem;
 }
 
 .auto-up {
-  flex: 0 0 auto;
-  min-width: 9rem;
   min-height: 34px;
-  font-size: 0.62rem;
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 0.6rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1657,19 +1699,20 @@
 .auto-rules {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 0 10px 10px 22px;
+  border-bottom: 1px solid var(--border-faint);
 }
 
 .auto-rule {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  padding-top: 0;
+  padding-bottom: 6px;
 }
 
+/* Indented by its text rather than by its box, so the switch and the field
+   stay in the same two columns as every other row's. */
 .auto-rule-label {
-  flex: 1;
+  grid-column: 1 / 3;
   min-width: 0;
+  padding-left: 12px;
   font-size: 0.62rem;
   letter-spacing: 0.08em;
   color: var(--fg-muted);
@@ -1679,7 +1722,9 @@
    border as everything else and a width that holds four digits, which is more
    folios than anyone will bind. */
 .auto-num {
-  width: 4.2rem;
+  grid-column: 5;
+  justify-self: stretch;
+  width: auto;
   min-height: 30px;
   padding: 2px 8px;
   border: 1px solid var(--border);
@@ -1699,4 +1744,20 @@
 .auto-num:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: -2px;
+}
+
+
+/* Desktop has the width for the original sizes. */
+@media (min-width: 820px) {
+  .auto-row,
+  .auto-rule {
+    grid-template-columns: minmax(0, 1fr) auto 3.6rem 3.6rem 9rem;
+    gap: 10px;
+    padding: 7px 12px;
+  }
+
+  .auto-toggle,
+  .auto-up {
+    font-size: 0.62rem;
+  }
 }

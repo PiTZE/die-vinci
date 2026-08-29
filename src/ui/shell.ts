@@ -133,6 +133,19 @@ export class Shell {
   private toastTimer = 0
   private inkOut = new Readout('INK')
   private chipsOut = new Readout('CHIPS')
+  /**
+   * Chips a second, watched rather than worked out.
+   *
+   * The ink rate is a formula, because production is one. Chips arrive a Wager
+   * at a time and the engine has no idea how long the next Wager will take, so
+   * this reads the number instead. Smoothed over about three seconds so it
+   * settles between Wagers rather than spiking on each one, and only upward:
+   * chips go down when you spend them and an income of minus four hundred is
+   * not a thing worth printing.
+   */
+  private chipsSeen: Decimal | null = null
+  private chipsAt = 0
+  private chipsRate = 0
   private active: TabId = 'table'
 
   constructor(
@@ -302,7 +315,30 @@ export class Shell {
     )
     const showChips = s.wagers > 0 || s.chips.gt(0)
     this.chipsOut.show(showChips)
-    if (showChips) this.chipsOut.set(format(s.chips, n))
+    if (showChips) {
+      const now = Date.now()
+      if (this.chipsSeen === null) {
+        this.chipsSeen = s.chips
+        this.chipsAt = now
+      } else {
+        const dt = (now - this.chipsAt) / 1000
+        if (dt >= 0.25) {
+          const gained = s.chips.minus(this.chipsSeen)
+          const per = gained.gt(0) ? gained.div(dt).toNumber() : 0
+          const k = Math.min(1, dt / 3)
+          this.chipsRate = this.chipsRate * (1 - k) + per * k
+          this.chipsSeen = s.chips
+          this.chipsAt = now
+        }
+      }
+      // Only once the wall is down. Before it a Wager pays exactly one and the
+      // rate is a statement about how fast you are pressing, which is what the
+      // ink readout already says.
+      this.chipsOut.set(
+        format(s.chips, n),
+        s.broke ? `${format(new Decimal(this.chipsRate), n)}/s` : '',
+      )
+    }
 
     for (const p of this.panes) {
       const btn = this.tabButtons.get(p.id)
