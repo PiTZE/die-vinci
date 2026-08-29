@@ -42,7 +42,7 @@ import {
 } from './game/tarot'
 import { UPGRADES, buyUpgrade } from './game/upgrades'
 import { enterChallenge, exitChallenge } from './game/challenges'
-import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode, runAutobuyers as rawRunAutobuyers, interval as intervalOf, isMaxed as isMaxedAuto } from './game/autobuyers'
+import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode, runAutobuyers as rawRunAutobuyers, interval as intervalOf, isMaxed as isMaxedAuto, setLimit, setUntil, allowed as autoAllowed } from './game/autobuyers'
 import { mustWager, resetForChallenge, rollCost } from './game/production'
 import type { UpgradeId } from './game/upgrades'
 import { format } from './format'
@@ -281,6 +281,14 @@ const actions: Actions = {
   },
   buyUpgrade: (id) => {
     buyUpgrade(state, id as UpgradeId)
+    persistSoon()
+  },
+  setAutobuyerLimit: (id, on, at) => {
+    setLimit(state, id, on, at)
+    persistSoon()
+  },
+  setAutobuyerUntil: (id, on, at) => {
+    setUntil(state, id, on, at)
     persistSoon()
   },
   buyChipMult: () => {
@@ -590,6 +598,7 @@ const hook: Record<string, unknown> = {
   mustWager,
   interval: intervalOf,
   isMaxed: isMaxedAuto,
+  autoAllowed,
   upgradeIds: () => Object.keys(UPGRADES),
   // The ticker's line picker, so a test can assert that an ordered sequence
   // comes out in order rather than watch a crawling bar for a minute.

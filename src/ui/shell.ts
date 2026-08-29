@@ -29,6 +29,10 @@ export interface Actions {
   exitChallenge(): void
   toggleAutobuyer(id: string): void
   upgradeAutobuyer(id: string): void
+  /** A cap on how many a reset autobuyer takes. AD's limitDimBoosts. */
+  setAutobuyerLimit(id: string, on: boolean, at?: number): void
+  /** And the folio count that lifts it. AD's limitUntilGalaxies. */
+  setAutobuyerUntil(id: string, on: boolean, at?: number): void
   setNotation(n: GameState['options']['notation']): void
   /** Pixels a second for the thoughts ticker. 0 holds each line still. */
   setThoughtSpeed(px: number): void

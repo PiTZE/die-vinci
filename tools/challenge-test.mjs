@@ -133,6 +133,46 @@ check('upgrading an autobuyer spends the doubling cost and shortens it',
   afterUp.level === beforeUp.level + 1 && afterUp.chips === beforeUp.chips - expectCost,
   `${JSON.stringify(beforeUp)} -> ${JSON.stringify(afterUp)}, cost ${expectCost}`)
 
+// The two reset autobuyers take a cap, which is the only autobuyer setting
+// Antimatter Dimensions gives and the only one worth giving: a reset is the
+// only purchase you can want to stop making. Its condition, from
+// dimboost-autobuyer.js, is an OR rather than an AND, so the folio rule lifts
+// the study cap instead of narrowing it.
+const limits = await ev(`(() => { const s = window.LD.state
+  const a = s.autobuyers.study
+  const out = {}
+  s.studies = 5; s.folios = 0
+  a.limitOn = false
+  out.uncapped = window.LD.autoAllowed(s, 'study')
+  a.limitOn = true; a.limitAt = 5
+  out.atTheCap = window.LD.autoAllowed(s, 'study')
+  a.limitAt = 6
+  out.underTheCap = window.LD.autoAllowed(s, 'study')
+  a.limitAt = 5; a.untilOn = true; a.untilFolios = 3
+  out.cappedFewFolios = window.LD.autoAllowed(s, 'study')
+  s.folios = 3
+  out.capLiftedByFolios = window.LD.autoAllowed(s, 'study')
+  // The folio autobuyer has the cap and not the lift.
+  const f = s.autobuyers.folio
+  f.limitOn = true; f.limitAt = 3
+  out.folioAtTheCap = window.LD.autoAllowed(s, 'folio')
+  f.limitAt = 4
+  out.folioUnderTheCap = window.LD.autoAllowed(s, 'folio')
+  // And a solid autobuyer has neither, so nothing can stop it.
+  out.solidAlwaysAllowed = window.LD.autoAllowed(s, 'solid1')
+  a.limitOn = false; a.untilOn = false; f.limitOn = false
+  return out })()`)
+check('a reset autobuyer stops at its cap',
+  limits.uncapped === true && limits.atTheCap === false && limits.underTheCap === true,
+  JSON.stringify(limits))
+check('and enough folios lift the study cap rather than narrowing it',
+  limits.cappedFewFolios === false && limits.capLiftedByFolios === true,
+  JSON.stringify(limits))
+check('the folio autobuyer takes a cap and no lift',
+  limits.folioAtTheCap === false && limits.folioUnderTheCap === true,
+  JSON.stringify(limits))
+check('and a solid autobuyer takes neither', limits.solidAlwaysAllowed === true)
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

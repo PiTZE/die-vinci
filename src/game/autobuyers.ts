@@ -59,18 +59,39 @@ export interface AutobuyerState {
   level: number
   /** Milliseconds since this one last fired. */
   since: number
+  /**
+   * The two reset autobuyers carry limits, which the dimension ones do not.
+   *
+   * Antimatter Dimensions' own settings, from dimboost-autobuyer.js and
+   * galaxy-autobuyer.js: a cap on how many to take, and for the shallower of
+   * the two a rule that lifts the cap once you hold enough of the deeper one.
+   * Its defaults are off, at 1 and at 10.
+   */
+  limitOn?: boolean
+  limitAt?: number
+  /** Study only: take them freely again once this many folios are bound. */
+  untilOn?: boolean
+  untilFolios?: number
 }
 
 export function newAutobuyers(): Record<string, AutobuyerState> {
   const out: Record<string, AutobuyerState> = {}
-  for (const a of AUTOBUYERS) out[a.id] = { unlocked: false, on: true, mode: 'ten', level: 0, since: 0 }
+  for (const a of AUTOBUYERS) {
+    out[a.id] = {
+      unlocked: false, on: true, mode: 'ten', level: 0, since: 0,
+      limitOn: false, limitAt: 1, untilOn: false, untilFolios: 10,
+    }
+  }
   return out
 }
 
 function slot(s: GameState, id: AutobuyerId): AutobuyerState {
   const held = s.autobuyers[id]
   if (held) return held
-  const fresh: AutobuyerState = { unlocked: false, on: true, mode: 'ten', level: 0, since: 0 }
+  const fresh: AutobuyerState = {
+    unlocked: false, on: true, mode: 'ten', level: 0, since: 0,
+    limitOn: false, limitAt: 1, untilOn: false, untilFolios: 10,
+  }
   s.autobuyers[id] = fresh
   return fresh
 }
@@ -127,6 +148,63 @@ export function cycleMode(s: GameState, id: AutobuyerId): void {
   a.mode = MODES[(i + 1) % MODES.length].id
 }
 
+/** Which autobuyers take a limit. AD gives them to its two reset autobuyers
+ *  and to nothing else, for the same reason: a reset is the only purchase you
+ *  can want to stop making. */
+export const LIMITED = ['study', 'folio'] as const
+
+export function hasLimit(id: AutobuyerId): boolean {
+  return (LIMITED as readonly string[]).includes(id)
+}
+
+export function limitOn(s: GameState, id: AutobuyerId): boolean {
+  return slot(s, id).limitOn === true
+}
+
+export function limitAt(s: GameState, id: AutobuyerId): number {
+  return Math.max(0, Math.floor(slot(s, id).limitAt ?? 1))
+}
+
+export function setLimit(s: GameState, id: AutobuyerId, on: boolean, at?: number): void {
+  const a = slot(s, id)
+  a.limitOn = on
+  if (at !== undefined && Number.isFinite(at)) a.limitAt = Math.max(0, Math.floor(at))
+}
+
+export function untilOn(s: GameState, id: AutobuyerId): boolean {
+  return slot(s, id).untilOn === true
+}
+
+export function untilFolios(s: GameState, id: AutobuyerId): number {
+  return Math.max(0, Math.floor(slot(s, id).untilFolios ?? 10))
+}
+
+export function setUntil(s: GameState, id: AutobuyerId, on: boolean, at?: number): void {
+  const a = slot(s, id)
+  a.untilOn = on
+  if (at !== undefined && Number.isFinite(at)) a.untilFolios = Math.max(0, Math.floor(at))
+}
+
+/**
+ * Whether a limited autobuyer may fire, which is AD's condition exactly:
+ *
+ *   const limitCondition = !limitDimBoosts || purchasedBoosts < maxDimBoosts
+ *   const galaxyCondition = limitUntilGalaxies && galaxies >= this.galaxies
+ *   if (limitCondition || galaxyCondition) requestDimensionBoost(false)
+ *
+ * The two are an OR, so the second lifts the first rather than narrowing it:
+ * hold enough folios and the cap on studies stops applying at all. That is
+ * what makes it useful, because early in a run you want the cap and late in
+ * one you want it gone.
+ */
+export function allowed(s: GameState, id: AutobuyerId): boolean {
+  if (!hasLimit(id)) return true
+  const held = id === 'study' ? s.studies : s.folios
+  const under = !limitOn(s, id) || held < limitAt(s, id)
+  const lifted = id === 'study' && untilOn(s, id) && s.folios >= untilFolios(s, id)
+  return under || lifted
+}
+
 export function anyUnlocked(s: GameState): boolean {
   return AUTOBUYERS.some((a) => slot(s, a.id).unlocked)
 }
@@ -160,6 +238,7 @@ export function runAutobuyers(s: GameState, dtMs: number, act: AutobuyerActions)
       // a time whenever the ink is short, which made it the single mode
       // wearing a different label for most of the game.
       if (m === 'ten' && d.id.startsWith('solid') && !act.canBuyGroup(Number(d.id.slice(5)))) break
+      if (!allowed(s, d.id)) break
       const ok = d.id.startsWith('solid')
         ? act.buySolid(Number(d.id.slice(5)), m === 'single')
         : d.id === 'rollRate'

@@ -1650,3 +1650,53 @@
     grid-column: 1 / -1;
   }
 }
+
+/* The two reset autobuyers carry rules, and a rule is a switch and a number.
+   Under the row rather than in it: the row is already a label, an interval and
+   three buttons, and a 390px phone has no more across to give. */
+.auto-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 10px 10px 22px;
+}
+
+.auto-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-rule-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+
+/* Typed into, so it has to look like a field rather than a button. Same 1px
+   border as everything else and a width that holds four digits, which is more
+   folios than anyone will bind. */
+.auto-num {
+  width: 4.2rem;
+  min-height: 30px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.auto-num:disabled {
+  color: var(--fg-dim);
+  border-color: var(--border-faint);
+}
+
+.auto-num:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
+}
