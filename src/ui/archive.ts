@@ -46,7 +46,7 @@ export function archivePane(): Pane {
         section.appendChild(rh)
         rows.set(r.id, { head: rh, title, mark })
 
-        const grid = el('div', 'tile-grid')
+        const grid = el('div', 'tile-grid odd-last')
         for (const a of r.entries) {
           const cell = el('div', 'tile')
           const name = el('span', 'tile-name', '')

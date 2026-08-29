@@ -20,6 +20,10 @@ import { SOLIDS } from '../src/game/solids'
 import { UPGRADES, buyUpgrade, canBuy, type UpgradeId } from '../src/game/upgrades'
 import { ACHIEVEMENTS, achievementPower, checkAchievements } from '../src/game/achievements'
 import { ARCANA, drawOffer, owned, takeCard } from '../src/game/tarot'
+import * as B from '../src/game/breaks'
+import { AUTOBUYERS, isMaxed, upgrade as upgradeAuto, unlock as unlockAuto, upgradeCost }
+  from '../src/game/autobuyers'
+import { CHALLENGES } from '../src/game/challenges'
 import { format } from '../src/format'
 
 const HOURS = Number(process.argv[2] ?? 8)
@@ -35,6 +39,10 @@ const DT = 0.25
 const QUIET = process.env.QUIET === '1'
 const TAROT = process.env.TAROT ?? 'draft'
 const FORCE = process.env.FORCE ?? ''
+/** Hands over the whole chip grid at the start. The question it answers is
+ *  what a Wager costs once the grid is bought, which is the number the break
+ *  grind is actually paced by and which no short run ever reaches. */
+const FREE_GRID = process.env.FREE_GRID === '1'
 
 /**
  * Which arcana a greedy player would rather have, worst to best. Ranked by what
@@ -56,6 +64,11 @@ function rng(): number {
 }
 
 const s = newGame(0)
+if (FREE_GRID) {
+  s.wagers = 1
+  s.chipUpgrades = Object.keys(UPGRADES)
+  s.autoRoll = true
+}
 let t = 0
 let ms = 0
 
@@ -115,6 +128,46 @@ function dump(): void {
   }
 }
 
+/**
+ * Chips, spent the way the game points you at spending them.
+ *
+ * The grid first because it is cheapest and gated, then the rebuyable
+ * multiplier while it is cheaper than the next autobuyer level, then the
+ * Wager's own autobuyer, which is the whole condition for breaking.
+ */
+let brokeAt = 0
+let breakableAt = 0
+function spendChips(): void {
+  for (let pass = 0; pass < 60; pass++) {
+    const next = (Object.keys(UPGRADES) as UpgradeId[])
+      .filter((id) => canBuy(s, id))
+      .sort((a, b) => UPGRADES[a].cost - UPGRADES[b].cost)[0]
+    if (!next) break
+    buyUpgrade(s, next)
+  }
+  // The Wager autobuyer needs the thirteenth challenge. The sim clears
+  // challenges by reaching the threshold inside one, which doWager already
+  // handles, so this only has to make sure it is entered.
+  for (let pass = 0; pass < 200; pass++) {
+    const auto = s.autobuyers[B.WAGER_AUTOBUYER]
+    const canMult = B.canBuyChipMult(s)
+    const wantAuto = auto?.unlocked && !isMaxed(s, B.WAGER_AUTOBUYER)
+      && s.chips.gte(upgradeCost(s, B.WAGER_AUTOBUYER))
+    if (!canMult && !wantAuto) break
+    // Whichever is cheaper, which is what a player reading two prices does.
+    if (wantAuto && (!canMult || upgradeCost(s, B.WAGER_AUTOBUYER).lte(B.chipMultCost(s)))) {
+      upgradeAuto(s, B.WAGER_AUTOBUYER)
+    } else {
+      B.buyChipMult(s)
+    }
+  }
+  if (!breakableAt && B.canBreak(s)) breakableAt = t
+  if (!s.broke && B.canBreak(s)) {
+    B.toggleBreak(s)
+    brokeAt = t
+  }
+}
+
 let done = 0
 let lastWager = 0
 let stalledAt: string | null = null
@@ -167,6 +220,12 @@ while (t < HOURS * 3600 && done < WAGERS) {
   }
 
   if (W.canWager(s)) {
+    // Enter the next uncleared challenge before calling, because reaching the
+    // threshold inside one is what clears it and what awards its autobuyer.
+    if (!s.challengeRunning) {
+      const next = CHALLENGES.find((c) => !s.challengesDone.includes(c.id))
+      if (next && s.wagers > 0) s.challengeRunning = next.id
+    }
     W.doWager(s)
     done += 1
     for (let pass = 0; pass < 12; pass++) {
@@ -197,6 +256,10 @@ while (t < HOURS * 3600 && done < WAGERS) {
         takeCard(s, pick)
       }
     }
+    // What a player does with chips, in the order the game makes obvious:
+    // finish the grid, then buy the multiplier, then buy the Wager autobuyer
+    // down toward its floor, which is the only thing breaking asks for.
+    spendChips()
     console.log(
       `\nWAGER ${done}  after ${hms(t - lastWager)}  (total ${hms(t)})  ` +
         `chips=${s.chips}  upgrades=${s.chipUpgrades.length}/${Object.keys(UPGRADES).length}  ` +
@@ -228,6 +291,17 @@ if (!QUIET) {
     prev = at
     prevRung = r
   }
+}
+
+if (!QUIET) {
+  console.log("\nbreak layer")
+  console.log("  wager autobuyer awarded: " + (s.autobuyers.wager?.unlocked ? "yes" : "no"))
+  console.log("  its interval: " + (s.autobuyers.wager ? Math.round(60000 * Math.pow(0.6, s.autobuyers.wager.level)) : "-") + "ms at level " + (s.autobuyers.wager?.level ?? 0))
+  console.log("  chip multiplier: x" + B.chipMultiplier(s).toString() + " (" + s.chipMult + " bought)")
+  console.log("  chips held: " + s.chips.toString())
+  console.log("  breakable at: " + (breakableAt ? hms(breakableAt) : "never"))
+  console.log("  broke at: " + (brokeAt ? hms(brokeAt) : "never"))
+  console.log("  challenges cleared: " + s.challengesDone.length + "/13")
 }
 
 if (done < WAGERS) {

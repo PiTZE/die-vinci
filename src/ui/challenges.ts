@@ -40,7 +40,7 @@ export function challengesPane(): Pane {
       exitRow.appendChild(exitBtn)
       section.appendChild(exitRow)
 
-      const list = el('div', 'tile-grid')
+      const list = el('div', 'tile-grid odd-last')
       for (const c of CHALLENGES) {
         const btn = el('button', 'tile')
         btn.type = 'button'

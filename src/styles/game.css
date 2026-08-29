@@ -1630,3 +1630,23 @@
     animation: none;
   }
 }
+
+/* The odd one out takes the whole row.
+   Two columns is what a 390px phone fits, and every one of these grids holds an
+   odd number: nine to an archive row, nine in the break grid, thirteen
+   challenges. The last cell was left as a half-width stub beside empty space.
+
+   Antimatter Dimensions centres its orphan instead: its challenge grid is
+   `flex-flow: row wrap` at 90rem with 40rem cells, so two to a row on desktop
+   and a lone last one sits in the middle. Centring a stub still leaves it a
+   stub, and these cells carry a name and a sentence rather than AD's 40rem of
+   prose, so here the last one takes the space instead.
+
+   Only while the grid really is two wide. Above the breakpoint nine fills three
+   columns exactly and thirteen leaves its orphan in a row that is already
+   ragged, which is what wrapping looks like and is fine. */
+@media (max-width: 819.98px) {
+  .tile-grid.odd-last > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
