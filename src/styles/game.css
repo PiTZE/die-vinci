@@ -1521,3 +1521,33 @@
     gap: 14px;
   }
 }
+
+/* A row of the archive, labelled. Nine tiles will not sit across a 390px
+   phone, so a row is a heading with its tiles flowing under it rather than a
+   literal row the way Antimatter Dimensions draws one. The count and the
+   bonus sit at the right, which is where every other section head in the game
+   puts its number. */
+.archive-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 10px 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+}
+
+.archive-row-head .grow {
+  flex: 1;
+}
+
+/* A finished row is the thing worth noticing here, so it takes the accent and
+   nothing else in the block does. The tiles keep their own state. */
+.archive-row-head.done,
+.archive-row-head.done .num {
+  color: var(--accent);
+}
+
+.archive-row-head + .tile-grid {
+  padding-top: 6px;
+}
