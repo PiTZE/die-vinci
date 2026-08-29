@@ -103,14 +103,29 @@ export function breakUnlocked(s: GameState): boolean {
 }
 
 /**
- * A toggle, as AD's is. Fixing it again is the only way to see the flat payout
- * a challenge is measured against, and AD keeps the same escape for the same
- * reason.
+ * One way, which is also AD's.
+ *
+ * Its `breakInfinity()` reads `player.break = !player.break`, and taking that
+ * line on its own is how this arrived here as a toggle with a FIX IT AGAIN on
+ * the other side of it. The button tells the real story. From
+ * BreakInfinityButton.vue: the label is "INFINITY IS BROKEN" once it is, the
+ * class is `--unclickable`, and the handler reads
+ *
+ *   else if (!this.isBroken && this.isUnlocked) Modal.breakInfinity.show()
+ *
+ * so a second press does nothing at all. The flag is a variable rather than a
+ * one-way latch because Eternity clears it, with the comment "Fix infinity
+ * because it can only break after big crunch autobuyer interval is maxed", and
+ * Reality sets it back. Nothing a player can press ever un-breaks it.
+ *
+ * There is no reason to want to, here or there. Breaking does exactly three
+ * things and all three are pure gain: production stops halting at the wall,
+ * the payout becomes 10^(log10(ink)/308 - 0.75) floored at one, which is never
+ * below the flat one it replaces, and the grid opens.
  */
-export function toggleBreak(s: GameState): boolean {
-  if (!canBreak(s)) return false
-  s.broke = !s.broke
-  if (!s.broke) return true
+export function breakWager(s: GameState): boolean {
+  if (!canBreak(s) || s.broke) return false
+  s.broke = true
   // Every other autobuyer takes its floor for free. A Wager that resolves in a
   // tenth of a second cannot wait twenty seconds for the folio timer, and AD
   // hands out the same gift on the same line.

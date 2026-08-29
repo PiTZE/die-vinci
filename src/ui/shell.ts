@@ -23,7 +23,7 @@ export interface Actions {
   buyUpgrade(id: string): void
   /** The rebuyable that doubles what a Wager pays. */
   buyChipMult(): void
-  toggleBreak(): void
+  breakWager(): void
   buyBreak(id: string): void
   enterChallenge(id: number): void
   exitChallenge(): void

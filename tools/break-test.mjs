@@ -119,7 +119,7 @@ check('the wall stops the run until it is broken',
 const freebies = await ev(`(async () => { const s = window.LD.state
   for (const k of Object.keys(s.autobuyers)) if (k !== 'wager') s.autobuyers[k].level = 0
   const before = Object.keys(s.autobuyers).filter(k => window.LD.isMaxed(s, k)).length
-  window.LD.actions.toggleBreak()
+  window.LD.actions.breakWager()
   await new Promise(r => setTimeout(r, 150))
   const after = Object.keys(s.autobuyers).filter(k => window.LD.isMaxed(s, k)).length
   return { before, after, total: Object.keys(s.autobuyers).length, broke: s.broke } })()`)
@@ -133,6 +133,25 @@ const grid = await ev(`({
   tiles: [...document.querySelectorAll('.tile-grid')].filter(g => !g.hidden).length,
   names: [...document.querySelectorAll('.break-figure')].length })`)
 check('and the grid appears with it', grid.tiles > 0, JSON.stringify(grid))
+
+// And there is no going back, which is what AD does as well. Its
+// breakInfinity() reads player.break = !player.break, but the button says
+// "INFINITY IS BROKEN", carries an unclickable class, and refuses a second
+// press. The flag is a variable only because Eternity clears it and Reality
+// sets it back.
+const oneWay = await ev(`(() => { const s = window.LD.state
+  const before = s.broke
+  window.LD.actions.breakWager()
+  const btn = [...document.querySelectorAll('.action')].find(b => b.title === undefined || true)
+  return { before, after: s.broke } })()`)
+check('breaking cannot be undone', oneWay.before === true && oneWay.after === true,
+  JSON.stringify(oneWay))
+await sleep(250)
+const label = await ev(`(() => { const b = [...document.querySelectorAll('.action')]
+    .find(x => /BROKEN|BREAK IT/.test(x.textContent))
+  return b ? { text: b.textContent.trim(), disabled: b.disabled } : null })()`)
+check('and the button says so and stops taking presses',
+  label && label.text === 'BROKEN' && label.disabled === true, JSON.stringify(label))
 
 // A rebuyable climbs and stops.
 const rebuy = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal

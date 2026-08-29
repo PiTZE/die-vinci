@@ -69,7 +69,7 @@ import {
   chipMultUnlocked,
   chipMultiplier,
   chipsFrom,
-  toggleBreak,
+  breakWager,
 } from './game/breaks'
 import { wagerPane } from './ui/wager'
 import { challengesPane } from './ui/challenges'
@@ -295,8 +295,8 @@ const actions: Actions = {
     buyChipMult(state)
     persistSoon()
   },
-  toggleBreak: () => {
-    toggleBreak(state)
+  breakWager: () => {
+    breakWager(state)
     persistSoon()
   },
   buyBreak: (id) => {

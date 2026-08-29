@@ -76,7 +76,7 @@ export function breakPane(): Pane {
       btn = el('button', 'action', 'BREAK IT')
       btn.type = 'button'
       btn.addEventListener('click', () => {
-        if (confirm.request('break')) actions.toggleBreak()
+        if (confirm.request('break')) actions.breakWager()
       })
       const row = el('div', 'row')
       row.appendChild(btn)
@@ -142,15 +142,18 @@ export function breakPane(): Pane {
         setText(gate, `take the Wager autobuyer down to 0.1 seconds. It is at ${(ms / 1000).toFixed(2)}.`)
       }
 
-      btn.disabled = !ready
+      // Done is done, which is what AD's button does too: it reads "INFINITY
+      // IS BROKEN", takes the unclickable class, and its handler refuses a
+      // second press.
+      btn.disabled = !ready || s.broke
       btn.classList.toggle('buyable', ready && !s.broke)
       btn.classList.toggle('held', s.broke)
       setText(
         btn,
-        confirm.isArmed('break')
-          ? 'SURE? THE PAYOUT CHANGES SHAPE'
-          : s.broke
-            ? 'FIX IT AGAIN'
+        s.broke
+          ? 'BROKEN'
+          : confirm.isArmed('break')
+            ? 'SURE? THE PAYOUT CHANGES SHAPE'
             : 'BREAK IT',
       )
       cube.classList.toggle('lit', s.broke)

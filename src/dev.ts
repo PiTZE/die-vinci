@@ -12,7 +12,7 @@ import { UPGRADES, buyUpgrade, canBuy, type UpgradeId } from './game/upgrades'
 import { ARCANA } from './game/tarot'
 import { CHALLENGES } from './game/challenges'
 import { AUTOBUYERS, INTERVAL_FLOOR, unlock } from './game/autobuyers'
-import { toggleBreak } from './game/breaks'
+import { breakWager } from './game/breaks'
 import { doWager } from './game/wager'
 import { listBackups } from './backup'
 import type { GameState } from './state'
@@ -48,7 +48,7 @@ const LINES = [
   '                     is lower. LD.arcana(0) drops them',
   'LD.challenges()      clear all 13 and take the autobuyers they award',
   'LD.autos()           every autobuyer unlocked and down at its 0.1s floor',
-  'LD.break()           break the Wager, or fix it again',
+  'LD.break()           break the Wager',
   'LD.skip("2h")        simulate time away. also 90, "30m", "3d"',
   'LD.rich()            enough of everything to poke at the late game',
   'LD.backups()         what could be restored, and how old',
@@ -228,11 +228,10 @@ export function devTools(d: DevDeps): Record<string, unknown> {
     },
     break() {
       const st = s()
-      const before = st.broke
-      toggleBreak(st)
+      if (st.broke) return 'already broken, and there is no going back'
+      if (!breakWager(st)) return 'refused: the Wager autobuyer is not at its floor'
       touch()
-      if (before === st.broke) return 'refused: the Wager autobuyer is not at its floor'
-      return st.broke ? 'broken. A Wager now pays by the overshoot' : 'fixed. A Wager pays one again'
+      return 'broken. A Wager now pays by the overshoot'
     },
     skip(v: number | string) {
       const secs = seconds(v)

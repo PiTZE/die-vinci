@@ -63,21 +63,24 @@ async function gap(seconds, { offline = true } = {}) {
       // line counts here.
       const text = t && t.classList.contains('show') ? t.textContent : null
       return text && text.startsWith('AWAY') ? text : null })()`
-  // Polled. The catch-up runs on the next tick and the toast on the frame
-  // after that, and a fixed 150ms was really a claim about how loaded the box
-  // is: this passed alone and failed inside `npm test`. Two seconds is a cap,
-  // not a delay, and a short gap that correctly shows nothing still costs the
-  // full two seconds only once.
+  // Read before the polling below, not after it. The catch-up lands on the
+  // first tick and the game keeps running while the toast is waited for, so
+  // sampling afterwards charged the gap for up to two extra seconds of live
+  // production: a five second gap read 2.19e12 against a ceiling of 2e12 once,
+  // and 1.4e12 on the next two runs. The number under test is what the gap
+  // credited, and that is settled by now.
+  const ink = Number(await ev(`window.LD.state.ink.toString()`))
+  const rate = Number(await ev(`window.LD.state.solids[0].amount.toString()`))
+  // The toast is polled for. The catch-up runs on the next tick and the toast
+  // on the frame after that, and a fixed wait was a claim about how loaded the
+  // box is: it passed alone and failed inside the full run. Two seconds is a
+  // cap, not a delay.
   let notice = await ev(readNotice)
   for (let i = 0; i < 13 && notice === null; i++) {
     await sleep(150)
     notice = await ev(readNotice)
   }
-  return {
-    ink: Number(await ev(`window.LD.state.ink.toString()`)),
-    rate: Number(await ev(`window.LD.state.solids[0].amount.toString()`)),
-    notice,
-  }
+  return { ink, rate, notice }
 }
 
 // Baseline: 1e10 d4 at one roll a second, three studies for an x8, and a d4
