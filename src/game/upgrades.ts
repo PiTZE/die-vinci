@@ -22,6 +22,11 @@ export type UpgradeId =
   | 'wagerTimeMult'
   | 'unspentMult'
   | 'studyPower'
+  | 'chipGen'
+  | 'skipStudy1'
+  | 'skipStudy2'
+  | 'skipStudy3'
+  | 'skipFolio'
 
 export interface UpgradeDef {
   id: UpgradeId
@@ -37,6 +42,11 @@ export const UPGRADE_CHAINS: UpgradeId[][] = [
   ['timeMult', 'solids19', 'solids37', 'resetBoost'],
   ['buyTenMult', 'solids28', 'solids456', 'folioBoost'],
   ['wagerTimeMult', 'unspentMult', 'studyPower'],
+  // AD's grid does not stop at eleven either. Its last five cost 10, 20, 40,
+  // 80 and 300, and four of them are the same idea: begin the run further
+  // along than the last one began. That is what changes the pace, rather than
+  // another multiplier on a table you still have to build from nothing.
+  ['chipGen', 'skipStudy1', 'skipStudy2', 'skipStudy3', 'skipFolio'],
 ]
 
 export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
@@ -113,6 +123,40 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
     needs: 'unspentMult',
     label: 'STUDIES',
     note: 'studies multiply by 2.5 instead of 2',
+  },
+  chipGen: {
+    id: 'chipGen',
+    cost: 10,
+    label: 'THE FLOAT',
+    note: 'chips arrive on their own, ten times slower than your fastest Wager',
+  },
+  skipStudy1: {
+    id: 'skipStudy1',
+    cost: 20,
+    needs: 'chipGen',
+    label: 'ONE AHEAD',
+    note: 'every run begins with a study already taken',
+  },
+  skipStudy2: {
+    id: 'skipStudy2',
+    cost: 40,
+    needs: 'skipStudy1',
+    label: 'TWO AHEAD',
+    note: 'and a second',
+  },
+  skipStudy3: {
+    id: 'skipStudy3',
+    cost: 80,
+    needs: 'skipStudy2',
+    label: 'THREE AHEAD',
+    note: 'and a third',
+  },
+  skipFolio: {
+    id: 'skipFolio',
+    cost: 300,
+    needs: 'skipStudy3',
+    label: 'ALREADY BOUND',
+    note: 'every run begins with a folio bound',
   },
 }
 
@@ -199,4 +243,34 @@ export function folioStrength(s: GameState): number {
 /** AD's resetBoost takes 9 off both requirements. */
 export function requirementDiscount(s: GameState): number {
   return isBought(s, 'resetBoost') ? 9 : 0
+}
+
+/**
+ * Studies a run starts with, AD's skipReset1/2/3.
+ *
+ * They are studies rather than solids: a study is what unlocks the next solid,
+ * so starting with three is starting with a four-deep chain instead of a die.
+ */
+export function startingStudies(s: GameState): number {
+  let n = 0
+  if (isBought(s, 'skipStudy1')) n += 1
+  if (isBought(s, 'skipStudy2')) n += 1
+  if (isBought(s, 'skipStudy3')) n += 1
+  return n
+}
+
+/** AD's skipResetGalaxy, which starts you a whole galaxy in. */
+export function startingFolios(s: GameState): number {
+  return isBought(s, 'skipFolio') ? 1 : 0
+}
+
+/**
+ * AD's passiveGen: chips at a tenth of the rate your fastest Wager earned
+ * them. Its own line is "Passively generate Infinity Points 10 times slower
+ * than your fastest Infinity".
+ */
+export function chipsPerSecondFromGrid(s: GameState, perWager: Decimal): Decimal {
+  if (!isBought(s, 'chipGen') || !Number.isFinite(s.stats.bestWagerMs)) return new Decimal(0)
+  const seconds = Math.max(0.1, s.stats.bestWagerMs / 1000)
+  return perWager.div(seconds * 10)
 }

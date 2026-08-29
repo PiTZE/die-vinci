@@ -26,6 +26,7 @@ export type TabId =
   | 'wager'
   | 'challenges'
   | 'tarot'
+  | 'break'
   | 'automation'
   | 'archive'
   | 'stats'
@@ -81,6 +82,18 @@ export interface GameState {
    *  mid-choice does not lose it. */
   pendingDraft: string[]
 
+  // Layer 1, broken. Antimatter Dimensions calls this Break Infinity: the
+  // prestige stops paying a flat one and starts paying by how far past the old
+  // wall the run got.
+  /** Whether the ceiling is off. A toggle, as AD's is. */
+  broke: boolean
+  /** Times the chip multiplier has been bought. Each one doubles the payout. */
+  chipMult: number
+  /** Ids of bought break upgrades. See game/breaks.ts. */
+  breakUpgrades: string[]
+  /** Break upgrade id to times bought, for the rebuyable ones. */
+  breakRebuyables: Record<string, number>
+
   options: {
     notation: NotationId
     tab: TabId
@@ -109,6 +122,10 @@ export interface GameState {
     sinceResetMs: number
     /** How many times the chain has been melted. */
     melts: number
+    /** The fastest Wager yet, in milliseconds. Infinity until one is called.
+     *  Break upgrades that generate chips passively read it, the way AD's
+     *  infinitiedGen reads bestInfinity.time. */
+    bestWagerMs: number
     /** Folios bound over the whole save. Never reset, unlike s.folios. */
     foliosEver: number
     /**
@@ -151,6 +168,10 @@ export function newGame(now: number): GameState {
     tarot: {},
     draftProgress: 0,
     pendingDraft: [],
+    broke: false,
+    chipMult: 0,
+    breakUpgrades: [],
+    breakRebuyables: {},
     options: {
       notation: 'mixed',
       tab: 'table',
@@ -163,6 +184,7 @@ export function newGame(now: number): GameState {
       confirms: defaultConfirms(),
     },
     stats: { started: now, playMs: 0, wagerMs: 0, sinceResetMs: 0, melts: 0, foliosEver: 0,
+      bestWagerMs: Infinity,
       solidsEver: SOLIDS_AT_START },
   }
 }

@@ -21,6 +21,10 @@ export interface Actions {
   buyFolio(): void
   wager(): void
   buyUpgrade(id: string): void
+  /** The rebuyable that doubles what a Wager pays. */
+  buyChipMult(): void
+  toggleBreak(): void
+  buyBreak(id: string): void
   enterChallenge(id: number): void
   exitChallenge(): void
   toggleAutobuyer(id: string): void

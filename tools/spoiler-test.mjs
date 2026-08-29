@@ -117,6 +117,14 @@ check('and still has the ones it needs',
 
 const freshArchive = await shown('ARCHIVE', '.tile')
 const freshArchiveAll = await everything('ARCHIVE')
+// Every pane is built whether or not its tab can be reached, so a label
+// written at mount sits in the document from the first second. The break layer
+// leaked ten words that way until its text moved into update().
+const breakWords = await ev(`(() => { const t = document.documentElement.innerHTML.toUpperCase()
+  return ["BREAK THE WAGER","OVERSHOOT","LEDGER","HOUSE EDGE","SHORTER ODDS","THE RAKE","CHEAPER PLATES","QUICK HANDS","PROVENANCE","CLOCKED"].filter(w => t.includes(w)) })()`)
+check('nothing about breaking the Wager on a fresh save',
+  breakWords.length === 0, breakWords.join(', '))
+
 check('and no archive entry about anything ahead',
   !AHEAD.some((w) => freshArchive.includes(w)), freshArchive.slice(0, 100))
 check('nor anywhere in the archive document',

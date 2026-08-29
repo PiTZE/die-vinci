@@ -28,7 +28,8 @@
     "test:roll": "node tools/roll-test.mjs",
     "test:spoilers": "node tools/spoiler-test.mjs",
     "test": "node tools/run-tests.mjs",
-    "test:tarot": "node tools/tarot-test.mjs"
+    "test:tarot": "node tools/tarot-test.mjs",
+    "test:break": "node tools/break-test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

@@ -13,9 +13,32 @@ import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey } from './hold'
 import { Confirmer } from './confirm'
+import {
+  canBuyChipMult,
+  chipMultCost,
+  chipMultUnlocked,
+  chipMultiplier,
+} from '../game/breaks'
 
 function setText(n: HTMLElement, v: string): void {
   if (n.textContent !== v) n.textContent = v
+}
+
+/** Same verb-and-cost shape the table's buttons use. */
+function duo(btn: HTMLElement, verb: string, cost: string): void {
+  let a = btn.firstElementChild as HTMLElement | null
+  let b = a?.nextElementSibling as HTMLElement | null
+  if (!a || !b) {
+    btn.textContent = ''
+    a = document.createElement('span')
+    a.className = 'btn-verb'
+    b = document.createElement('span')
+    b.className = 'btn-cost'
+    btn.append(a, b)
+    btn.classList.add('duo')
+  }
+  setText(a, verb)
+  setText(b, cost)
 }
 
 export function wagerPane(): Pane {
@@ -27,6 +50,8 @@ export function wagerPane(): Pane {
   let note: HTMLElement
   /** Which upgrade the note line is describing, or empty for the prompt. */
   let noteFor = ''
+  let multRow: HTMLElement
+  let multBtn: HTMLButtonElement
   const cells = new Map<UpgradeId, { btn: HTMLButtonElement; cost: HTMLElement }>()
 
   return {
@@ -101,6 +126,16 @@ export function wagerPane(): Pane {
       note = el('div', 'upgrade-note', '')
       grid.appendChild(note)
 
+      // AD's ipMult: a rebuyable that doubles the payout, opened by owning the
+      // whole grid above it. Its cost is AD's too, 10^(n+1).
+      multRow = el('div', 'row')
+      multBtn = el('button', 'action', '')
+      multBtn.type = 'button'
+      multBtn.title = 'Double what every Wager pays'
+      multBtn.addEventListener('click', () => actions.buyChipMult())
+      multRow.appendChild(multBtn)
+      grid.appendChild(multRow)
+
       root.append(call, grid)
 
       bindKey('w', () => {
@@ -124,13 +159,22 @@ export function wagerPane(): Pane {
         confirm.isArmed('wager')
           ? 'SURE? THIS RESETS EVERYTHING'
           : ready
-          ? `CALL THE WAGER  +${format(chipsFromWager(), n)}`
+          ? `CALL THE WAGER  +${format(chipsFromWager(s), n)}`
           : `${format(s.inkThisWager, n)} / ${format(WAGER_AT, n)} INK`,
       )
       callBtn.disabled = !ready
       callBtn.classList.toggle('buyable', ready)
 
       setText(chipsLine, format(s.chips, n))
+
+      const multOpen = chipMultUnlocked(s)
+      multRow.hidden = !multOpen
+      if (multOpen) {
+        const can = canBuyChipMult(s)
+        duo(multBtn, `DOUBLE THE PAYOUT  x${format(chipMultiplier(s), n)}`, `${format(chipMultCost(s), n)} CHIPS`)
+        multBtn.disabled = !can
+        multBtn.classList.toggle('buyable', can)
+      }
       for (const [id, cell] of cells) {
         const bought = isBought(s, id)
         const affordable = canBuy(s, id)

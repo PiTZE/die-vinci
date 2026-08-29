@@ -40,10 +40,10 @@ import {
   takeCard,
   weightOf,
 } from './game/tarot'
-import { buyUpgrade } from './game/upgrades'
+import { UPGRADES, buyUpgrade } from './game/upgrades'
 import { enterChallenge, exitChallenge } from './game/challenges'
-import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode, runAutobuyers as rawRunAutobuyers } from './game/autobuyers'
-import { resetForChallenge } from './game/production'
+import { toggle as toggleAuto, upgrade as upgradeAuto, cycleMode as cycleAutoMode, runAutobuyers as rawRunAutobuyers, interval as intervalOf, isMaxed as isMaxedAuto } from './game/autobuyers'
+import { mustWager, resetForChallenge, rollCost } from './game/production'
 import type { UpgradeId } from './game/upgrades'
 import { format } from './format'
 import { exportSave, importSave, loadGame, saveGame, switchSlot, wipeSave } from './save'
@@ -59,6 +59,18 @@ import { Shell, type Actions } from './ui/shell'
 import { tablePane } from './ui/table'
 import { optionsPane } from './ui/options'
 import { tarotPane } from './ui/tarot'
+import { breakPane } from './ui/break'
+import {
+  breakCost,
+  breakLevel,
+  buyBreak,
+  buyChipMult,
+  chipMultCost,
+  chipMultUnlocked,
+  chipMultiplier,
+  chipsFrom,
+  toggleBreak,
+} from './game/breaks'
 import { wagerPane } from './ui/wager'
 import { challengesPane } from './ui/challenges'
 import { automationPane } from './ui/automation'
@@ -271,6 +283,18 @@ const actions: Actions = {
     buyUpgrade(state, id as UpgradeId)
     persistSoon()
   },
+  buyChipMult: () => {
+    buyChipMult(state)
+    persistSoon()
+  },
+  toggleBreak: () => {
+    toggleBreak(state)
+    persistSoon()
+  },
+  buyBreak: (id) => {
+    buyBreak(state, id)
+    persistSoon()
+  },
   enterChallenge: (id) => {
     enterChallenge(state, id, resetForChallenge)
     persistSoon()
@@ -366,6 +390,7 @@ shell.build(
     wagerPane(),
     challengesPane(),
     tarotPane(),
+    breakPane(),
     automationPane(),
     archivePane(),
     statsPane(),
@@ -550,8 +575,22 @@ const hook: Record<string, unknown> = {
     buyRollRate: () => buyRollRate(st),
     buyStudy: () => buyStudy(st),
     buyFolio: () => buyFolio(st),
+    wager: () => doWager(st),
   }),
   weightOf,
+  // The break layer, so its suite can assert the formulas rather than watch a
+  // button. Pure reads; the actions that change anything are above.
+  chipsFrom,
+  chipMultCost,
+  chipMultUnlocked,
+  chipMultiplier,
+  breakCost,
+  breakLevel,
+  rollCost,
+  mustWager,
+  interval: intervalOf,
+  isMaxed: isMaxedAuto,
+  upgradeIds: () => Object.keys(UPGRADES),
   // The ticker's line picker, so a test can assert that an ordered sequence
   // comes out in order rather than watch a crawling bar for a minute.
   pickThought,

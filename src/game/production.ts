@@ -34,6 +34,15 @@ import { restrictions } from './challenges'
 import { runAutobuyers } from './autobuyers'
 import { levelOf, modifiers } from './tarot'
 import { achievementPower } from './achievements'
+import {
+  autobuyerSpeedFactor,
+  breakMultiplier,
+  ceilingHolds,
+  chipsPerSecond,
+  folioStrengthBonus,
+  rollCostStep,
+  solidCostRelief,
+} from './breaks'
 
 /**
  * A study's multiplier reaches down the chain rather than across all of it.
@@ -68,6 +77,9 @@ export function solidMultiplier(s: GameState, idx: number): Decimal {
     .times(unspentMultiplier(s, idx))
     // The archive pays, the way Antimatter Dimensions' achievements do.
     .times(achievementPower(s))
+    // And whatever the break grid has bought, which is nothing until the wall
+    // comes down.
+    .times(breakMultiplier(s))
   // XI Strength reshapes the multiplier rather than adding to it, so it
   // compounds with everything above instead of sitting beside it.
   if (m.solidExp !== 1) out = out.pow(m.solidExp)
@@ -117,8 +129,10 @@ export function doMelt(s: GameState): boolean {
 export function solidCost(s: GameState, idx: number): Decimal {
   const def = SOLIDS[idx - 1]
   const st = s.solids[idx - 1]
+  // CHEAPER PLATES takes the edge off the per-ten climb, which is AD's
+  // dimCostMult doing the same job on the same curve.
   return def.baseCost
-    .times(def.costMult.pow(Math.floor(st.bought / 10)))
+    .times(def.costMult.div(solidCostRelief(s)).pow(Math.floor(st.bought / 10)))
     .times(modifiers(s).costFactor)
 }
 
@@ -212,7 +226,7 @@ export function rollPower(s: GameState): number {
   const forced = restrictions(s).rollBase
   if (forced !== null) return forced
   // A folio upgrade makes each one count double, the way AD's galaxyBoost does.
-  return rollIntervalMultiplier(s.folios * folioStrength(s))
+  return rollIntervalMultiplier(s.folios * folioStrength(s) * folioStrengthBonus(s))
 }
 
 /** Seconds between rolls. */
@@ -228,7 +242,10 @@ export function rollRate(s: GameState): number {
 }
 
 export function rollCost(s: GameState): Decimal {
-  return ROLL_COST_BASE.times(ROLL_COST_MULT.pow(s.rollUpgrades)).times(
+  // SHORTER ODDS walks the x20 a level down toward x2, which is AD's own
+  // tickspeedCostMult doing the same thing to the same number.
+  const step = rollCostStep(s, ROLL_COST_MULT.toNumber())
+  return ROLL_COST_BASE.times(Decimal.pow(step, s.rollUpgrades)).times(
     modifiers(s).rollCostFactor,
   )
 }
@@ -277,6 +294,24 @@ export function canBuyStudy(s: GameState): boolean {
  * Only once the automator is owned, because before that the opening is supposed
  * to be a button you press.
  */
+/**
+ * The Wager, handed in rather than imported.
+ *
+ * doWager lives in wager.ts, which already imports seedForAutomator from here,
+ * so importing it back would be a cycle. wager.ts registers itself at load
+ * instead. Until it does, the Wager autobuyer does nothing, which is the right
+ * answer for any caller that has not loaded the prestige at all.
+ */
+let callWager: ((s: GameState) => boolean) | null = null
+
+export function registerWager(fn: (s: GameState) => boolean): void {
+  callWager = fn
+}
+
+function autoWager(s: GameState): boolean {
+  return callWager ? callWager(s) : false
+}
+
 export function seedForAutomator(s: GameState): void {
   if (!s.autoRoll) return
   const first = s.solids[0]
@@ -534,7 +569,9 @@ export function rolling(s: GameState): boolean {
  * itself on the next study, but there was no way to know that from the screen.
  */
 export function mustWager(s: GameState): boolean {
-  return s.inkThisWager.gte(WAGER_AT)
+  // Broken, nothing stops. That is the whole of it: the wall stays where it
+  // is and the run simply runs past it, which is what the payout then reads.
+  return ceilingHolds(s) && s.inkThisWager.gte(WAGER_AT)
 }
 
 export function startRoll(s: GameState, now: number): boolean {
@@ -766,12 +803,19 @@ export function tick(s: GameState, dt: number, now: number): void {
     return
   }
 
-  runAutobuyers(s, dt * 1000, {
+  // THE RAKE, which is AD's ipGen: a share of your best run, arriving on its
+  // own. QUICK HANDS is handed to the ladder as a speed factor rather than
+  // written into each interval.
+  const rake = chipsPerSecond(s)
+  if (rake.gt(0)) s.chips = s.chips.plus(rake.times(dt))
+
+  runAutobuyers(s, (dt * 1000) / autobuyerSpeedFactor(s), {
     buySolid: (idx, one) => buySolid(s, idx, one),
     canBuyGroup: (idx) => canBuyGroup(s, idx),
     buyRollRate: () => buyRollRate(s),
     buyStudy: () => buyStudy(s),
     buyFolio: () => buyFolio(s),
+    wager: () => autoWager(s),
   })
 
   const interval = rollInterval(s)

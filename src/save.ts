@@ -189,6 +189,10 @@ function decode(raw: Raw, now: number): GameState {
     return { bought: Number(got.bought) || 0, amount: new Decimal(got.amount ?? 0) }
   })
   s.lastTick = Number(m.lastTick) || now
+  // JSON cannot hold Infinity, so a save written before any Wager was called
+  // brings this back as null. Left alone, "your fastest Wager" would read as
+  // zero milliseconds and pay the cap for a run nobody has made.
+  if (!Number.isFinite(s.stats.bestWagerMs)) s.stats.bestWagerMs = Infinity
   return s
 }
 

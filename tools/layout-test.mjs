@@ -327,11 +327,17 @@ check('and the border, the label and the row stay their normal colours',
 
 // How far through the run you are, kept on the table rather than behind the
 // WAGER tab, because this run stops dead at the threshold.
+// The lens of a Vesica Piscis, filled from the bottom. The rectangle it
+// replaced reported a width; this reports the height of the fill against the
+// height of the lens, which is the same claim about the same number.
 const run = await ev(`(() => {
   const bar = document.querySelector('.run-bar')
-  const f = bar.querySelector('.run-bar-fill')
+  const lens = bar.querySelector('.geo-vesica path[d]')
+  const fill = bar.querySelector('.geo-vesica rect')
+  const lensH = lens ? lens.getBBox().height : 0
+  const fillH = fill ? Number(fill.getAttribute('height') || 0) : 0
   return { hidden: bar.hidden, label: bar.querySelector('.run-bar-label').textContent,
-    fill: parseFloat(f.style.width) || 0 } })()`)
+    fill: lensH > 0 ? (fillH / lensH) * 100 : -1 } })()`)
 check('the table shows how far through the run you are',
   run.hidden === false && /\d/.test(run.label) && run.fill > 0 && run.fill < 100,
   JSON.stringify(run))

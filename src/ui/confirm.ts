@@ -23,7 +23,11 @@ export const CONFIRM_KEYS = [
   // phone spends them on whatever the thumb landed on. The one-Point tiles
   // stay a single tap, because asking about a purchase you can make again
   // after the next Wager is noise.
-  { key: 'upgrade', label: 'A POINT UPGRADE OVER 1' },
+  { key: 'upgrade', label: 'A CHIP UPGRADE OVER 1' },
+  // Breaking changes what every future Wager pays, and fixing it again changes
+  // it back. Neither is destructive, but both are the kind of switch you want
+  // to have meant to throw.
+  { key: 'break', label: 'BREAKING THE WAGER' },
 ] as const
 
 export type ConfirmKey = (typeof CONFIRM_KEYS)[number]['key']

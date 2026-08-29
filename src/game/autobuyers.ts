@@ -34,6 +34,11 @@ export const AUTOBUYERS: AutobuyerDef[] = [
   { id: 'rollRate', label: 'ROLL RATE', baseInterval: 500 },
   { id: 'study', label: 'STUDY', baseInterval: 4000 },
   { id: 'folio', label: 'FOLIO', baseInterval: 20000 },
+  // The prestige itself, which is the one AD gates Break Infinity behind.
+  // Its own Big Crunch autobuyer starts at 150 seconds; a Wager here is a
+  // shorter run than an Infinity there, so this starts at sixty and reaches
+  // the same 100ms floor in thirteen levels rather than fifteen.
+  { id: 'wager', label: 'THE WAGER', baseInterval: 60000 },
 ]
 
 /** AD's autobuyers carry a mode. Single buys one, ten fills the group of ten,
@@ -134,6 +139,8 @@ export interface AutobuyerActions {
   buyRollRate: () => boolean
   buyStudy: () => boolean
   buyFolio: () => boolean
+  /** Calls the Wager when it can. Awarded by the thirteenth challenge. */
+  wager: () => boolean
 }
 
 export function runAutobuyers(s: GameState, dtMs: number, act: AutobuyerActions): void {
@@ -159,7 +166,9 @@ export function runAutobuyers(s: GameState, dtMs: number, act: AutobuyerActions)
           ? act.buyRollRate()
           : d.id === 'study'
             ? act.buyStudy()
-            : act.buyFolio()
+            : d.id === 'folio'
+              ? act.buyFolio()
+              : act.wager()
       if (!ok) break
       // Max keeps buying within the same tick until the ink runs out.
       if (m === 'max' && d.id.startsWith('solid')) {

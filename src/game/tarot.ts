@@ -16,6 +16,7 @@
 import Decimal from 'break_infinity.js'
 import type { GameState } from '../state'
 import { ARCANA_MAX_LEVEL } from './balance'
+import { restrictions } from './challenges'
 
 export type ArcanaId =
   | 'fool' | 'magician' | 'priestess' | 'empress' | 'emperor' | 'hierophant'
@@ -277,6 +278,10 @@ export function towerStriking(s: GameState): boolean {
 }
 
 export function modifiers(s: GameState): Modifiers {
+  // The thirteenth challenge is a run with the deck face down. Reading it here
+  // rather than at each call site means a card cannot leak in through one
+  // effect that forgot to ask.
+  if (restrictions(s).noArcana) return NONE
   if (!s.tarot || owned(s) === 0) return NONE
   const L = (id: ArcanaId) => levelOf(s, id)
   const m: Modifiers = { ...NONE, globalMult: new Decimal(1), topMult: new Decimal(1), keepInk: new Decimal(0) }

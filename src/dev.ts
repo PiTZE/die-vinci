@@ -11,7 +11,8 @@ import { unlockedSolids } from './state'
 import { UPGRADES, buyUpgrade, canBuy, type UpgradeId } from './game/upgrades'
 import { ARCANA } from './game/tarot'
 import { CHALLENGES } from './game/challenges'
-import { unlock } from './game/autobuyers'
+import { AUTOBUYERS, INTERVAL_FLOOR, unlock } from './game/autobuyers'
+import { toggleBreak } from './game/breaks'
 import { doWager } from './game/wager'
 import { listBackups } from './backup'
 import type { GameState } from './state'
@@ -45,7 +46,9 @@ const LINES = [
   'LD.upgrade("resetBoost")   buy one by id. LD.upgradeIds() lists them',
   'LD.arcana(3)         hold all 22 arcana, at that level or their cap, whichever',
   '                     is lower. LD.arcana(0) drops them',
-  'LD.challenges()      clear all 12 and take the autobuyers they award',
+  'LD.challenges()      clear all 13 and take the autobuyers they award',
+  'LD.autos()           every autobuyer unlocked and down at its 0.1s floor',
+  'LD.break()           break the Wager, or fix it again',
   'LD.skip("2h")        simulate time away. also 90, "30m", "3d"',
   'LD.rich()            enough of everything to poke at the late game',
   'LD.backups()         what could be restored, and how old',
@@ -207,6 +210,29 @@ export function devTools(d: DevDeps): Record<string, unknown> {
       touch()
       const autos = Object.values(st.autobuyers).filter((a) => a.unlocked).length
       return `${cleared} cleared, ${st.challengesDone.length}/${CHALLENGES.length} done, ${autos} autobuyers`
+    },
+    /**
+     * Every autobuyer at its floor, which is what Break the Wager asks for.
+     * Reaching that legitimately is thirteen challenges and a few thousand
+     * chips, and none of it is what a test of the break layer is about.
+     */
+    autos() {
+      const st = s()
+      for (const a of AUTOBUYERS) {
+        unlock(st, a.id)
+        const slot = st.autobuyers[a.id]
+        if (slot) slot.level = 40
+      }
+      touch()
+      return `${AUTOBUYERS.length} autobuyers, all at ${INTERVAL_FLOOR}ms`
+    },
+    break() {
+      const st = s()
+      const before = st.broke
+      toggleBreak(st)
+      touch()
+      if (before === st.broke) return 'refused: the Wager autobuyer is not at its floor'
+      return st.broke ? 'broken. A Wager now pays by the overshoot' : 'fixed. A Wager pays one again'
     },
     skip(v: number | string) {
       const secs = seconds(v)

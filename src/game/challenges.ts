@@ -45,6 +45,11 @@ export const CHALLENGES: ChallengeDef[] = [
     note: 'folios cost twice as many solids' },
   { id: 12, awards: 'folio', label: 'FOLIO AUTO', faithful: true,
     note: 'each solid is bought with the solid two places below it' },
+  // AD has twelve and its twelfth awards the Big Crunch autobuyer. This game
+  // has one more prestige control to hand out than it has AD restrictions, so
+  // the thirteenth is ours: play a whole run with the deck face down.
+  { id: 13, awards: 'wager', label: 'WAGER AUTO', faithful: false,
+    note: 'the arcana do nothing' },
 ]
 
 export function byId(id: number): ChallengeDef | undefined {
@@ -84,6 +89,8 @@ export interface Restrictions {
   folioCostFactor: number
   /** Buy a solid with the solid this many places below it, instead of ink. */
   payWithOffset: number
+  /** Every arcanum is ignored for the length of the run. */
+  noArcana: boolean
 }
 
 const NONE: Restrictions = {
@@ -99,6 +106,7 @@ const NONE: Restrictions = {
   studyCostFactor: 1,
   folioCostFactor: 1,
   payWithOffset: 0,
+  noArcana: false,
 }
 
 /** Entering resets layer 0, exactly as the Wager does. Leaving does too. */
@@ -141,6 +149,8 @@ export function restrictions(s: GameState): Restrictions {
       return { ...NONE, folioCostFactor: 2 }
     case 12:
       return { ...NONE, payWithOffset: 2 }
+    case 13:
+      return { ...NONE, noArcana: true }
     default:
       return NONE
   }

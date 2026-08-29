@@ -15,7 +15,9 @@ import { START_INK, WAGER_AT } from './balance'
 import { unlock } from './autobuyers'
 import { byId } from './challenges'
 import { drawOffer } from './tarot'
-import { seedForAutomator } from './production'
+import { chipsFrom } from './breaks'
+import { startingFolios, startingStudies } from './upgrades'
+import { registerWager, seedForAutomator } from './production'
 import type { GameState } from '../state'
 
 /**
@@ -34,8 +36,9 @@ export function canWager(s: GameState): boolean {
   return s.inkThisWager.gte(WAGER_AT)
 }
 
-export function chipsFromWager(): Decimal {
-  return new Decimal(1)
+/** What calling it right now pays. Flat one until the wall is broken. */
+export function chipsFromWager(s: GameState): Decimal {
+  return chipsFrom(s)
 }
 
 /** How close this run is to the threshold, 0 to 1, on a log scale. */
@@ -52,8 +55,11 @@ export function wagerProgress(s: GameState): number {
 export function doWager(s: GameState): boolean {
   if (!canWager(s)) return false
 
-  s.chips = s.chips.plus(chipsFromWager())
+  s.chips = s.chips.plus(chipsFromWager(s))
   s.wagers += 1
+  // The fastest run yet, which two break upgrades read. Measured on wagerMs,
+  // the clock doWager is about to reset.
+  s.stats.bestWagerMs = Math.min(s.stats.bestWagerMs ?? Infinity, s.stats.wagerMs)
 
   // Reaching the threshold inside a challenge is what clears it, and clearing
   // it is what unlocks the autobuyer. AD's first challenge is simply reaching
@@ -70,8 +76,10 @@ export function doWager(s: GameState): boolean {
 
   s.ink = new Decimal(START_INK)
   s.inkThisWager = new Decimal(0)
-  s.studies = 0
-  s.folios = 0
+  // ONE AHEAD and the two behind it, and ALREADY BOUND. AD's skipResets: the
+  // next run opens further along than the last one did.
+  s.studies = startingStudies(s)
+  s.folios = startingFolios(s)
   s.rollUpgrades = 0
   for (const st of s.solids) {
     st.bought = 0
@@ -95,3 +103,7 @@ export function doWager(s: GameState): boolean {
   if (!s.pendingDraft.length) s.pendingDraft = drawOffer(s)
   return true
 }
+
+// Closes the loop described in production.ts: the engine runs the autobuyer
+// ladder and one rung of it is the prestige, which lives up here.
+registerWager(doWager)

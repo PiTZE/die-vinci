@@ -579,22 +579,29 @@
 /* How far through the run you are, on the table itself. One bar with its own
    label inside it, the way Antimatter Dimensions draws its percentage to
    Infinity, rather than a labelled section wrapping a bar. */
+/* The lens and its number, side by side. The figure is 150 wide at a 0.62
+   aspect, so it takes about 93px of height and the row states that rather than
+   letting the SVG decide. */
 .run-bar {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 12px;
   min-height: 26px;
   margin-top: var(--gap);
+  padding: 5px 12px;
   border: 1px solid var(--border-faint);
   overflow: hidden;
 }
 
-.run-bar-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-  background: var(--fill);
+/* Accent, because this is the one number on the table that says how the run is
+   going. Everything around it stays achromatic. */
+.geo-vesica {
+  flex: 0 0 auto;
+  width: 74px;
+  height: 46px;
+  color: var(--accent);
 }
 
 .run-bar-label {
@@ -1550,4 +1557,38 @@
 
 .archive-row-head + .tile-grid {
   padding-top: 6px;
+}
+
+/* Metatron's Cube, on the break screen. Thirteen circles and seventy-eight
+   chords is a lot of 1px lines, so it sits dim until the wall is actually
+   down and then takes the accent. */
+.break-figure {
+  display: flex;
+  justify-content: center;
+  padding: 18px 10px 6px;
+}
+
+.geo-metatron {
+  width: min(70vw, 220px);
+  height: auto;
+  color: var(--fg-dim);
+  transition: color 400ms linear;
+}
+
+.geo-metatron.lit {
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .geo-metatron {
+    transition: none;
+  }
+}
+
+.break-gate {
+  padding: 0 12px 10px;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--fg-muted);
+  text-align: center;
 }

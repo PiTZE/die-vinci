@@ -35,6 +35,7 @@ import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey, holdable } from './hold'
 import { Confirmer } from './confirm'
+import { vesica, type Vesica } from './geometry'
 import { setBlur, setDieRolling, setThrow, wireframe } from './wireframe'
 import { playThrow, setSpinBed, THROW_ABOVE_S } from './sound'
 
@@ -143,7 +144,7 @@ export function tablePane(): Pane {
   let wagerNow: HTMLButtonElement
   let resetGroup: HTMLElement
   let runBar: HTMLElement
-  let runFill: HTMLElement
+  let runLens: Vesica
   let runLabel: HTMLElement
   let lastFace = 0
   const steady = new Steady()
@@ -353,10 +354,15 @@ export function tablePane(): Pane {
       //
       // On a log scale, because the run spans 308 orders of magnitude and a
       // linear bar would read zero for all but the last seconds of it.
+      // A Vesica Piscis rather than a rectangle. Euclid's Elements opens by
+      // drawing these two circles, and the lens where they cross is where the
+      // first equilateral triangle comes from, which is where every solid on
+      // this table eventually comes from. A bar said the same number and said
+      // nothing else.
       runBar = el('div', 'run-bar')
-      runFill = el('span', 'run-bar-fill')
+      runLens = vesica(120)
       runLabel = el('span', 'run-bar-label', '')
-      runBar.append(runFill, runLabel)
+      runBar.append(runLens.root, runLabel)
 
       root.append(grid, runBar)
 
@@ -580,8 +586,7 @@ export function tablePane(): Pane {
         // throws the bar away along with the table.
         const pct = wagerProgress(s) * 100
         setText(runLabel, `TO THE WAGER  ${pct.toFixed(2)}%`)
-        const w = `${pct.toFixed(2)}%`
-        if (runFill.style.width !== w) runFill.style.width = w
+        runLens.set(wagerProgress(s))
       }
 
       setText(rollLine, `${format(new Decimal(rate), n)}/s`)
