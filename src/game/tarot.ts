@@ -293,9 +293,23 @@ export function modifiers(s: GameState): Modifiers {
   }
 
   // XV The Devil: a large multiplier, paid for in roll rate.
+  //
+  // The bill has to be real. At 1 + 3L against a penalty that only reached
+  // 0.92 at level one, the trade was a gift: the Devil finished six Wagers in
+  // 1h16m where the next best card of its tier took 1h31m, and it beat every
+  // early card in the game while being three times likelier to appear than the
+  // Sun, which it also nearly matched. Smaller bonus, penalty biting from the
+  // first level, and it lands at 1h31m alongside Strength.
+  //
+  // The floor stays, and it is not decoration. Priced without one, at
+  // 1/(1 + L), the card is worse than not holding it: six Wagers took 2h08m
+  // against 1h50m with no cards at all, and every level made it worse. Roll
+  // rate multiplies the whole chain, so a linear cost on it swamps a linear
+  // bonus. What the floor buys past level 5 is small: the last five levels are
+  // worth about three minutes across six Wagers.
   if (L('devil')) {
-    m.globalMult = m.globalMult.times(1 + L('devil') * 3)
-    m.rollRateMult *= Math.max(0.25, 1 - L('devil') * 0.08)
+    m.globalMult = m.globalMult.times(1 + L('devil') * 1.5)
+    m.rollRateMult *= Math.max(0.4, 1 - L('devil') * 0.12)
   }
 
   // XX Judgement: points held rather than spent.
@@ -333,8 +347,22 @@ export function modifiers(s: GameState): Modifiers {
   }
 
   // VII The Chariot: a charge out of the gate.
-  if (L('chariot') && s.stats.sinceResetMs / 1000 < CHARIOT_WINDOW_S * L('chariot')) {
-    m.rollRateMult *= 1 + L('chariot')
+  //
+  // The window is fixed and the level raises the surge, which is the opposite
+  // of how this was written. It used to do both: 20 seconds a level at a
+  // multiplier of 1 + L, which at level five is a hundred-second window on a
+  // run that resets every minute or two, so the surge never lapsed. That made
+  // an early-tier card, the commonest thing in the draft, the strongest card
+  // in the game: six Wagers in 1h11m against 1h50m with nothing, ahead of the
+  // Sun's 1h14m.
+  //
+  // Fixing the window alone was not the fix. It only moved 1h11m to 1h13m,
+  // because the surge is on roll rate and roll rate multiplies the entire
+  // chain. The multiplier itself was the whole story, and 0.3 a level puts it
+  // at 1h31m, in among the other early cards: Justice 1h27m, the Empress
+  // 1h33m, the Hierophant 1h36m.
+  if (L('chariot') && s.stats.sinceResetMs / 1000 < CHARIOT_WINDOW_S) {
+    m.rollRateMult *= 1 + L('chariot') * 0.3
   }
 
   // 0 The Fool, V The Hierophant, VIII Justice, XII The Hanged Man: resets.
