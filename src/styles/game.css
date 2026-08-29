@@ -705,11 +705,37 @@
 
    One grammar now. Held is an accent border and an accent name. Not held is the
    same tile at reduced opacity. Nothing else carries state. */
+/* Wrapping rather than a grid, so the last row fills instead of leaving a
+   hole where the missing cells would have been.
+   Thirteen challenges, nine to an archive row, nine break upgrades, twenty-two
+   arcana: not one of them divides by the number of columns at any width, and a
+   grid leaves the remainder hanging at the left of an empty row. These grow to
+   take the line they are on, so a short last row is three wide cells rather
+   than three narrow ones and a gap.
+   Antimatter Dimensions centres its orphan instead: its challenge grid is
+   flex-flow row wrap at 90rem with 40rem cells, so a lone last one sits in the
+   middle. Centring a stub still leaves it a stub, and its cells hold 40rem of
+   prose where these hold a name and a sentence. */
 .tile-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  display: flex;
+  flex-flow: row wrap;
+  justify-content: center;
   gap: 8px;
   padding: 10px;
+}
+
+/* Grows to take the line, but only so far.
+   Filling without a ceiling makes a short last row absurd: twenty-two arcana
+   five to a row leaves two, and two cards each half the screen wide do not
+   read as cards. The cap is set so that one item alone still fills a 390px
+   phone, which is where a lone thirteenth challenge sits, while two on a
+   desktop stay about a card and a half and centre.
+   Full rows never reach the cap, so the centring only ever applies to the
+   short row at the bottom. */
+.tile-grid > * {
+  flex: 1 1 11rem;
+  max-width: 23rem;
+  min-width: 0;
 }
 
 .tile {
@@ -1673,25 +1699,6 @@
   }
 }
 
-/* The odd one out takes the whole row.
-   Two columns is what a 390px phone fits, and every one of these grids holds an
-   odd number: nine to an archive row, nine in the break grid, thirteen
-   challenges. The last cell was left as a half-width stub beside empty space.
-
-   Antimatter Dimensions centres its orphan instead: its challenge grid is
-   `flex-flow: row wrap` at 90rem with 40rem cells, so two to a row on desktop
-   and a lone last one sits in the middle. Centring a stub still leaves it a
-   stub, and these cells carry a name and a sentence rather than AD's 40rem of
-   prose, so here the last one takes the space instead.
-
-   Only while the grid really is two wide. Above the breakpoint nine fills three
-   columns exactly and thirteen leaves its orphan in a row that is already
-   ragged, which is what wrapping looks like and is fine. */
-@media (max-width: 819.98px) {
-  .tile-grid.odd-last > :last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-  }
-}
 
 /* The two reset autobuyers carry rules, and a rule is a switch and a number.
    Under the row rather than in it: the row is already a label, an interval and

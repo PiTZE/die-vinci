@@ -87,7 +87,7 @@ export function breakPane(): Pane {
       gridTitle = el('span', 'grow', '')
       gh.appendChild(gridTitle)
       gridSection.appendChild(gh)
-      grid = el('div', 'tile-grid odd-last')
+      grid = el('div', 'tile-grid')
       for (const u of BREAK_UPGRADES) {
         const cell = el('button', 'tile upgrade')
         cell.type = 'button'
