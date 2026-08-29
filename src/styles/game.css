@@ -582,6 +582,9 @@
 /* The lens and its number, side by side. The figure is 150 wide at a 0.62
    aspect, so it takes about 93px of height and the row states that rather than
    letting the SVG decide. */
+/* No box. The border made sense around a rectangle that filled, because the
+   rectangle needed an edge to fill up to. The lens carries its own outline, so
+   a second one around it was a box drawn around a drawing. */
 .run-bar {
   position: relative;
   display: flex;
@@ -591,7 +594,6 @@
   min-height: 26px;
   margin-top: var(--gap);
   padding: 5px 12px;
-  border: 1px solid var(--border-faint);
   overflow: hidden;
 }
 
