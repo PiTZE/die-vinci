@@ -34,7 +34,7 @@ export function canWager(s: GameState): boolean {
   return s.inkThisWager.gte(WAGER_AT)
 }
 
-export function pointsFromWager(): Decimal {
+export function chipsFromWager(): Decimal {
   return new Decimal(1)
 }
 
@@ -52,7 +52,7 @@ export function wagerProgress(s: GameState): number {
 export function doWager(s: GameState): boolean {
   if (!canWager(s)) return false
 
-  s.points = s.points.plus(pointsFromWager())
+  s.chips = s.chips.plus(chipsFromWager())
   s.wagers += 1
 
   // Reaching the threshold inside a challenge is what clears it, and clearing

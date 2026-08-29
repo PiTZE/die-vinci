@@ -147,14 +147,14 @@ const beforeWager = await ev(`(() => {
 check('no automation tab before the first Wager', beforeWager === true)
 
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.wagers = 1; s.points = new D(3) })()`)
+  s.wagers = 1; s.chips = new D(3) })()`)
 await sleep(400)
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'AUTOMATION').click()`)
 await sleep(300)
 await ev(`[...document.querySelectorAll('.auto-up')].find(b => b.textContent.includes('UNLOCK')).click()`)
 await sleep(300)
-check('it costs a point', (await ev(`Number(window.LD.state.points)`)) === 2,
-  `points now ${await ev(`Number(window.LD.state.points)`)}`)
+check('it costs a point', (await ev(`Number(window.LD.state.chips)`)) === 2,
+  `points now ${await ev(`Number(window.LD.state.chips)`)}`)
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
 await sleep(300)
 const auto = await ev(`({ auto: window.LD.state.autoRoll,

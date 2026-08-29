@@ -117,6 +117,26 @@ check('the save box asks for no keyboard',
 // 5 -> 6 moves a save still sitting on the old every-frame default onto 100ms,
 // and leaves any other rate where the player put it. A version 5 save is
 // planted the same way, with writes stubbed so it survives the navigation.
+// 6 -> 7 renames the currency. A save holding Points has to come back holding
+// the same number of Chips, and the grid it bought has to still be bought.
+{
+  const V6 = JSON.stringify({
+    version: 6, lastTick: Date.now(), ink: '1e40', inkThisWager: '1e40',
+    solids: Array.from({ length: 9 }, () => ({ bought: 20, amount: '1e10' })),
+    rollUpgrades: 20, studies: 8, folios: 1, points: '17', wagers: 6, tarot: {},
+    pointUpgrades: ['timeMult', 'solids19'],
+    options: { notation: 'mixed', tab: 'table' }, stats: { started: Date.now() },
+  })
+  await ev(`(() => { localStorage.setItem('${KEY}', ${JSON.stringify(V6)})
+    localStorage.setItem = () => {} })()`)
+  await send('Page.navigate', { url: 'http://127.0.0.1:5173/' })
+  await appReady(ev)
+  const got = await ev(`({ chips: window.LD.state.chips.toString(),
+    held: window.LD.state.chipUpgrades.length })`)
+  check('a version 6 save carries its Points over as Chips',
+    got.chips === '17' && got.held === 2, JSON.stringify(got))
+}
+
 for (const [was, want] of [[16, 100], [500, 500]]) {
   const V5 = JSON.stringify({
     version: 5, lastTick: Date.now(), ink: '1e40', inkThisWager: '1e40',

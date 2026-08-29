@@ -199,7 +199,7 @@ while (t < HOURS * 3600 && done < WAGERS) {
     }
     console.log(
       `\nWAGER ${done}  after ${hms(t - lastWager)}  (total ${hms(t)})  ` +
-        `points=${s.points}  upgrades=${s.pointUpgrades.length}/${Object.keys(UPGRADES).length}  ` +
+        `chips=${s.chips}  upgrades=${s.chipUpgrades.length}/${Object.keys(UPGRADES).length}  ` +
         `archive=${s.achievements.length}/${ACHIEVEMENTS.length} x${achievementPower(s).toNumber().toFixed(3)}  ` +
         `arcana=${owned(s)}`,
     )

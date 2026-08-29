@@ -61,10 +61,10 @@ export interface GameState {
 
   // Layer 1. Present from the first commit so the save never needs migrating
   // when the Wager lands.
-  points: Decimal
+  chips: Decimal
   wagers: number
   /** Ids of bought Points upgrades. See game/upgrades.ts. */
-  pointUpgrades: string[]
+  chipUpgrades: string[]
   /** Which challenge is being run, or 0 for none. */
   challengeRunning: number
   challengesDone: number[]
@@ -140,9 +140,9 @@ export function newGame(now: number): GameState {
     meltPower: new Decimal(1),
     studies: 0,
     folios: 0,
-    points: new Decimal(0),
+    chips: new Decimal(0),
     wagers: 0,
-    pointUpgrades: [],
+    chipUpgrades: [],
     challengeRunning: 0,
     challengesDone: [],
     autobuyers: newAutobuyers(),

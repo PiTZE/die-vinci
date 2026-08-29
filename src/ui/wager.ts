@@ -8,7 +8,7 @@ import {
   isBought,
   type UpgradeId,
 } from '../game/upgrades'
-import { canWager, pointsFromWager } from '../game/wager'
+import { canWager, chipsFromWager } from '../game/wager'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey } from './hold'
@@ -23,7 +23,7 @@ export function wagerPane(): Pane {
   let confirmSettings: Record<string, boolean> = {}
   let callBtn: HTMLButtonElement
   let callLine: HTMLElement
-  let pointsLine: HTMLElement
+  let chipsLine: HTMLElement
   let note: HTMLElement
   /** Which upgrade the note line is describing, or empty for the prompt. */
   let noteFor = ''
@@ -59,9 +59,9 @@ export function wagerPane(): Pane {
 
       const grid = el('div', 'section')
       const gh = el('div', 'section-head')
-      gh.appendChild(el('span', 'grow', 'POINTS'))
-      pointsLine = el('span', 'num dim', '')
-      gh.appendChild(pointsLine)
+      gh.appendChild(el('span', 'grow', 'CHIPS'))
+      chipsLine = el('span', 'num dim', '')
+      gh.appendChild(chipsLine)
       grid.appendChild(gh)
 
       const cols = el('div', 'upgrade-grid')
@@ -124,13 +124,13 @@ export function wagerPane(): Pane {
         confirm.isArmed('wager')
           ? 'SURE? THIS RESETS EVERYTHING'
           : ready
-          ? `CALL THE WAGER  +${format(pointsFromWager(), n)}`
+          ? `CALL THE WAGER  +${format(chipsFromWager(), n)}`
           : `${format(s.inkThisWager, n)} / ${format(WAGER_AT, n)} INK`,
       )
       callBtn.disabled = !ready
       callBtn.classList.toggle('buyable', ready)
 
-      setText(pointsLine, format(s.points, n))
+      setText(chipsLine, format(s.chips, n))
       for (const [id, cell] of cells) {
         const bought = isBought(s, id)
         const affordable = canBuy(s, id)

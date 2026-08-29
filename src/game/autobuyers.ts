@@ -89,12 +89,12 @@ export function upgradeCost(s: GameState, id: AutobuyerId): Decimal {
 }
 
 export function canUpgrade(s: GameState, id: AutobuyerId): boolean {
-  return slot(s, id).unlocked && !isMaxed(s, id) && s.points.gte(upgradeCost(s, id))
+  return slot(s, id).unlocked && !isMaxed(s, id) && s.chips.gte(upgradeCost(s, id))
 }
 
 export function upgrade(s: GameState, id: AutobuyerId): boolean {
   if (!canUpgrade(s, id)) return false
-  s.points = s.points.minus(upgradeCost(s, id))
+  s.chips = s.chips.minus(upgradeCost(s, id))
   slot(s, id).level += 1
   return true
 }

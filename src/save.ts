@@ -44,7 +44,7 @@ import { newGame, type GameState } from './state'
 
 // Decimals do not survive JSON, so every one of them goes out as a string and
 // comes back through the constructor. The field lists below are the contract.
-const DECIMAL_FIELDS = ['ink', 'inkThisWager', 'points', 'meltPower'] as const
+const DECIMAL_FIELDS = ['ink', 'inkThisWager', 'chips', 'meltPower'] as const
 
 type Raw = Record<string, any>
 
@@ -61,6 +61,23 @@ function encode(s: GameState): Raw {
  * tarot field later should not cost anyone their save.
  */
 const MIGRATIONS: Record<number, (r: Raw) => Raw> = {
+  // 6 -> 7: Points became Chips, and the grid they buy went with them. The
+  // Wager is a bet, so what it pays is what a table pays. Pacioli's problem of
+  // points keeps its name where the history is what is being referred to: the
+  // archive entry and the ticker line still say points, because that is what
+  // he called it in 1494.
+  6: (r) => {
+    const out = { ...r }
+    if (out.points !== undefined) {
+      out.chips = out.points
+      delete out.points
+    }
+    if (out.pointUpgrades !== undefined) {
+      out.chipUpgrades = out.pointUpgrades
+      delete out.pointUpgrades
+    }
+    return out
+  },
   // 5 -> 6: the refresh rate defaulted to every frame, which at a late-game
   // roll rate is a table of digits nobody can read and a frame budget the dice
   // then have to share. The default is 100ms now, and a save sitting on 16
@@ -152,7 +169,7 @@ function decode(raw: Raw, now: number): GameState {
     stats: { ...base.stats, ...(m.stats ?? {}) },
     tarot: { ...(m.tarot ?? {}) },
     pendingDraft: Array.isArray(m.pendingDraft) ? [...m.pendingDraft] : [],
-    pointUpgrades: Array.isArray(m.pointUpgrades) ? [...m.pointUpgrades] : [],
+    chipUpgrades: Array.isArray(m.chipUpgrades) ? [...m.chipUpgrades] : [],
     challengesDone: Array.isArray(m.challengesDone) ? [...m.challengesDone] : [],
     autobuyers: { ...base.autobuyers, ...(m.autobuyers ?? {}) },
     achievements: Array.isArray(m.achievements) ? [...m.achievements] : [],

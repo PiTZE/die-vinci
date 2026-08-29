@@ -107,7 +107,7 @@ export const ARCANA: TarotDef[] = [
   T('sun', 'XIX', 'The Sun', 'late',
     'everything is multiplied, and nothing is asked'),
   T('judgement', 'XX', 'Judgement', 'late',
-    'points you have not spent multiply production'),
+    'chips you have not spent multiply production'),
   T('world', 'XXI', 'The World', 'late',
     'a run begins with more of the table already open'),
 ]
@@ -311,9 +311,9 @@ export function modifiers(s: GameState): Modifiers {
     m.rollRateMult *= Math.max(0.7, 1 - L('devil') * 0.05)
   }
 
-  // XX Judgement: points held rather than spent.
-  if (L('judgement') && s.points.gt(0)) {
-    m.globalMult = m.globalMult.times(s.points.times(L('judgement') * 0.5).plus(1))
+  // XX Judgement: chips held rather than spent.
+  if (L('judgement') && s.chips.gt(0)) {
+    m.globalMult = m.globalMult.times(s.chips.times(L('judgement') * 0.5).plus(1))
   }
 
   // XVI The Tower: lightning, and nothing falls down.

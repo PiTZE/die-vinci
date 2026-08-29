@@ -34,14 +34,14 @@ function seconds(v: number | string): number {
 const LINES = [
   'LD.help()            this list',
   'LD.ink(1e120)        set ink            LD.add(1e50)   add ink',
-  'LD.points(50)        set points         LD.wagers(10)  set wagers completed',
+  'LD.chips(50)         set chips          LD.wagers(10)  set wagers completed',
   'LD.dice(1e6)         give that many of every unlocked solid',
   'LD.bought(90)        set purchases on every solid, which drives the x2 per ten',
   'LD.rate(80)          set roll rate upgrades',
   'LD.study(3)          take studies       LD.folio(2)    bind folios',
   'LD.openAll()         unlock every solid without paying for it',
   'LD.wager()           call the Wager regardless of the threshold',
-  'LD.upgrades()        buy every affordable Points upgrade, cheapest first',
+  'LD.upgrades()        buy every affordable chip upgrade, cheapest first',
   'LD.upgrade("resetBoost")   buy one by id. LD.upgradeIds() lists them',
   'LD.arcana(3)         hold all 22 arcana, at that level or their cap, whichever',
   '                     is lower. LD.arcana(0) drops them',
@@ -73,8 +73,8 @@ export function devTools(d: DevDeps): Record<string, unknown> {
       touch()
       return s().ink.toString()
     },
-    points(v: number) {
-      s().points = new Decimal(v)
+    chips(v: number) {
+      s().chips = new Decimal(v)
       touch()
       return v
     },
@@ -139,7 +139,7 @@ export function devTools(d: DevDeps): Record<string, unknown> {
       s().inkThisWager = new Decimal('1.8e308')
       const ok = doWager(s())
       touch()
-      return ok ? `wager ${s().wagers}, points ${s().points}` : 'refused'
+      return ok ? `wager ${s().wagers}, chips ${s().chips}` : 'refused'
     },
     upgradeIds() {
       return Object.keys(UPGRADES)
@@ -147,7 +147,7 @@ export function devTools(d: DevDeps): Record<string, unknown> {
     upgrade(id: string) {
       const ok = buyUpgrade(s(), id as UpgradeId)
       touch()
-      return ok ? `bought ${id}` : `cannot buy ${id}, check points and its prerequisite`
+      return ok ? `bought ${id}` : `cannot buy ${id}, check chips and its prerequisite`
     },
     upgrades() {
       let n = 0
@@ -160,7 +160,7 @@ export function devTools(d: DevDeps): Record<string, unknown> {
         n++
       }
       touch()
-      return `${n} bought, ${s().pointUpgrades.length}/${Object.keys(UPGRADES).length} held`
+      return `${n} bought, ${s().chipUpgrades.length}/${Object.keys(UPGRADES).length} held`
     },
     /**
      * Every arcanum at once, at whatever level. The draft is one card a Wager,
@@ -224,7 +224,7 @@ export function devTools(d: DevDeps): Record<string, unknown> {
       const st = s()
       st.studies = STUDIES_THAT_UNLOCK
       st.rollUpgrades = 60
-      st.points = new Decimal(40)
+      st.chips = new Decimal(40)
       st.wagers = 8
       st.ink = new Decimal('1e150')
       st.solids.forEach((row, i) => {
@@ -232,7 +232,7 @@ export function devTools(d: DevDeps): Record<string, unknown> {
         row.amount = new Decimal(10).pow(60 - i * 5)
       })
       touch()
-      return 'nine solids stocked, 60 roll upgrades, 40 points, 8 wagers'
+      return 'nine solids stocked, 60 roll upgrades, 40 chips, 8 wagers'
     },
     backups() {
       return listBackups().map((b) => ({

@@ -154,7 +154,7 @@ check('tabs that fit share the whole bar',
 // four, which fit, so the rest have to be unlocked before this means anything.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.studies = 8; s.wagers = 2; s.autoRoll = true; s.challengesDone = [1,2]
-  s.points = new D(4); s.ink = new D('1e40') })()`)
+  s.chips = new D(4); s.ink = new D('1e40') })()`)
 await sleep(150)
 const bar = await ev(`(() => {
   const tabs = [...document.querySelectorAll('.tab')].filter(t => getComputedStyle(t).display !== 'none')

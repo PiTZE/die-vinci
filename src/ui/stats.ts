@@ -78,8 +78,8 @@ export function statsPane(): Pane {
 
       const wager = section('THE WAGER', (s) => s.wagers > 0)
       wager('CALLED', (s) => `${s.wagers}`)
-      wager('POINTS', (s) => s.points.toString())
-      wager('UPGRADES', (s) => `${s.pointUpgrades.length}`)
+      wager('CHIPS', (s) => s.chips.toString())
+      wager('UPGRADES', (s) => `${s.chipUpgrades.length}`)
       wager('IN THIS ONE', (s) => formatTime(s.stats.wagerMs / 1000))
       wager('CHALLENGES', (s) => `${s.challengesDone.length}`)
 

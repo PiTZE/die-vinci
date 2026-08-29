@@ -57,7 +57,7 @@ const SECTIONS: Section[] = [
     title: 'THE AUTOMATOR',
     needs: afterAutomator,
     body: [
-      'One point, once you have called the Wager, and the dice roll on their own. You can switch it off again in AUTOMATION.',
+      'One chip, once you have called the Wager, and the dice roll on their own. You can switch it off again in AUTOMATION.',
       'Until you own it you hold ROLL, and holding gives exactly the roll rate: a roll refuses to start while one is in the air. It buys you your finger back rather than any extra speed. It is also what makes time away from the game count.',
       'You never lose it. Not to a study, not to a folio, not to the Wager.',
     ],
@@ -76,7 +76,7 @@ const SECTIONS: Section[] = [
     needs: nearWager,
     body: [
       'At 1.8e308 ink you can call the Wager, named for the interrupted game of dice Pacioli posed in 1494.',
-      'It clears everything on the table and pays one point. Points buy the grid, and the grid makes the next run faster. That is the whole loop.',
+      'It clears everything on the table and pays one chip. Chips buy the grid, and the grid makes the next run faster. That is the whole loop.',
       'The number is where a double stops being able to count, which is a fair place for a game about chance to break.',
     ],
   },
@@ -92,7 +92,7 @@ const SECTIONS: Section[] = [
     title: 'AUTOBUYERS',
     needs: afterAutobuyer,
     body: [
-      'Each buys one thing on a timer. A point spent on one cuts its interval to 0.6 of what it was, down to a floor of a tenth of a second.',
+      'Each buys one thing on a timer. A chip spent on one cuts its interval to 0.6 of what it was, down to a floor of a tenth of a second.',
       'The mode button sets what each purchase does: one, a group of ten, or as many as the ink allows.',
     ],
   },

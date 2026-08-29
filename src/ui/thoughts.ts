@@ -47,7 +47,7 @@ const LINES: Line[] = [
     s.solids[SOLIDS.length - 1].amount.gt(0)
       ? 'A sphere of seventy-two bases, turning at the top of the chain.'
       : null,
-  (s) => (s.points.gt(0) ? `${format(s.points, s.options.notation)} points unspent.` : null),
+  (s) => (s.chips.gt(0) ? `${format(s.chips, s.options.notation)} chips unspent.` : null),
   (s) => (s.stats.playMs > 3600_000 ? 'An hour at the table. Leonardo would have moved on by now.' : null),
 ]
 

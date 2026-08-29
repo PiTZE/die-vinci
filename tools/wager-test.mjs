@@ -69,13 +69,13 @@ await sleep(150)
 await ev(`(() => { const a = window.LD.state.autobuyers
   for (const k of Object.keys(a)) a[k].on = false })()`)
 await sleep(150)
-const before = await ev(`({ points: Number(window.LD.state.points), wagers: window.LD.state.wagers })`)
+const before = await ev(`({ chips: Number(window.LD.state.chips), wagers: window.LD.state.wagers })`)
 await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)
 await sleep(150)
-const after = await ev(`({ points: Number(window.LD.state.points), wagers: window.LD.state.wagers,
+const after = await ev(`({ chips: Number(window.LD.state.chips), wagers: window.LD.state.wagers,
   ink: window.LD.state.ink.toString(), studies: window.LD.state.studies, folios: window.LD.state.folios,
   roll: window.LD.state.rollUpgrades, bought: window.LD.state.solids.reduce((a,d)=>a+d.bought,0) })`)
-check('wager pays a point', after.points === before.points + 1, JSON.stringify(after))
+check('wager pays a chip', after.chips === before.chips + 1, JSON.stringify(after))
 check('wager counts up', after.wagers === before.wagers + 1)
 check('wager clears layer 0',
   after.ink === '10' && after.studies === 0 && after.folios === 0 && after.roll === 0 && after.bought === 0,
@@ -96,7 +96,7 @@ check('touching an upgrade writes out what it does',
 // cost 10, and a discount of 9 against 10 floors at 1, which would pass this
 // check without proving the discount is actually being subtracted.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.points = new D(20); s.pointUpgrades = []; s.studies = 5 })()`)
+  s.chips = new D(20); s.chipUpgrades = []; s.studies = 5 })()`)
 await sleep(150)
 // Only the active pane updates, so the table has to be on screen to be read.
 await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'TABLE').click()`)
@@ -107,7 +107,7 @@ const need = `(() => { const t = [...document.querySelectorAll('.action')]
   .find(b => b.textContent.startsWith('STUDY'))
   return t ? (t.querySelector('.btn-cost')?.textContent ?? t.textContent) : 'none' })()`
 const studyNeedBefore = await ev(need)
-await ev(`window.LD.state.pointUpgrades = ['timeMult','solids19','solids37','resetBoost']`)
+await ev(`window.LD.state.chipUpgrades = ['timeMult','solids19','solids37','resetBoost']`)
 await sleep(150)
 const studyNeedAfter = await ev(need)
 check('resetBoost lowers the study requirement by 9',

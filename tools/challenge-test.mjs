@@ -111,11 +111,11 @@ const boughtAfter = await ev(`window.LD.state.solids[0].bought`)
 check('an unlocked autobuyer buys on its own', boughtAfter > boughtBefore,
   `${boughtBefore} -> ${boughtAfter}`)
 
-// And upgrading it costs points and shortens the interval.
-await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.points = new D(50) })()`)
+// And upgrading it costs chips and shortens the interval.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.chips = new D(50) })()`)
 await ev(`${tab('AUTOMATION')}.click()`); await sleep(150)
 const beforeUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level,
-  points: Number(window.LD.state.points),
+  chips: Number(window.LD.state.chips),
   every: window.LD.state.autobuyers.solid1.level })`)
 // Cost doubles per level, so it is derived rather than assumed to be 1.
 const expectCost = Math.pow(2, beforeUp.level)
@@ -128,9 +128,9 @@ await ev(`(() => {
   if (b) b.click()
 })()`)
 await sleep(150)
-const afterUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level, points: Number(window.LD.state.points) })`)
+const afterUp = await ev(`({ level: window.LD.state.autobuyers.solid1.level, chips: Number(window.LD.state.chips) })`)
 check('upgrading an autobuyer spends the doubling cost and shortens it',
-  afterUp.level === beforeUp.level + 1 && afterUp.points === beforeUp.points - expectCost,
+  afterUp.level === beforeUp.level + 1 && afterUp.chips === beforeUp.chips - expectCost,
   `${JSON.stringify(beforeUp)} -> ${JSON.stringify(afterUp)}, cost ${expectCost}`)
 
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}

@@ -47,10 +47,10 @@ export function studyBonus(s: GameState, tier: number): Decimal {
 }
 
 /**
- * Every ten bought, this tier's study bonus, and whatever the Points grid adds:
+ * Every ten bought, this tier's study bonus, and whatever the chip grid adds:
  * a global multiplier from time played, one from time in this wager, one from
  * wagers completed for the solids that upgrade covers, and one on the first
- * solid from points left unspent.
+ * solid from chips left unspent.
  */
 export function solidMultiplier(s: GameState, idx: number): Decimal {
   const st = s.solids[idx - 1]
@@ -684,12 +684,12 @@ export function automatorCost(): number {
 }
 
 export function canBuyAutomator(s: GameState): boolean {
-  return !s.autoRoll && automatorUnlocked(s) && s.points.gte(AUTOMATOR_COST)
+  return !s.autoRoll && automatorUnlocked(s) && s.chips.gte(AUTOMATOR_COST)
 }
 
 export function buyAutomator(s: GameState): boolean {
   if (!canBuyAutomator(s)) return false
-  s.points = s.points.minus(AUTOMATOR_COST)
+  s.chips = s.chips.minus(AUTOMATOR_COST)
   s.autoRoll = true
   s.autoRollOn = true
   s.rollStartedAt = 0

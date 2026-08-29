@@ -124,7 +124,7 @@ export class Shell {
   private announcedFull = false
   private toastTimer = 0
   private inkOut = new Readout('INK')
-  private pointsOut = new Readout('POINTS')
+  private chipsOut = new Readout('CHIPS')
   private active: TabId = 'table'
 
   constructor(
@@ -139,7 +139,7 @@ export class Shell {
     const barInner = el('div', 'bar-inner')
     // Readouts only. Theme lives in OPTIONS, which is the only place it needs
     // to be, and the bar is for numbers that change.
-    barInner.append(this.inkOut.root, this.pointsOut.root, el('div', 'bar-spacer'))
+    barInner.append(this.inkOut.root, this.chipsOut.root, el('div', 'bar-spacer'))
     bar.appendChild(barInner)
 
     const tabs = el('nav', 'tabs')
@@ -292,9 +292,9 @@ export class Shell {
       format(s.ink, n),
       rollingItself(s) ? `${format(inkRate, n)}/s` : `${format(inkPerRoll(s), n)} per roll`,
     )
-    const showPoints = s.wagers > 0 || s.points.gt(0)
-    this.pointsOut.show(showPoints)
-    if (showPoints) this.pointsOut.set(format(s.points, n))
+    const showChips = s.wagers > 0 || s.chips.gt(0)
+    this.chipsOut.show(showChips)
+    if (showChips) this.chipsOut.set(format(s.chips, n))
 
     for (const p of this.panes) {
       const btn = this.tabButtons.get(p.id)

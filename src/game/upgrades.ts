@@ -105,7 +105,7 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
     cost: 5,
     needs: 'wagerTimeMult',
     label: 'UNSPENT',
-    note: 'the first solid gains a multiplier from unspent points',
+    note: 'the first solid gains a multiplier from unspent chips',
   },
   studyPower: {
     id: 'studyPower',
@@ -117,7 +117,7 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
 }
 
 export function isBought(s: GameState, id: UpgradeId): boolean {
-  return s.pointUpgrades.includes(id)
+  return s.chipUpgrades.includes(id)
 }
 
 export function isAvailable(s: GameState, id: UpgradeId): boolean {
@@ -127,13 +127,13 @@ export function isAvailable(s: GameState, id: UpgradeId): boolean {
 }
 
 export function canBuy(s: GameState, id: UpgradeId): boolean {
-  return isAvailable(s, id) && s.points.gte(UPGRADES[id].cost)
+  return isAvailable(s, id) && s.chips.gte(UPGRADES[id].cost)
 }
 
 export function buyUpgrade(s: GameState, id: UpgradeId): boolean {
   if (!canBuy(s, id)) return false
-  s.points = s.points.minus(UPGRADES[id].cost)
-  s.pointUpgrades.push(id)
+  s.chips = s.chips.minus(UPGRADES[id].cost)
+  s.chipUpgrades.push(id)
   return true
 }
 
@@ -178,7 +178,7 @@ export function pairMultiplier(s: GameState, idx: number): Decimal {
 /** AD: (unspentIP / 2) ^ 1.5 + 1, on the first dimension only. */
 export function unspentMultiplier(s: GameState, idx: number): Decimal {
   if (idx !== 1 || !isBought(s, 'unspentMult')) return new Decimal(1)
-  return s.points.div(2).pow(1.5).plus(1)
+  return s.chips.div(2).pow(1.5).plus(1)
 }
 
 /** AD's buy10Mult is 1.1, applied on top of the x2 per ten. */
