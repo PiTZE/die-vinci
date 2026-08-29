@@ -203,3 +203,13 @@ export const FOLIO_COST_MULT = 60
 export function folioRequirement(owned: number): number {
   return FOLIO_BASE + FOLIO_COST_MULT * owned
 }
+
+/**
+ * Every arcanum caps here, and none of them carries its own number any more.
+ *
+ * A uniform cap is a thing a player can hold in their head: nine levels, nine
+ * solids, nine to a row in the archive. It used to be ten with three cards
+ * carrying their own lower number, which meant the answer to "how far does
+ * this go" was "look it up".
+ */
+export const ARCANA_MAX_LEVEL = 9

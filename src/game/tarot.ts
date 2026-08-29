@@ -15,6 +15,7 @@
 // wasted draw.
 import Decimal from 'break_infinity.js'
 import type { GameState } from '../state'
+import { ARCANA_MAX_LEVEL } from './balance'
 
 export type ArcanaId =
   | 'fool' | 'magician' | 'priestess' | 'empress' | 'emperor' | 'hierophant'
@@ -34,17 +35,14 @@ export interface TarotDef {
   note: string
   tier: Tier
   /**
-   * The last level that does anything.
+   * The last level that does anything, and it is nine on every card.
    *
-   * Four of these fall out of the effect itself: the Magician's skip clamps at
-   * 0.8, which is level 8; the Hermit's cost floor and the Hanged Man's kept
-   * fraction both land at level 10; and the World cannot open more than the
-   * eight solids a study would have. Past those, a level was a draft spent on
-   * nothing.
-   *
-   * The rest had no ceiling at all, so they take 10. That is a decision rather
-   * than a derivation, and it is what makes "full" mean the same thing on every
-   * card, which is what lets a full card step out of the draft.
+   * Three of them used to carry their own number, derived from where the
+   * effect stopped paying: the Magician's skip clamps at 0.8 and the World
+   * cannot open more of the table than there is. Those clamps are still in the
+   * formulas, so a card that runs out early still runs out early; what changed
+   * is that the answer to "how far does this go" is now the same on all
+   * twenty-two, and it is the same nine as the solids and the archive rows.
    */
   max: number
   /** Present and unused. Repentance gave every arcanum a reversed form, and
@@ -53,8 +51,9 @@ export interface TarotDef {
   reversed?: string
 }
 
-/** Ten unless the card's own formula stops paying sooner. */
-export const MAX_LEVEL = 10
+/** The cap lives in balance.ts with every other tunable number, and is named
+ *  here so the cards read it under the name they always used. */
+export const MAX_LEVEL = ARCANA_MAX_LEVEL
 
 const T = (
   id: ArcanaId,
@@ -70,7 +69,7 @@ export const ARCANA: TarotDef[] = [
   T('fool', '0', 'The Fool', 'mid',
     'a folio keeps your studies'),
   T('magician', 'I', 'The Magician', 'mid',
-    'each solid also feeds the one two below it', 8),
+    'each solid also feeds the one two below it'),
   T('priestess', 'II', 'The High Priestess', 'late',
     'your largest solid pays ink of its own'),
   T('empress', 'III', 'The Empress', 'early',
@@ -86,13 +85,13 @@ export const ARCANA: TarotDef[] = [
   T('justice', 'VIII', 'Justice', 'early',
     'a reset leaves you some of every solid'),
   T('hermit', 'IX', 'The Hermit', 'early',
-    'every solid costs less', 10),
+    'every solid costs less'),
   T('wheel', 'X', 'Wheel of Fortune', 'mid',
     'every die is rolled twice and keeps the better face'),
   T('strength', 'XI', 'Strength', 'mid',
     'solid multipliers gain an exponent'),
   T('hanged', 'XII', 'The Hanged Man', 'mid',
-    'a study no longer clears your roll rate', 10),
+    'a study no longer clears your roll rate'),
   T('death', 'XIII', 'Death', 'late',
     'melt the chain into the solid at the top of it'),
   T('temperance', 'XIV', 'Temperance', 'mid',
@@ -110,7 +109,7 @@ export const ARCANA: TarotDef[] = [
   T('judgement', 'XX', 'Judgement', 'late',
     'points you have not spent multiply production'),
   T('world', 'XXI', 'The World', 'late',
-    'a run begins with more of the table already open', 8),
+    'a run begins with more of the table already open'),
 ]
 
 export const ARCANA_BY_ID: Record<string, TarotDef> = Object.fromEntries(
@@ -308,8 +307,8 @@ export function modifiers(s: GameState): Modifiers {
   // bonus. What the floor buys past level 5 is small: the last five levels are
   // worth about three minutes across six Wagers.
   if (L('devil')) {
-    m.globalMult = m.globalMult.times(1 + L('devil') * 1.5)
-    m.rollRateMult *= Math.max(0.4, 1 - L('devil') * 0.12)
+    m.globalMult = m.globalMult.times(1 + L('devil') * 1.6)
+    m.rollRateMult *= Math.max(0.7, 1 - L('devil') * 0.05)
   }
 
   // XX Judgement: points held rather than spent.
@@ -368,7 +367,7 @@ export function modifiers(s: GameState): Modifiers {
   // 0 The Fool, V The Hierophant, VIII Justice, XII The Hanged Man: resets.
   m.keepStudies = L('fool')
   if (L('hierophant')) m.keepInk = new Decimal(10).pow(1 + L('hierophant') * 2)
-  m.keepSolids = L('justice') * 2
+  m.keepSolids = L('justice')
   m.keepRollFrac = Math.min(1, L('hanged') * 0.1)
 
   // XVIII The Moon. The World is read straight from the card level over in

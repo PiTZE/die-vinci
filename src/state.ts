@@ -7,6 +7,7 @@ import {
   SOLIDS_AT_START,
   START_INK,
   STUDIES_THAT_UNLOCK,
+  ARCANA_MAX_LEVEL,
 } from './game/balance'
 import type { NotationId } from './format'
 import { newAutobuyers, type AutobuyerState } from './game/autobuyers'
@@ -169,7 +170,9 @@ export function newGame(now: number): GameState {
 /** How many solids are on the table. Studies unlock the rest. */
 export function unlockedSolids(s: GameState): number {
   // XXI The World: a run begins with more of the table already open.
-  const extra = s.tarot?.world ?? 0
+  // Through the same cap the cards themselves read, so a save holding a level
+  // above it cannot open a solid the draft could never have paid for.
+  const extra = Math.min(ARCANA_MAX_LEVEL, s.tarot?.world ?? 0)
   return Math.min(SOLID_COUNT, SOLIDS_AT_START + extra + Math.min(s.studies, STUDIES_THAT_UNLOCK))
 }
 
