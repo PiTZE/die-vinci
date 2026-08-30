@@ -145,7 +145,11 @@ export class Shell {
    */
   private chipsSeen: Decimal | null = null
   private chipsAt = 0
-  private chipsRate = 0
+  // Decimal, not a double. Chips reach 1e18000 after the wall comes down, and
+  // toNumber() on that is Infinity, which the smoothing then held forever and
+  // the readout printed as 1e9000000000000000/s. Same mistake the roll rate
+  // made, one layer up.
+  private chipsRate: Decimal = new Decimal(0)
   private active: TabId = 'table'
 
   constructor(
@@ -324,9 +328,9 @@ export class Shell {
         const dt = (now - this.chipsAt) / 1000
         if (dt >= 0.25) {
           const gained = s.chips.minus(this.chipsSeen)
-          const per = gained.gt(0) ? gained.div(dt).toNumber() : 0
+          const per = gained.gt(0) ? gained.div(dt) : new Decimal(0)
           const k = Math.min(1, dt / 3)
-          this.chipsRate = this.chipsRate * (1 - k) + per * k
+          this.chipsRate = this.chipsRate.times(1 - k).plus(per.times(k))
           this.chipsSeen = s.chips
           this.chipsAt = now
         }
@@ -336,7 +340,7 @@ export class Shell {
       // ink readout already says.
       this.chipsOut.set(
         format(s.chips, n),
-        s.broke ? `${format(new Decimal(this.chipsRate), n)}/s` : '',
+        s.broke ? `${format(this.chipsRate, n)}/s` : '',
       )
     }
 
