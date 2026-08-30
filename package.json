@@ -1,7 +1,7 @@
 {
   "name": "die-vinci",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "description": "A game about Leo. An incremental dice game built on the solids Leonardo drew for Pacioli.",
   "scripts": {
