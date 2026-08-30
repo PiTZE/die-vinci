@@ -31,6 +31,9 @@ export interface Actions {
   upgradeAutobuyer(id: string): void
   /** A cap on how many a reset autobuyer takes. AD's limitDimBoosts. */
   setAutobuyerLimit(id: string, on: boolean, at?: number): void
+  /** The Wager autobuyer's payout threshold, and whether it rises on its own. */
+  setWagerThreshold(at: string): void
+  setWagerRise(on: boolean): void
   /** And the folio count that lifts it. AD's limitUntilGalaxies. */
   setAutobuyerUntil(id: string, on: boolean, at?: number): void
   setNotation(n: GameState['options']['notation']): void

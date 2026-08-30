@@ -92,6 +92,9 @@ export function buyChipMult(s: GameState): boolean {
   if (!canBuyChipMult(s)) return false
   s.chips = s.chips.minus(chipMultCost(s))
   s.chipMult += 1
+  // The payout just doubled, so what the autobuyer waits for doubles with it.
+  // AD does this from infinity-upgrades.js on the same purchase.
+  bumpWagerThreshold(s, CHIP_MULT_STEP)
   return true
 }
 
@@ -177,12 +180,16 @@ export interface BreakUpgradeDef {
 export const BREAK_UPGRADES: BreakUpgradeDef[] = [
   { id: 'totalInk', cost: 1e4, label: 'LEDGER',
     note: 'every solid gains a multiplier from the ink this run has earned' },
+  { id: 'currentInk', cost: 5e4, label: 'ON THE TABLE',
+    note: 'every solid gains a multiplier from the ink you are holding' },
   { id: 'wagerMult', cost: 1e5, label: 'HOUSE EDGE',
     note: 'every solid gains a multiplier from Wagers called' },
   { id: 'archiveMult', cost: 1e6, label: 'PROVENANCE',
     note: 'every solid gains a multiplier from the archive' },
   { id: 'fastestMult', cost: 1e7, label: 'CLOCKED',
     note: 'every solid gains a multiplier from your fastest Wager' },
+  { id: 'bulkResets', cost: 5e9, label: 'IN ONE MOTION',
+    note: 'the study and folio autobuyers take every rung the table can pay for at once' },
   { id: 'foliosStronger', cost: 5e11, label: 'BINDING',
     note: 'folios are half again as strong' },
   { id: 'autoFaster', cost: 1e15, label: 'QUICK HANDS',
@@ -252,6 +259,12 @@ export function breakMultiplier(s: GameState): Decimal {
   if (hasBreak(s, 'totalInk')) {
     out = out.times(Math.sqrt(Math.max(0, s.inkThisWager.log10()) + 1))
   }
+  // AD's currentAMMult, the one upgrade its break grid had and ours did not.
+  // Same shape as the one above it, read off what you are holding rather than
+  // what the run has earned.
+  if (hasBreak(s, 'currentInk')) {
+    out = out.times(Math.sqrt(Math.max(0, s.ink.log10()) + 1))
+  }
   if (hasBreak(s, 'wagerMult')) {
     out = out.times(1 + Math.log10(Math.max(1, s.wagers)) * 10)
   }
@@ -296,6 +309,47 @@ export function folioStrengthBonus(s: GameState): number {
 
 export function autobuyerSpeedFactor(s: GameState): number {
   return hasBreak(s, 'autoFaster') ? 0.5 : 1
+}
+
+/** IN ONE MOTION, which is AD's autobuyMaxDimboosts. */
+export function bulkResetsUnlocked(s: GameState): boolean {
+  return hasBreak(s, 'bulkResets')
+}
+
+/**
+ * What a Wager has to be worth before the autobuyer calls it.
+ *
+ * Before the wall comes down this is nothing: a Wager pays exactly one chip
+ * whenever it is called, so waiting buys nothing and AD agrees. Its
+ * `willInfinity` opens `if (!player.break ...) return true`, crunching the
+ * moment it can. Past the wall it switches to comparing the payout against a
+ * threshold, `gainedInfinityPoints().gte(this.amount)`, and that is the whole
+ * reason AD's post-break antimatter runs far past 1.8e308: the run is banking
+ * an overshoot rather than cashing out at the first opportunity.
+ *
+ * Ours did not, so every Wager after the break paid the same 1.78 chips it
+ * paid before it and the grid stayed out of reach forever.
+ */
+export function wagerThreshold(s: GameState): Decimal {
+  const raw = s.autobuyers[WAGER_AUTOBUYER]?.amount
+  return new Decimal(raw == null ? 1 : raw).max(1)
+}
+
+export function autoWagerReady(s: GameState): boolean {
+  if (!s.broke) return true
+  return chipsFrom(s).gte(wagerThreshold(s))
+}
+
+/**
+ * The threshold climbs with the payout, so it does not have to be retyped
+ * every time the multiplier doubles. AD's `increaseWithMult`, bumped from
+ * `infinity-upgrades.js` on exactly the same event: buying the chip
+ * multiplier, `Autobuyer.bigCrunch.bumpAmount(DC.D2.pow(amount))`.
+ */
+export function bumpWagerThreshold(s: GameState, mult: number): void {
+  const a = s.autobuyers[WAGER_AUTOBUYER]
+  if (!a || a.riseWithMult === false) return
+  a.amount = wagerThreshold(s).times(mult).toString()
 }
 
 /** Chips a second from THE RAKE, AD's ipGen wearing our clock. */

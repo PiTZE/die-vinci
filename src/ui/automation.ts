@@ -13,6 +13,8 @@ import {
   untilOn,
   upgradeCost,
 } from '../game/autobuyers'
+import Decimal from 'break_infinity.js'
+import { WAGER_AUTOBUYER, wagerThreshold } from '../game/breaks'
 import { format } from '../format'
 import type { GameState } from '../state'
 import { automatorCost, automatorUnlocked, canBuyAutomator } from '../game/production'
@@ -44,6 +46,27 @@ function numberBox(label: string, write: (v: number) => void): HTMLInputElement 
     if (cleaned !== n.value) n.value = cleaned
     if (cleaned === '') return
     write(Number(cleaned))
+  })
+  return n
+}
+
+/**
+ * The same box, for a number that will not fit in one. The Wager threshold
+ * climbs with the payout, so it is typed and read as a Decimal.
+ */
+function bigBox(label: string, write: (v: string) => void): HTMLInputElement {
+  const n = document.createElement('input')
+  n.className = 'auto-num'
+  n.type = 'text'
+  n.inputMode = 'decimal'
+  n.autocomplete = 'off'
+  n.spellcheck = false
+  n.setAttribute('aria-label', label)
+  n.addEventListener('input', () => {
+    const cleaned = n.value.replace(/[^0-9.e+]/gi, '')
+    if (cleaned !== n.value) n.value = cleaned
+    if (cleaned === '' || !Number.isFinite(new Decimal(cleaned).e)) return
+    write(cleaned)
   })
   return n
 }
@@ -130,6 +153,25 @@ export function automationPane(): Pane {
         // it. Typed rather than cycled: the useful values are whatever this
         // run happens to need, and a fixed list of them would be a guess.
         let rules: (typeof rows extends Map<string, infer V> ? V : never)['rules']
+        // The Wager's own rule, and only once the wall is down: what a Wager
+        // has to pay before this calls it. Before the wall a Wager pays one
+        // chip whenever it is called, so there is nothing to wait for, which
+        // is why AD's willInfinity returns true outright while !player.break.
+        if (a.id === WAGER_AUTOBUYER) {
+          const box = el('div', 'auto-rules')
+          const payRow = el('div', 'auto-rule')
+          const riseOn = el('button', 'auto-toggle', 'OFF')
+          riseOn.type = 'button'
+          riseOn.title = 'Raise it whenever the payout doubles'
+          riseOn.addEventListener('click', () =>
+            actions.setWagerRise(!(shown.autobuyers[WAGER_AUTOBUYER]?.riseWithMult !== false)))
+          payRow.append(el('span', 'auto-rule-label', 'ONLY AT'), riseOn)
+          const payAt = bigBox('chips', (v) => actions.setWagerThreshold(v))
+          payRow.appendChild(payAt)
+          box.appendChild(payRow)
+          section.appendChild(box)
+          rules = { root: box, capOn: riseOn, capAt: payAt }
+        }
         if (hasLimit(a.id)) {
           const box = el('div', 'auto-rules')
           const capRow = el('div', 'auto-rule')
@@ -201,7 +243,20 @@ export function automationPane(): Pane {
         setText(row.modeBtn, m === 'single' ? '1' : m === 'ten' ? '10' : 'MAX')
         row.modeBtn.hidden = !a.id.startsWith('solid')
 
-        if (row.rules) {
+        // The Wager's threshold is its own thing, and it stays out of sight
+        // until the wall is down, because until then a Wager pays one chip
+        // whenever it is called and there is nothing to wait for.
+        if (a.id === WAGER_AUTOBUYER && row.rules) {
+          row.rules.root.hidden = !s.broke
+          if (s.broke) {
+            const rise = s.autobuyers[WAGER_AUTOBUYER]?.riseWithMult !== false
+            setText(row.rules.capOn, rise ? 'RISES' : 'FIXED')
+            row.rules.capOn.classList.toggle('buyable', rise)
+            if (document.activeElement !== row.rules.capAt) {
+              row.rules.capAt.value = format(wagerThreshold(s), n)
+            }
+          }
+        } else if (row.rules) {
           const capped = limitOn(s, a.id)
           setText(row.rules.capOn, capped ? 'ON' : 'OFF')
           row.rules.capOn.classList.toggle('buyable', capped)

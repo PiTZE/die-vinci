@@ -70,6 +70,7 @@ import {
   chipMultiplier,
   chipsFrom,
   breakWager,
+  WAGER_AUTOBUYER,
 } from './game/breaks'
 import { wagerPane } from './ui/wager'
 import { challengesPane } from './ui/challenges'
@@ -285,6 +286,16 @@ const actions: Actions = {
   },
   setAutobuyerLimit: (id, on, at) => {
     setLimit(state, id, on, at)
+    persistSoon()
+  },
+  setWagerThreshold: (at) => {
+    const a = state.autobuyers[WAGER_AUTOBUYER]
+    if (a) a.amount = at
+    persistSoon()
+  },
+  setWagerRise: (on) => {
+    const a = state.autobuyers[WAGER_AUTOBUYER]
+    if (a) a.riseWithMult = on
     persistSoon()
   },
   setAutobuyerUntil: (id, on, at) => {

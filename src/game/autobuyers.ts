@@ -72,6 +72,15 @@ export interface AutobuyerState {
   /** Study only: take them freely again once this many folios are bound. */
   untilOn?: boolean
   untilFolios?: number
+  /**
+   * The Wager only, and only past the wall: what a Wager has to pay before
+   * this calls it. AD's bigCrunch `amount`, with `increaseWithMult` beside
+   * it; both default on, at one, which is AD's default too.
+   *
+   * A string, because it outgrows a double as fast as the payout does.
+   */
+  amount?: string
+  riseWithMult?: boolean
 }
 
 export function newAutobuyers(): Record<string, AutobuyerState> {

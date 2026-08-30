@@ -35,8 +35,10 @@ import { runAutobuyers } from './autobuyers'
 import { levelOf, modifiers } from './tarot'
 import { achievementPower } from './achievements'
 import {
+  autoWagerReady,
   autobuyerSpeedFactor,
   breakMultiplier,
+  bulkResetsUnlocked,
   ceilingHolds,
   chipsPerSecond,
   folioStrengthBonus,
@@ -323,11 +325,28 @@ export function buyRollRate(s: GameState): boolean {
 // -- studies and folios ---------------------------------------------------
 
 /** Studies and folios are both paid in dice, not ink. */
-export function studyReq(s: GameState): { idx: number; need: Decimal } {
-  const n = s.studies + 1
+/** As many rungs as one bulk reset will take, which is AD's own ceiling of
+ *  nothing in particular: a bound so a bad extrapolation cannot spin. */
+const BULK_RESET_CAP = 1e6
+
+/** The requirement k studies ahead. k = 1 is the next one. */
+function studyReqAt(s: GameState, k: number): { idx: number; need: Decimal } {
+  const n = s.studies + k
   const r = restrictions(s)
   const need = Math.max(1, studyRequirement(n) - requirementDiscount(s)) * r.studyCostFactor
   return { idx: Math.min(studyTier(n), r.cap), need: new Decimal(need) }
+}
+
+export function studyReq(s: GameState): { idx: number; need: Decimal } {
+  return studyReqAt(s, 1)
+}
+
+/** The same, k folios ahead. */
+function folioReqAt(s: GameState, k: number): { idx: number; need: Decimal } {
+  const r = restrictions(s)
+  const need =
+    Math.max(1, folioRequirement(s.folios + k - 1) - requirementDiscount(s)) * r.folioCostFactor
+  return { idx: Math.min(SOLIDS.length, r.cap), need: new Decimal(need) }
 }
 
 export function canBuyStudy(s: GameState): boolean {
@@ -416,9 +435,74 @@ export function buyStudy(s: GameState): boolean {
 }
 
 export function folioReq(s: GameState): { idx: number; need: Decimal } {
-  const r = restrictions(s)
-  const need = Math.max(1, folioRequirement(s.folios) - requirementDiscount(s)) * r.folioCostFactor
-  return { idx: Math.min(SOLIDS.length, r.cap), need: new Decimal(need) }
+  return folioReqAt(s, 1)
+}
+
+/**
+ * How many of a ladder the table already satisfies, in one step.
+ *
+ * Both schedules are linear once the chain is full, 20 + 15n for studies and
+ * a flat climb for folios, so two samples give the slope and the count falls
+ * out of one division. That is AD's maxBuyDimBoosts exactly: it reads
+ * bulkRequirement(1) and bulkRequirement(2), extrapolates, and binary searches
+ * only when the extrapolation overshoots, which here happens where the
+ * schedule has not straightened out yet.
+ */
+function bulkCount(
+  s: GameState,
+  req: (k: number) => { idx: number; need: Decimal },
+): number {
+  const held = (k: number) => s.solids[req(k).idx - 1].amount
+  if (held(1).lt(req(1).need)) return 0
+  if (held(2).lt(req(2).need)) return 1
+  const step = req(2).need.minus(req(1).need)
+  if (step.lte(0)) return 1
+  const guess = held(1).minus(req(1).need).div(step).floor().toNumber() + 1
+  if (!Number.isFinite(guess) || guess < 2) return 1
+  const cap = Math.min(guess, BULK_RESET_CAP)
+  if (held(cap).gte(req(cap).need)) return cap
+  let lo = 2
+  let hi = cap
+  while (hi !== lo + 1) {
+    const mid = Math.floor((hi + lo) / 2)
+    if (held(mid).gte(req(mid).need)) lo = mid
+    else hi = mid
+  }
+  return lo
+}
+
+/**
+ * Every study the table can pay for, on one reset.
+ *
+ * AD's autobuyMaxDimboosts, which is a break upgrade there too and buys the
+ * boost autobuyer its bulk mode. It opens the same way AD's does: while a
+ * study still unlocks a solid the chain has to fill in order, so those are
+ * bought one at a time.
+ */
+export function maxBuyStudies(s: GameState): boolean {
+  if (unlockedSolids(s) < SOLIDS.length) return buyStudy(s)
+  const n = bulkCount(s, (k) => studyReqAt(s, k))
+  if (n < 1) return false
+  if (n === 1) return buyStudy(s)
+  s.studies += n
+  s.rollUpgrades = Math.floor(s.rollUpgrades * modifiers(s).keepRollFrac)
+  resetTable(s)
+  return true
+}
+
+/** The same for folios, which have no chain to fill first. */
+export function maxBuyFolios(s: GameState): boolean {
+  if (!folioUnlocked(s)) return false
+  const n = bulkCount(s, (k) => folioReqAt(s, k))
+  if (n < 1) return false
+  if (n === 1) return buyFolio(s)
+  const m = modifiers(s)
+  s.folios += n
+  s.stats.foliosEver += n
+  s.studies = Math.min(s.studies, m.keepStudies)
+  s.rollUpgrades = Math.floor(s.rollUpgrades * m.keepRollFrac)
+  resetTable(s)
+  return true
 }
 
 export function folioUnlocked(s: GameState): boolean {
@@ -990,9 +1074,13 @@ export function tick(s: GameState, dt: number, now: number): void {
     buySolid: (idx, one) => buySolid(s, idx, one),
     canBuyGroup: (idx) => canBuyGroup(s, idx),
     buyRollRate: () => buyRollRate(s),
-    buyStudy: () => buyStudy(s),
-    buyFolio: () => buyFolio(s),
-    wager: () => autoWager(s),
+    // IN ONE MOTION turns both reset autobuyers bulk, which is what AD's
+    // autobuyMaxDimboosts does to its boost autobuyer. Rebuilding the ladder
+    // one rung an interval is the floor on how fast a Wager can be, and no
+    // price change touches it.
+    buyStudy: () => (bulkResetsUnlocked(s) ? maxBuyStudies(s) : buyStudy(s)),
+    buyFolio: () => (bulkResetsUnlocked(s) ? maxBuyFolios(s) : buyFolio(s)),
+    wager: () => autoWagerReady(s) && autoWager(s),
   })
 
   // Seconds per roll for the bookkeeping below, which only needs a double
