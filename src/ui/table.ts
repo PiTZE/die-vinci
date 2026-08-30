@@ -572,10 +572,20 @@ export function tablePane(): Pane {
           }
         } else {
           r.face.classList.remove('stale')
-          // Whole numbers. A die never lands on 10.5, and printing it in the
-          // same column that shows a landed face the rest of the time reads as
-          // a broken number rather than as an average.
-          setText(r.face, String(Math.floor(meanFace(def.faces, faceBias(s)))))
+          // Too fast to follow, and it still shows the face the dice landed
+          // on rather than what they average.
+          //
+          // The average was the honest number and it read as a dead one: it
+          // is the same digit every frame while the dice are visibly tumbling
+          // underneath it, so the column looked stuck exactly where the table
+          // got fast. The batched path rolls real faces every tick whether or
+          // not anything reads them, so there is always a true number to show
+          // here. It changes at the refresh rate rather than on each landing,
+          // which is a blur rather than a reading, but a blur is what the dice
+          // themselves are doing at this speed and the two now agree.
+          const face = s.faces[def.idx - 1] || r.lastFace
+          if (face) r.lastFace = face
+          setText(r.face, face ? String(face) : '')
         }
 
         // Averaged over the faces, because that is what the row actually pays

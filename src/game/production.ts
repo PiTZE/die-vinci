@@ -40,9 +40,10 @@ import {
   ceilingHolds,
   chipsPerSecond,
   folioStrengthBonus,
-  rollCostStep,
-  solidCostRelief,
+  rollCostScale,
+  solidCostScale,
 } from './breaks'
+import { costAt, costScale, maxBought, type CostScale } from './cost-scaling'
 
 /**
  * A study's multiplier reaches down the chain rather than across all of it.
@@ -126,14 +127,38 @@ export function doMelt(s: GameState): boolean {
   return true
 }
 
-export function solidCost(s: GameState, idx: number): Decimal {
+/**
+ * A solid's price curve. Geometric per group of ten up to the wall, and
+ * steepening past it, which is what CHEAPER PLATES buys back.
+ *
+ * This is AD's dimension declaration with our numbers in it. The tarot cost
+ * modifier stays outside the scale rather than folded into its base, because
+ * the base is what fixes where the wall falls and a card must not move the
+ * wall.
+ */
+function solidScale(s: GameState, idx: number): CostScale {
   const def = SOLIDS[idx - 1]
+  return costScale(
+    def.baseCost.toNumber(),
+    def.costMult.toNumber(),
+    solidCostScale(s),
+    WAGER_AT.toNumber(),
+  )
+}
+
+export function solidCost(s: GameState, idx: number): Decimal {
   const st = s.solids[idx - 1]
-  // CHEAPER PLATES takes the edge off the per-ten climb, which is AD's
-  // dimCostMult doing the same job on the same curve.
-  return def.baseCost
-    .times(def.costMult.div(solidCostRelief(s)).pow(Math.floor(st.bought / 10)))
-    .times(modifiers(s).costFactor)
+  return costAt(solidScale(s, idx), Math.floor(st.bought / 10)).times(modifiers(s).costFactor)
+}
+
+/** The roll rate's, which is AD's tickspeed declaration wearing our ratio. */
+function rollScale(s: GameState): CostScale {
+  return costScale(
+    ROLL_COST_BASE.toNumber(),
+    ROLL_COST_MULT.toNumber(),
+    rollCostScale(s),
+    WAGER_AT.toNumber(),
+  )
 }
 
 /**
@@ -279,12 +304,7 @@ export function rollRate(s: GameState): Decimal {
 }
 
 export function rollCost(s: GameState): Decimal {
-  // SHORTER ODDS walks the x20 a level down toward x2, which is AD's own
-  // tickspeedCostMult doing the same thing to the same number.
-  const step = rollCostStep(s, ROLL_COST_MULT.toNumber())
-  return ROLL_COST_BASE.times(Decimal.pow(step, s.rollUpgrades)).times(
-    modifiers(s).rollCostFactor,
-  )
+  return costAt(rollScale(s), s.rollUpgrades).times(modifiers(s).rollCostFactor)
 }
 
 export function canBuyRollRate(s: GameState): boolean {
@@ -489,15 +509,18 @@ function buySolidGroups(s: GameState, idx: number, groups: number): boolean {
   const left = groups - (Math.floor(st.bought / 10) - startGroup)
   if (left < 1) return did
 
-  const def = SOLIDS[idx - 1]
-  const ratio = def.costMult.div(solidCostRelief(s))
-  const first = def.baseCost.times(modifiers(s).costFactor).times(10)
   const owned = st.bought / 10
-  const afford = Decimal.affordGeometricSeries(s.ink, first, ratio, owned).toNumber()
-  if (!Number.isFinite(afford) || afford < 1) return did
+  // The tarot cost modifier divides the wallet rather than shifting the base,
+  // for the same reason solidScale keeps it out: the base fixes the wall.
+  const factor = modifiers(s).costFactor
+  const bulk = maxBought(solidScale(s, idx), owned, s.ink.div(factor), 10)
+  if (!bulk) return did
 
-  const n = Math.min(afford, left)
-  const price = Decimal.sumGeometricSeries(n, first, ratio, owned)
+  const n = Math.min(bulk.quantity, left)
+  const price =
+    n === bulk.quantity
+      ? bulk.price.times(factor)
+      : costAt(solidScale(s, idx), owned + n - 1).times(factor).times(10)
   if (overThreshold(s, price) || s.ink.lt(price)) return did
 
   s.ink = s.ink.minus(price)
@@ -511,13 +534,16 @@ function buySolidGroups(s: GameState, idx: number, groups: number): boolean {
 /** The same series, on the roll rate, which climbs by a fixed step a level. */
 function buyRollRateBulk(s: GameState, levels: number): boolean {
   if (restrictions(s).noRollRate || levels < 1) return false
-  const step = new Decimal(rollCostStep(s, ROLL_COST_MULT.toNumber()))
-  const first = ROLL_COST_BASE.times(modifiers(s).rollCostFactor)
-  const afford = Decimal.affordGeometricSeries(s.ink, first, step, s.rollUpgrades).toNumber()
-  if (!Number.isFinite(afford) || afford < 1) return false
+  const factor = modifiers(s).rollCostFactor
+  const scale = rollScale(s)
+  const bulk = maxBought(scale, s.rollUpgrades, s.ink.div(factor), 1)
+  if (!bulk) return false
 
-  const n = Math.min(afford, levels)
-  const price = Decimal.sumGeometricSeries(n, first, step, s.rollUpgrades)
+  const n = Math.min(bulk.quantity, levels)
+  const price =
+    n === bulk.quantity
+      ? bulk.price.times(factor)
+      : costAt(scale, s.rollUpgrades + n - 1).times(factor)
   if (overThreshold(s, price) || s.ink.lt(price)) return false
 
   s.ink = s.ink.minus(price)

@@ -323,12 +323,30 @@ check('the face reads left of the solid, not over it',
 check('and the wireframe stays at full strength',
   Number(rest.opacity) === 1, rest.opacity)
 
-// Too fast to read means no numbers at all, just a blur.
-await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.rollUpgrades = 60 })()`)
+// Too fast to read still shows a real face rather than the die's average.
+//
+// It used to print the average, which is the honest number over a run of rolls
+// and reads as a dead one: the same digit every frame with the dice visibly
+// tumbling under it, so the column looked stuck exactly where the table got
+// fast. The batched path rolls real faces every tick whether or not anything
+// reads them, so there is always a true number to show.
+await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.autoRollOn = true; s.rollUpgrades = 60 })()`)
 await sleep(150)
-const blur = await ev(`({ face: document.querySelector('.solid-face').textContent })`)
-check('an unreadable roll rate shows the average, as a whole number',
-  blur.face === '2', JSON.stringify(blur))
+const blur = await ev(`(() => {
+  const seen = []
+  return new Promise(done => {
+    const t = setInterval(() => {
+      seen.push(document.querySelector('.solid-face').textContent)
+      if (seen.length >= 12) { clearInterval(t); done(seen) }
+    }, 60)
+  })
+})()`)
+const faces = blur.map(Number)
+check('an unreadable roll rate still shows a landed face',
+  faces.every((f) => Number.isInteger(f) && f >= 1 && f <= 4), JSON.stringify(blur))
+// A d4's average is 2.5, so the old behaviour printed a flat 2 forever. Any
+// variation at all proves these are rolls and not that number.
+check('and it is a real roll, not one number held', new Set(faces).size > 1, JSON.stringify(blur))
 
 // A row you own none of sits the throw out: no face, and its wireframe does
 // not move while the ones with dice on them do.

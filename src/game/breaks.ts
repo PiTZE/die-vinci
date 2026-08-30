@@ -41,6 +41,13 @@ export const WAGER_AUTOBUYER = 'wager'
 const DIVISOR = 308
 const OFFSET = 0.75
 
+/**
+ * Where the price climb starts steepening from, with neither upgrade bought.
+ * AD's is ten, in `Player.tickSpeedMultDecrease` and `dimensionMultDecrease`,
+ * both written as `10 - Effects.sum(...)`.
+ */
+const SCALE_BASE = 10
+
 export function chipsFrom(s: GameState): Decimal {
   const base = s.broke
     ? Decimal.pow10(Math.max(0, s.inkThisWager.log10()) / DIVISOR - OFFSET).floor().max(1)
@@ -259,15 +266,28 @@ export function breakMultiplier(s: GameState): Decimal {
   return out
 }
 
-/** How much each roll rate level costs, after SHORTER ODDS. */
-export function rollCostStep(s: GameState, base: number): number {
-  return Math.max(2, base - breakLevel(s, 'rollCostDown') * ((base - 2) / 8))
+/**
+ * How fast the price climb itself steepens past the wall, which is the only
+ * thing these two upgrades touch.
+ *
+ * Both are AD's, down to the cost and the step count: SHORTER ODDS is
+ * `tickspeedCostMult`, 1e6 at x5 over eight levels, and CHEAPER PLATES is
+ * `dimCostMult`, 1e7 at x5e3 over seven. AD's description says what they are
+ * for in as many words, "Reduce post-infinity Tickspeed Upgrade cost
+ * multiplier scaling", and its effect is a flat `10 - level` on the scale.
+ *
+ * They used to reduce the plain geometric ratio here instead, because there
+ * was no scaling for them to reduce. There is now, so they do what AD's do.
+ * Below the wall the price climb is untouched by either, which is also AD:
+ * `Player.tickSpeedMultDecrease` only ever reaches `costScale`, and
+ * `costScale` only ever reaches the term past `scalingCostThreshold`.
+ */
+export function rollCostScale(s: GameState): number {
+  return SCALE_BASE - breakLevel(s, 'rollCostDown')
 }
 
-/** What a solid's per-ten cost multiplier is divided by, after CHEAPER PLATES. */
-export function solidCostRelief(s: GameState): number {
-  const n = breakLevel(s, 'solidCostDown')
-  return n === 0 ? 1 : Math.pow(10, n * 0.25)
+export function solidCostScale(s: GameState): number {
+  return SCALE_BASE - breakLevel(s, 'solidCostDown')
 }
 
 export function folioStrengthBonus(s: GameState): number {

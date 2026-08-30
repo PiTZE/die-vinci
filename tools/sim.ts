@@ -163,8 +163,21 @@ function spendChips(): void {
   }
   if (!breakableAt && B.canBreak(s)) breakableAt = t
   if (!s.broke && B.canBreak(s)) {
-    B.toggleBreak(s)
+    B.breakWager(s)
     brokeAt = t
+  }
+
+  // The break grid, cheapest first, which is what a player reading a row of
+  // prices does. Without this the sim never bought SHORTER ODDS or CHEAPER
+  // PLATES, and those are the two upgrades the wall exists to be pushed
+  // against, so a broken run was being measured with its levers untouched.
+  for (let pass = 0; pass < 200; pass++) {
+    const next = B.BREAK_UPGRADES
+      .map((d) => d.id)
+      .filter((id) => B.canBuyBreak(s, id))
+      .sort((x, y) => (B.breakCost(s, x).lt(B.breakCost(s, y)) ? -1 : 1))[0]
+    if (!next) break
+    B.buyBreak(s, next)
   }
 }
 

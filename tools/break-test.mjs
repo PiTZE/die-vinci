@@ -167,17 +167,44 @@ const rebuy = await ev(`(() => { const s = window.LD.state, D = window.LD.Decima
 check('a rebuyable climbs x5 a level', rebuy.costs[1] / rebuy.costs[0] === 5, JSON.stringify(rebuy.costs))
 check('and stops at its cap', rebuy.capped === 8, `level ${rebuy.capped}`)
 
-// SHORTER ODDS has to actually move the number the whole run is paced by.
-const odds = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.rollUpgrades = 10
+// SHORTER ODDS reduces the cost scaling past the wall and nothing below it,
+// which is what AD's tickspeedCostMult does. Its description says so outright:
+// "Reduce post-infinity Tickspeed Upgrade cost multiplier scaling". Level 10
+// is far below 1.8e308, so the price there must not move; past the wall it
+// must move enormously, or the upgrade the break layer is paced by does
+// nothing.
+const odds = await ev(`(() => { const s = window.LD.state
+  const at = (n, lvl) => { s.rollUpgrades = n; s.breakRebuyables = lvl ? { rollCostDown: lvl } : {}
+    return window.LD.rollCost(s).toString() }
+  // In log10, because these numbers are past what a double can hold and
+  // Number("4e67578") is Infinity, which compares equal to itself.
+  const lg = (n, lvl) => { s.rollUpgrades = n; s.breakRebuyables = lvl ? { rollCostDown: lvl } : {}
+    return window.LD.rollCost(s).log10() }
+  const out = { belowPlain: at(10, 0), belowMaxed: at(10, 8),
+                overPlain: lg(600, 0), overMaxed: lg(600, 8) }
+  s.rollUpgrades = 0; s.breakRebuyables = {}
+  return out })()`)
+check('SHORTER ODDS leaves the price below the wall alone',
+  odds.belowMaxed === odds.belowPlain, JSON.stringify([odds.belowPlain, odds.belowMaxed]))
+check('SHORTER ODDS cuts the climb past the wall',
+  odds.overMaxed < odds.overPlain - 1000,
+  `1e${Math.round(odds.overPlain)} -> 1e${Math.round(odds.overMaxed)} at level 600`)
+
+// And the wall itself: the price climb has to steepen past 1.8e308, or a
+// broken run has nothing to push against. Ten levels either side of it.
+const wall = await ev(`(() => { const s = window.LD.state
   s.breakRebuyables = {}
-  const before = window.LD.rollCost(s).toString()
-  s.breakRebuyables = { rollCostDown: 8 }
-  const after = window.LD.rollCost(s).toString()
-  s.breakRebuyables = {}
-  return { before, after } })()`)
-check('SHORTER ODDS makes roll rate cheaper to climb',
-  Number(odds.after) < Number(odds.before) / 1e6, JSON.stringify(odds))
+  const at = n => { s.rollUpgrades = n; return window.LD.rollCost(s).log10() }
+  // The step between consecutive levels is flat below the wall and grows past
+  // it, which is the whole of AD's 0.5 e (e+1) log(scale) term.
+  const below = at(101) - at(100)
+  const over = at(601) - at(600)
+  s.rollUpgrades = 0
+  return { below, over } })()`)
+check('below the wall the climb is flat x20 a level',
+  Math.abs(wall.below - Math.log10(20)) < 1e-9, String(wall.below))
+check('past the wall the climb itself steepens', wall.over > wall.below * 100,
+  `${wall.below.toFixed(3)} -> ${wall.over.toFixed(3)} orders a level`)
 
 // The chip multiplier is AD's ipMult: x2 a purchase, 10^(n+1) to buy.
 const mult = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
