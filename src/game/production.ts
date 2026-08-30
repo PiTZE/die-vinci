@@ -201,14 +201,17 @@ export function canBuyGroup(s: GameState, idx: number): boolean {
 
 export function canBuySolid(s: GameState, idx: number): boolean {
   if (idx > openSolids(s)) return false
-  if (overThreshold(s, buyPrice(s, idx))) return false
+  // Priced once. This runs on every row of every UI update and again inside
+  // MAX, and buyPrice is three Decimal multiplications and a division.
+  const price = buyPrice(s, idx)
+  if (overThreshold(s, price)) return false
   const r = restrictions(s)
   if (r.payWithOffset > 0) {
     const from = idx - r.payWithOffset
     if (from < 1) return false
-    return s.solids[from - 1].amount.gte(buyPrice(s, idx))
+    return s.solids[from - 1].amount.gte(price)
   }
-  return s.ink.gte(buyPrice(s, idx))
+  return s.ink.gte(price)
 }
 
 /** `one` is the shift-click path: a single die at the current tier price. */
@@ -435,7 +438,92 @@ export function buyFolio(s: GameState): boolean {
 // -- max all --------------------------------------------------------------
 
 /** A bound so a corrupt or infinite ink value cannot lock the main thread. */
-const MAX_ALL_STEPS = 5000
+/** 2^64 groups of ten. The loop exits on the first pass that buys nothing. */
+const MAX_ALL_PASSES = 64
+
+/**
+ * Buys up to `groups` whole groups of ten, in one step, at the exact price.
+ *
+ * A group of ten costs `baseCost x costFactor x 10` times the per-ten
+ * multiplier raised to the number of groups already owned, so the price of a
+ * run of groups is a geometric series and both halves of it have a closed
+ * form. `Decimal.affordGeometricSeries` gives how many the wallet covers and
+ * `Decimal.sumGeometricSeries` gives what they cost, each in constant time.
+ *
+ * This is Antimatter Dimensions' `ExponentialCostScaling.getMaxBought`, which
+ * `buyMaxDimension` calls once and applies once rather than counting up to.
+ * AD works in log space with plain doubles and touches Decimal twice, at
+ * `money.log10()` and `Decimal.pow10(logPrice)`; break_infinity ships the same
+ * solution, so there is no reason to hand-roll the logarithms here.
+ *
+ * One deliberate departure. AD charges only the most expensive item in a bulk
+ * purchase, and says so: "this assumes you only have to pay for the most
+ * expensive thing you get when you buy in bulk." At our smallest per-ten
+ * multiplier, a x1000 cut to about x17.8 by CHEAPER PLATES at full level, that
+ * would hand back roughly 6% of every MAX. The exact sum costs the same one
+ * call, so MAX pays what it has always paid and no balance moves.
+ */
+function buySolidGroups(s: GameState, idx: number, groups: number): boolean {
+  if (idx > openSolids(s)) return false
+  const r = restrictions(s)
+  // A challenge that pays out of the solid two rungs up keeps the single-group
+  // path. That wallet is a die count rather than ink, it never runs away, and
+  // the series would have to be written against a different currency to no end.
+  if (r.payWithOffset > 0) return canBuySolid(s, idx) && buySolid(s, idx)
+
+  const st = s.solids[idx - 1]
+  let did = false
+
+  // Buy up to the next boundary first, at the current price, which is what
+  // buyMaxDimension does before it bulk-buys. buySolid buys what the ink
+  // covers and never crosses into the next price tier, so this one call is
+  // both the top-up of a part-filled group and the whole of the early game,
+  // where a group of ten is far out of reach and dice are bought one at a
+  // time. Skipping it because the group was aligned left a new game unable to
+  // buy its first tetrahedron.
+  const startGroup = Math.floor(st.bought / 10)
+  if (canBuySolid(s, idx) && buySolid(s, idx)) did = true
+  // Ink ran out inside the group. There is nothing to bulk with.
+  if (st.bought % 10 !== 0) return did
+
+  const left = groups - (Math.floor(st.bought / 10) - startGroup)
+  if (left < 1) return did
+
+  const def = SOLIDS[idx - 1]
+  const ratio = def.costMult.div(solidCostRelief(s))
+  const first = def.baseCost.times(modifiers(s).costFactor).times(10)
+  const owned = st.bought / 10
+  const afford = Decimal.affordGeometricSeries(s.ink, first, ratio, owned).toNumber()
+  if (!Number.isFinite(afford) || afford < 1) return did
+
+  const n = Math.min(afford, left)
+  const price = Decimal.sumGeometricSeries(n, first, ratio, owned)
+  if (overThreshold(s, price) || s.ink.lt(price)) return did
+
+  s.ink = s.ink.minus(price)
+  st.bought += n * 10
+  st.amount = st.amount.plus(n * 10)
+  if (r.eraseLower) for (let i = 0; i < idx - 1; i++) s.solids[i].amount = new Decimal(0)
+  if (r.haltMs > 0) s.haltMs = r.haltMs
+  return true
+}
+
+/** The same series, on the roll rate, which climbs by a fixed step a level. */
+function buyRollRateBulk(s: GameState, levels: number): boolean {
+  if (restrictions(s).noRollRate || levels < 1) return false
+  const step = new Decimal(rollCostStep(s, ROLL_COST_MULT.toNumber()))
+  const first = ROLL_COST_BASE.times(modifiers(s).rollCostFactor)
+  const afford = Decimal.affordGeometricSeries(s.ink, first, step, s.rollUpgrades).toNumber()
+  if (!Number.isFinite(afford) || afford < 1) return false
+
+  const n = Math.min(afford, levels)
+  const price = Decimal.sumGeometricSeries(n, first, step, s.rollUpgrades)
+  if (overThreshold(s, price) || s.ink.lt(price)) return false
+
+  s.ink = s.ink.minus(price)
+  s.rollUpgrades += n
+  return true
+}
 
 export function canMaxAll(s: GameState): boolean {
   if (canBuyRollRate(s)) return true
@@ -458,30 +546,36 @@ export function canMaxAll(s: GameState): boolean {
  */
 export function maxAll(s: GameState): void {
   const open = openSolids(s)
-  for (let pass = 0; pass < MAX_ALL_STEPS; pass++) {
+
+  // Each pass hands every tier the same allowance, and the allowance doubles.
+  //
+  // The round robin is the whole point and it stays. Deepest first, because a
+  // doubling on a deep solid compounds through every tier below it, and the
+  // same ink at the shallow end only multiplies the last step. Letting one
+  // tier take everything it can afford is exactly the bug this loop was
+  // written against: at 1e7 ink with four solids open it bought ten d12 and
+  // left d4, d6 and d8 at zero, so nothing made ink at all.
+  //
+  // What changed is the number of passes. One group of ten per tier per pass
+  // meant fifty thousand dice took five thousand passes, which measured at
+  // 295ms against a 60ms hold repeat, so holding M queued calls faster than
+  // they finished. Doubling turns a million groups into twenty passes.
+  let allowance = 1
+  for (let pass = 0; pass < MAX_ALL_PASSES; pass++) {
     let did = false
 
-    // Deepest first. A doubling on a deep solid compounds through every tier
-    // below it; the same ink at the shallow end only multiplies the last step.
-    //
-    // Each tier takes only what fills its current group of ten, because that is
-    // where the x2 is, and then the pass moves on. Antimatter Dimensions does
-    // the same in buyMaxDimension: buy until ten, then consider bulk. Picking
-    // the single most expensive affordable row instead was what emptied the
-    // wallet into one tier: at 1e7 ink with four solids open it bought ten d12
-    // and left d4, d6 and d8 at zero, so nothing made ink at all.
     for (let idx = open; idx >= 1; idx--) {
-      if (!canBuySolid(s, idx)) continue
-      if (buySolid(s, idx)) did = true
+      if (buySolidGroups(s, idx, allowance)) did = true
     }
 
     // Roll rate last, after the chain, which is where AD buys tickspeed. And
     // never onto an empty table: roll rate multiplies what the dice pay, so
     // with no dice it multiplies nothing, and ink can only come from a die.
     const canProduce = s.solids.slice(0, open).some((d) => d.amount.gt(0))
-    if (canProduce && canBuyRollRate(s) && buyRollRate(s)) did = true
+    if (canProduce && buyRollRateBulk(s, allowance)) did = true
 
     if (!did) return
+    allowance *= 2
   }
 }
 
