@@ -156,6 +156,23 @@ export function buyPrice(s: GameState, idx: number): Decimal {
   return solidCost(s, idx).times(buyCount(s, idx))
 }
 
+/**
+ * A price past the threshold, while the threshold still holds.
+ *
+ * Antimatter Dimensions puts its wall here rather than on the wallet.
+ * Tickspeed's `isAvailableForPurchase` reads `player.break || this.cost.lt(
+ * Decimal.NUMBER_MAX_VALUE)`, and every dimension's `isAffordable` opens with
+ * `if (!player.break && this.cost.gt(Decimal.NUMBER_MAX_VALUE)) return false`.
+ *
+ * It matters for one frame. Production lands at the end of a tick and the ink
+ * is pulled back to the threshold at the start of the next one, so a click
+ * placed between the two sees whatever the last roll paid. Pricing the wall
+ * closes that gap without pretending the number is smaller than it is.
+ */
+function overThreshold(s: GameState, cost: Decimal): boolean {
+  return ceilingHolds(s) && cost.gt(WAGER_AT)
+}
+
 /** Unlocked, and not cut off by a challenge that shortens the chain. */
 export function openSolids(s: GameState): number {
   return Math.min(unlockedSolids(s), restrictions(s).cap)
@@ -173,6 +190,7 @@ export function canBuyGroup(s: GameState, idx: number): boolean {
   if (idx > openSolids(s)) return false
   const r = restrictions(s)
   const need = solidCost(s, idx).times(10 - (s.solids[idx - 1].bought % 10))
+  if (overThreshold(s, need)) return false
   if (r.payWithOffset > 0) {
     const from = idx - r.payWithOffset
     if (from < 1) return false
@@ -183,6 +201,7 @@ export function canBuyGroup(s: GameState, idx: number): boolean {
 
 export function canBuySolid(s: GameState, idx: number): boolean {
   if (idx > openSolids(s)) return false
+  if (overThreshold(s, buyPrice(s, idx))) return false
   const r = restrictions(s)
   if (r.payWithOffset > 0) {
     const from = idx - r.payWithOffset
@@ -198,6 +217,7 @@ export function buySolid(s: GameState, idx: number, one = false): boolean {
   const r = restrictions(s)
   const n = one ? 1 : buyCount(s, idx)
   const price = solidCost(s, idx).times(n)
+  if (overThreshold(s, price)) return false
 
   if (r.payWithOffset > 0) {
     const from = idx - r.payWithOffset
@@ -229,16 +249,30 @@ export function rollPower(s: GameState): number {
   return rollIntervalMultiplier(s.folios * folioStrength(s) * folioStrengthBonus(s))
 }
 
-/** Seconds between rolls. */
-export function rollInterval(s: GameState): number {
-  const base = ROLL_INTERVAL_BASE * Math.pow(rollPower(s), s.rollUpgrades)
+/**
+ * Seconds between rolls, as a Decimal, because a double cannot hold it.
+ *
+ * Nine folios put the per-upgrade multiplier at about 0.486, so the interval
+ * halves every purchase. At 984 upgrades it falls below 5.6e-309, the smallest
+ * double whose reciprocal is still finite, and `1 / interval` becomes
+ * Infinity: the roll count overflows, `Decimal.times(Infinity)` returns a
+ * malformed zero, and every row pays nothing on a save that cannot be undone
+ * from the UI. That happened.
+ *
+ * Antimatter Dimensions never meets it because tickspeed is a Decimal the
+ * whole way down. `Tickspeed.baseValue` is `DC.E3.times(mult.pow(upgrades))`
+ * and `perSecond` is `Decimal.divide(1000, current)`, so its equivalent wall
+ * sits around twenty million upgrades rather than a thousand.
+ */
+export function rollInterval(s: GameState): Decimal {
+  const base = Decimal.pow(rollPower(s), s.rollUpgrades).times(ROLL_INTERVAL_BASE)
   // VII The Chariot speeds it up, XV The Devil slows it down. A multiplier on
   // the rate is a divisor on the interval.
-  return base / modifiers(s).rollRateMult
+  return base.div(modifiers(s).rollRateMult)
 }
 
-export function rollRate(s: GameState): number {
-  return 1 / rollInterval(s)
+export function rollRate(s: GameState): Decimal {
+  return new Decimal(1).div(rollInterval(s))
 }
 
 export function rollCost(s: GameState): Decimal {
@@ -252,6 +286,7 @@ export function rollCost(s: GameState): Decimal {
 
 export function canBuyRollRate(s: GameState): boolean {
   if (restrictions(s).noRollRate) return false
+  if (overThreshold(s, rollCost(s))) return false
   return s.ink.gte(rollCost(s))
 }
 
@@ -527,9 +562,17 @@ export function rollFace(faces: number, bias = 0): number {
   return Math.min(faces, 1 + Math.floor(u * faces))
 }
 
-/** Seconds one roll takes. The dice spin for exactly this long. */
+/**
+ * Seconds one roll takes, as a plain number, for the animation and the sound.
+ *
+ * The engine works in Decimal; a tumble does not. Anything the UI cares about
+ * happens above FACE_READABLE_S, and everything below it is a blur, so
+ * flattening to a double here loses nothing that could be seen. Past the point
+ * where a double underflows this reads zero, and every caller already treats
+ * zero as "too fast to draw".
+ */
 export function rollDuration(s: GameState): number {
-  return rollInterval(s)
+  return rollInterval(s).toNumber()
 }
 
 /**
@@ -602,7 +645,7 @@ export const FACE_READABLE_S = 0.18
  * the faces average to 1 and applying them separately would cost a Decimal
  * pass each for no visible difference.
  */
-function produce(s: GameState, rolls: number, factors: number[]): void {
+function produce(s: GameState, rolls: Decimal, factors: number[]): void {
   // openSolids, not unlockedSolids: a challenge that shortens the chain takes
   // the deep solids off the table, and off the table means out of the roll.
   const n = openSolids(s)
@@ -681,7 +724,7 @@ function resolveOneRoll(s: GameState): void {
     }
   }
 
-  produce(s, 1, factors)
+  produce(s, new Decimal(1), factors)
 }
 
 /**
@@ -689,7 +732,7 @@ function resolveOneRoll(s: GameState): void {
  * frame so the dice look alive, but production uses the mean, which is what a
  * thousand independent rolls a second converges to anyway.
  */
-function resolveManyRolls(s: GameState, count: number): void {
+function resolveManyRolls(s: GameState, count: Decimal): void {
   for (let i = 0; i < s.solids.length; i++) {
     s.faces[i] = rolls(s, i) ? rollFace(SOLIDS[i].faces, faceBias(s)) : 0
   }
@@ -700,10 +743,11 @@ function resolveManyRolls(s: GameState, count: number): void {
   produce(s, count, s.solids.map((_, i) => (rolls(s, i) ? meanFace(SOLIDS[i].faces, bias) : 0)))
 }
 
-function applyRolls(s: GameState, count: number): void {
-  if (count <= 0) return
-  if (count <= ROLLS_DRAWN_INDIVIDUALLY) {
-    for (let i = 0; i < count; i++) resolveOneRoll(s)
+function applyRolls(s: GameState, count: Decimal): void {
+  if (count.lte(0)) return
+  if (count.lte(ROLLS_DRAWN_INDIVIDUALLY)) {
+    const n = count.toNumber()
+    for (let i = 0; i < n; i++) resolveOneRoll(s)
   } else {
     resolveManyRolls(s, count)
   }
@@ -779,11 +823,24 @@ export function tick(s: GameState, dt: number, now: number): void {
   // up its real value on the first tick instead of claiming one solid.
   s.stats.solidsEver = Math.max(s.stats.solidsEver ?? 0, unlockedSolids(s))
 
-  // Ink held is clamped whether or not the run is over, because ink held can
-  // exceed what the run has earned and a double has nowhere left to put it.
-  // The clamp is a clamp and nothing more; what ends the run is the line
-  // below, which asks what the run earned.
-  if (s.ink.gt(WAGER_AT)) s.ink = WAGER_AT
+  // Ink is held to the threshold only while the threshold is a threshold.
+  //
+  // Unconditional, this was a bug with two faces. The clamp runs at the top of
+  // the tick and the dice pay out at the bottom, so the autobuyers, which run
+  // in between, never saw more than 1.8e308 and stalled at roll upgrade 236
+  // for the rest of the game, while a button press, which runs between ticks,
+  // saw the real number and bought as far as it liked. The only thing that
+  // worked after breaking was holding FASTER by hand, and holding FASTER by
+  // hand is what walked one save off the end of a double.
+  //
+  // Antimatter Dimensions gates the same thing on `player.break`, and it never
+  // caps antimatter at all: its currency setter has no ceiling, the Infinity
+  // you see before breaking is the notation rule `ui.formatPreBreak &&
+  // gte(NUMBER_MAX_VALUE)`, and what it actually enforces is on prices.
+  // See overThreshold below, which is that.
+  //
+  // What ends the run is the line after this, which asks what the run earned.
+  if (ceilingHolds(s) && s.ink.gt(WAGER_AT)) s.ink = WAGER_AT
 
   // Everything stops at the threshold, dice included. Letting the chain run on
   // past it would only be counting into a number the game has already declared
@@ -818,7 +875,11 @@ export function tick(s: GameState, dt: number, now: number): void {
     wager: () => autoWager(s),
   })
 
-  const interval = rollInterval(s)
+  // Seconds per roll for the bookkeeping below, which only needs a double
+  // while a roll is slow enough to be watched. Everything faster is settled in
+  // Decimal, so an interval a double cannot represent reads zero here and
+  // takes the continuous path, which is where it belongs anyway.
+  const interval = rollDuration(s)
 
   // By hand: nothing happens until a spin finishes, and the dice pay out when
   // they land rather than while they are in the air.
@@ -838,20 +899,40 @@ export function tick(s: GameState, dt: number, now: number): void {
       // of catch-up belongs to the away path, which has its own budget.
       const held = Math.min(CATCHUP_AFTER_S, (now - s.rollStartedAt) / 1000)
       s.rollStartedAt = 0
-      applyRolls(s, Math.max(1, Math.floor(held / interval)))
+      applyRolls(s, Decimal.max(1, rollRate(s).times(held).floor()))
     }
     return
   }
 
-  // Automated: rolls land back to back for as long as the elapsed time covers.
+  // Automated, and past the point where a roll can be watched: a rate times
+  // elapsed time, with no count of rolls anywhere in it.
+  //
+  // This is how Antimatter Dimensions runs its entire loop. Dimension.
+  // productionForDiff is productionPerSecond.times(diff / 1000) and there is no
+  // tick count in the engine at all. A count is a JS integer, and no JS integer
+  // holds 1e310 of anything; floor(accum / interval) came back Infinity, which
+  // poisoned rollAccum to -Infinity and made every Decimal it touched a zero.
   s.rollAccum += dt
-  if (interval <= 0) return
-  const rolls = Math.floor(s.rollAccum / interval)
-  // When the current roll began, so the animation can run off the same clock
-  // the manual one does and stay in phase with the faces it lands on.
-  s.rollStartedAt = now - Math.min(s.rollAccum, interval) * 1000
-  if (rolls <= 0) return
-  s.rollAccum -= rolls * interval
-  s.rollStartedAt = now - s.rollAccum * 1000
-  applyRolls(s, rolls)
+
+  // Few enough in the window to draw one at a time, which is the boundary
+  // applyRolls already drew and the one the cards that read faces against each
+  // other depend on. The leftover carries, so the tumble stays in phase with
+  // the faces it lands on.
+  if (interval > 0 && s.rollAccum / interval <= ROLLS_DRAWN_INDIVIDUALLY) {
+    const rolls = Math.floor(s.rollAccum / interval)
+    // When the current roll began, so the animation can run off the same clock
+    // the manual one does.
+    s.rollStartedAt = now - Math.min(s.rollAccum, interval) * 1000
+    if (rolls <= 0) return
+    s.rollAccum -= rolls * interval
+    s.rollStartedAt = now - s.rollAccum * 1000
+    applyRolls(s, new Decimal(rolls))
+    return
+  }
+
+  // Past that the faces were already being averaged, so nothing is lost by
+  // dropping the count entirely and taking a rate times elapsed time instead.
+  s.rollAccum = 0
+  s.rollStartedAt = now
+  resolveManyRolls(s, rollRate(s).times(dt))
 }

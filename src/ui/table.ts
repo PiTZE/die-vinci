@@ -1,4 +1,3 @@
-import Decimal from 'break_infinity.js'
 import { SOLIDS } from '../game/solids'
 import {
   buyCount,
@@ -18,7 +17,7 @@ import {
   solidMultiplier,
   studyReq,
   openSolids,
-  rollInterval,
+  rollDuration,
   rollProgress,
   rolling,
   mustWager,
@@ -415,7 +414,7 @@ export function tablePane(): Pane {
       // Every frame, whatever the refresh rate says. Fed from update() it moved
       // in as many steps a second as the readouts were redrawn, which at 100ms
       // is ten and reads as a stutter.
-      const duration = rollInterval(s)
+      const duration = rollDuration(s)
       const readable = duration >= FACE_READABLE_S
       const spinning = rolling(s) && s.haltMs <= 0 && !mustWager(s)
       setBlur(spinning && !readable)
@@ -459,7 +458,7 @@ export function tablePane(): Pane {
       wagerNow.textContent = confirm.isArmed('wager') ? 'SURE? THIS RESETS' : 'CALL THE WAGER'
       // Under a fast roll rate the digit would change every frame, which is
       // noise rather than a reading. The dice just spin then.
-      const duration = rollInterval(s)
+      const duration = rollDuration(s)
       const readable = duration >= FACE_READABLE_S
 
       // The throw itself is driven from animate(), every frame. Feeding it from
@@ -626,7 +625,7 @@ export function tablePane(): Pane {
         runLens.set(wagerProgress(s))
       }
 
-      setText(rollLine, `${format(new Decimal(rate), n)}/s`)
+      setText(rollLine, `${format(rate, n)}/s`)
       const rc = rollCost(s)
       duo(rollBtn, 'FASTER', `${format(rc, n)} INK`)
       const canRoll = steady.on('faster', canBuyRollRate(s), now)

@@ -23,7 +23,7 @@ import {
   meltUnlocked,
   meanFace,
   rollFace as __rollFace,
-  rollInterval,
+  rollDuration,
   tick,
 } from './game/production'
 import { publishAway, simulateAway } from './game/offline'
@@ -234,7 +234,7 @@ const actions: Actions = {
     // without one, and a roll is always one.
     // Below this the shake loop is carrying the sound, and a throw on top of
     // it would be one more thing in an already continuous rattle.
-    if (state.options.sound && rollInterval(state) >= THROW_ABOVE_S) playThrow()
+    if (state.options.sound && rollDuration(state) >= THROW_ABOVE_S) playThrow()
   },
   buyAutomator: () => {
     buyAutomator(state)
@@ -625,7 +625,7 @@ const hook: Record<string, unknown> = {
   canMelt,
   meltGain,
   get rollInterval() {
-    return rollInterval(state)
+    return rollDuration(state)
   },
   // Exposed so the die-loading maths can be checked against samples rather
   // than trusted. Pure functions; neither touches the save.

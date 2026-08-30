@@ -193,6 +193,13 @@ function decode(raw: Raw, now: number): GameState {
   // brings this back as null. Left alone, "your fastest Wager" would read as
   // zero milliseconds and pay the cap for a run nobody has made.
   if (!Number.isFinite(s.stats.bestWagerMs)) s.stats.bestWagerMs = Infinity
+  // Same reason, opposite direction. A roll count used to overflow once the
+  // interval underflowed a double, which left rollAccum at -Infinity and
+  // rollStartedAt at +Infinity, and JSON writes both of those as null. The
+  // overflow is gone, but a save written while it was there still carries it,
+  // and a null accumulator would never resolve another roll.
+  if (!Number.isFinite(s.rollAccum)) s.rollAccum = 0
+  if (!Number.isFinite(s.rollStartedAt)) s.rollStartedAt = 0
   return s
 }
 

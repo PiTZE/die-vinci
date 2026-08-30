@@ -313,7 +313,7 @@ if (done < WAGERS) {
   )
   console.log(
     `  solids open: ${P.openSolids(s)}/${SOLIDS.length}   studies: ${s.studies}   folios: ${s.folios}   ` +
-      `roll: ${s.rollUpgrades} (${(1 / P.rollInterval(s)).toFixed(1)}/s)`,
+      `roll: ${s.rollUpgrades} (${P.rollRate(s).toExponential(1)}/s)`,
   )
   console.log(`  automator at ${automatorAt ? hms(automatorAt) : 'never'}`)
   console.log(`  peak ink ${format(peak, 'scientific')} at ${hms(peakAt)}`)
