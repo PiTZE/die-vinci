@@ -31,24 +31,39 @@ function mantissaString(m: number, places: number): string {
   return fixed.includes('.') ? fixed.replace(/\.?0+$/, '') : fixed
 }
 
-function scientific(d: Decimal, places: number): string {
-  const e = d.exponent
+/**
+ * Mantissa and exponent, with the rounding carried.
+ *
+ * 9.995 at two places rounds to "10", and the readout then said 10e129, which
+ * is not a number anyone writes. The carry has to happen before the exponent
+ * is read, not after, so every notation below takes its parts from here rather
+ * than off the Decimal.
+ *
+ * Found in the bar rather than reasoned about: the esperienza readout printed
+ * 10e129 next to a multiplier of x9.99e909.
+ */
+function parts(d: Decimal, places: number): { m: number; e: number } {
   const m = d.mantissa
+  const e = d.exponent
+  return Number(m.toFixed(places)) >= 10 ? { m: m / 10, e: e + 1 } : { m, e }
+}
+
+function scientific(d: Decimal, places: number): string {
+  const { m, e } = parts(d, places)
   return `${mantissaString(m, places)}e${e}`
 }
 
 function engineering(d: Decimal, places: number): string {
-  const e = d.exponent
+  const { m, e } = parts(d, places)
   const shift = ((e % 3) + 3) % 3
-  const m = d.mantissa * Math.pow(10, shift)
-  return `${mantissaString(m, places)}e${e - shift}`
+  return `${mantissaString(m * Math.pow(10, shift), places)}e${e - shift}`
 }
 
 function letters(d: Decimal, places: number): string {
-  const tier = Math.floor(d.exponent / 3)
-  if (tier < 1 || tier >= LETTERS.length) return scientific(d, places)
-  const m = d.mantissa * Math.pow(10, d.exponent - tier * 3)
-  return `${mantissaString(m, places)}${LETTERS[tier]}`
+  const { m, e } = parts(d, places)
+  const tier = Math.floor(e / 3)
+  if (tier < 1 || tier >= LETTERS.length) return `${mantissaString(m, places)}e${e}`
+  return `${mantissaString(m * Math.pow(10, e - tier * 3), places)}${LETTERS[tier]}`
 }
 
 /**
@@ -60,7 +75,9 @@ function letters(d: Decimal, places: number): string {
 const MIXED_SWITCH_EXPONENT = 33
 
 function mixed(d: Decimal, places: number): string {
-  return d.exponent < MIXED_SWITCH_EXPONENT ? letters(d, places) : scientific(d, places)
+  // The switch reads the carried exponent too, so 9.999e32 prints 1.00e33
+  // rather than 10.00No on the wrong side of the boundary.
+  return parts(d, places).e < MIXED_SWITCH_EXPONENT ? letters(d, places) : scientific(d, places)
 }
 
 /**
