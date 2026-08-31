@@ -213,3 +213,33 @@ export function folioRequirement(owned: number): number {
  * this go" was "look it up".
  */
 export const ARCANA_MAX_LEVEL = 9
+
+// -- I The Magician, which loads the dice ---------------------------------
+//
+// `rollFace` has taken a bias since it was written, and nothing moved it until
+// this card. A uniform draw raised to the power 1 - b: at 0 every face is
+// equally likely, and as b approaches 1 the die always shows its maximum.
+//
+// The level curve saturates rather than stepping, which is the one place a
+// card here departs from the plain `1 + L x k` every other one uses. A
+// multiplier has no ceiling and a bias does: it cannot pass 1, and at 1 the
+// die is not a die. A linear step either wastes the last levels against the
+// cap or wastes the first ones being imperceptible, so this closes a fixed
+// share of the gap to the cap per level. Every level is worth taking and none
+// of them reaches the end.
+//
+// What it is worth measured: six Wagers in 1h25m against 1h29m taking no card
+// at all, which puts it beside The Fool and Wheel of Fortune, the other two
+// mid-tier cards. The effect it replaced was worth one minute in the same
+// test, at any magnitude.
+
+/** Share of the remaining gap to the cap that one level closes. */
+export const MAGICIAN_BIAS_RATE = 0.25
+
+/** Where the loading stops. Nine levels reach 0.79 of it. */
+export const MAGICIAN_BIAS_CAP = 0.85
+
+export function magicianBias(level: number): number {
+  if (level <= 0) return 0
+  return MAGICIAN_BIAS_CAP * (1 - Math.pow(1 - MAGICIAN_BIAS_RATE, level))
+}

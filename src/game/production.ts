@@ -746,12 +746,21 @@ const meanCache = new Map<string, number>()
  * How far the dice are loaded, 0 to 1. Zero is a fair die. One always lands on
  * its highest face.
  *
- * Nothing moves this yet. It is here because the upgrade that does is coming,
- * and a fair die is just the b = 0 case of a loaded one, so the two do not
- * need separate code paths.
+ * I The Magician is the only thing that moves it. Isaac's Magician grants
+ * homing tears for the room: your shots find what you are aiming at. Here the
+ * dice do, and that is the whole card.
+ *
+ * The bias was written before anything used it, on the grounds that a fair die
+ * is the b = 0 case of a loaded one and the two should not need separate code
+ * paths. That turned out to be the right bet: the card is a number in the
+ * modifier bundle, and `test:roll` was already sampling the machinery at four
+ * bias levels against meanFace's prediction.
+ *
+ * Read through modifiers rather than off the card, so the challenge that runs
+ * with the deck face down takes the loading away with everything else.
  */
-export function faceBias(_s: GameState): number {
-  return 0
+export function faceBias(s: GameState): number {
+  return modifiers(s).faceBias
 }
 
 /**
@@ -874,10 +883,6 @@ function produce(s: GameState, rolls: Decimal, factors: number[]): void {
       .times(rolls)
       .times(m.globalMult)
     s.solids[i - 2].amount = s.solids[i - 2].amount.plus(made)
-    // I The Magician: a share also lands two tiers down, skipping a rung.
-    if (m.skip > 0 && i >= 3) {
-      s.solids[i - 3].amount = s.solids[i - 3].amount.plus(made.times(m.skip))
-    }
   }
 }
 

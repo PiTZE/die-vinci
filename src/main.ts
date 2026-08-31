@@ -22,6 +22,7 @@ import {
   meltGain,
   meltUnlocked,
   meanFace,
+  faceBias,
   rollFace as __rollFace,
   rollDuration,
   tick,
@@ -642,6 +643,9 @@ const hook: Record<string, unknown> = {
   // than trusted. Pure functions; neither touches the save.
   rollFace: __rollFace,
   meanFace,
+  // How far the dice are currently loaded, which is the whole of what I The
+  // Magician does and the only thing that moves it.
+  faceBias,
   channel: __CHANNEL__,
   version: __VERSION__,
   buildId: __BUILD_ID__,

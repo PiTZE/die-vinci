@@ -15,7 +15,7 @@
 // wasted draw.
 import Decimal from 'break_infinity.js'
 import type { GameState } from '../state'
-import { ARCANA_MAX_LEVEL } from './balance'
+import { ARCANA_MAX_LEVEL, magicianBias } from './balance'
 import { restrictions } from './challenges'
 
 export type ArcanaId =
@@ -39,11 +39,12 @@ export interface TarotDef {
    * The last level that does anything, and it is nine on every card.
    *
    * Three of them used to carry their own number, derived from where the
-   * effect stopped paying: the Magician's skip clamps at 0.8 and the World
-   * cannot open more of the table than there is. Those clamps are still in the
-   * formulas, so a card that runs out early still runs out early; what changed
-   * is that the answer to "how far does this go" is now the same on all
-   * twenty-two, and it is the same nine as the solids and the archive rows.
+   * effect stopped paying: the Magician's loading approaches MAGICIAN_BIAS_CAP
+   * and the World cannot open more of the table than there is. Those clamps
+   * are still in the formulas, so a card that runs out early still runs out
+   * early; what changed is that the answer to "how far does this go" is now
+   * the same on all twenty-two, and it is the same nine as the solids and the
+   * archive rows.
    */
   max: number
   /** Present and unused. Repentance gave every arcanum a reversed form, and
@@ -70,7 +71,7 @@ export const ARCANA: TarotDef[] = [
   T('fool', '0', 'The Fool', 'mid',
     'a folio keeps your studies'),
   T('magician', 'I', 'The Magician', 'mid',
-    'each solid also feeds the one two below it'),
+    'the dice are loaded, and land high'),
   T('priestess', 'II', 'The High Priestess', 'late',
     'your largest solid pays ink of its own'),
   T('empress', 'III', 'The Empress', 'early',
@@ -212,8 +213,13 @@ export interface Modifiers {
   solidExp: number
   /** Extra on the deepest unlocked solid alone. */
   topMult: Decimal
-  /** The share each solid also sends two tiers down instead of one. */
-  skip: number
+  /**
+   * How far the dice are loaded, 0 to 1. Zero is a fair die.
+   *
+   * In the bundle rather than read off the card, so the challenge that runs
+   * with the deck face down takes it away with everything else.
+   */
+  faceBias: number
   /** Extra face rolls, keeping the best. */
   rerolls: number
   /** What matching faces are worth, beyond the one they already pay. */
@@ -240,7 +246,7 @@ const NONE: Modifiers = {
   globalMult: new Decimal(1),
   solidExp: 1,
   topMult: new Decimal(1),
-  skip: 0,
+  faceBias: 0,
   rerolls: 0,
   pairBonus: 0,
   costFactor: 1,
@@ -336,8 +342,25 @@ export function modifiers(s: GameState): Modifiers {
   // IV The Emperor: the deep end.
   if (L('emperor')) m.topMult = new Decimal(1 + L('emperor') * 5)
 
-  // I The Magician: the chain reaches further.
-  if (L('magician')) m.skip = Math.min(0.8, L('magician') * 0.1)
+  // I The Magician: the dice find their mark.
+  //
+  // Isaac's Magician grants homing tears for the room, and homing is the whole
+  // idea: what you throw goes where you want it. Here that is a loaded die,
+  // which the engine has been able to roll since rollFace was written and
+  // nothing had yet asked it to.
+  //
+  // The effect it replaces could not matter at any magnitude. It fed each
+  // solid a share of its output two rungs down, and the chain's own step
+  // between rungs is orders of magnitude larger than anything a neighbour can
+  // donate: swept at 0.1, 0.5, 2 and 10, six Wagers took 1h49m at every single
+  // value, against 1h50m with no card at all. That was a design problem, not a
+  // tuning one.
+  //
+  // Loading the dice is not. The face is taken raw, so it multiplies every
+  // tier at once and compounds nine deep. At level nine a d72 averages 59.8
+  // rather than 36.5 and a d4 averages 3.4 rather than 2.5; see magicianBias
+  // in balance.ts for the curve and what it is worth measured.
+  if (L('magician')) m.faceBias = magicianBias(L('magician'))
 
   // X Wheel of Fortune, VI The Lovers: the two that are about dice.
   m.rerolls = L('wheel')
