@@ -1,5 +1,6 @@
 import Decimal from 'break_infinity.js'
 import { SOLIDS, SOLID_COUNT } from './game/solids'
+import { CODICES } from './game/codices'
 import {
   OFFLINE_TICKS_DEFAULT,
   UI_MS_DEFAULT,
@@ -14,6 +15,14 @@ import { newAutobuyers, type AutobuyerState } from './game/autobuyers'
 import { defaultConfirms } from './ui/confirm'
 import { THOUGHT_SPEED_DEFAULT } from './ui/thoughts'
 
+/** One codex: purchases made, and how many exist right now. */
+export interface CodexState {
+  /** Purchases. Each one hands over ten and multiplies this codex's output. */
+  bought: number
+  /** How many exist, including the ones the codex above produced. */
+  amount: Decimal
+}
+
 export interface SolidState {
   /** Purchases since the last reset. Drives the doubling every ten. */
   bought: number
@@ -27,6 +36,7 @@ export type TabId =
   | 'challenges'
   | 'tarot'
   | 'break'
+  | 'codices'
   | 'automation'
   | 'archive'
   | 'stats'
@@ -93,6 +103,21 @@ export interface GameState {
   breakUpgrades: string[]
   /** Break upgrade id to times bought, for the rebuyable ones. */
   breakRebuyables: Record<string, number>
+
+  // The codices: Antimatter Dimensions' Infinity Dimensions, bought with chips
+  // and surviving the Wager that clears everything below them. See
+  // game/codices.ts.
+  codices: CodexState[]
+  /** How many are open. They open in order, on how deep a run has gone. */
+  codexOpen: number
+  /** What the codices have made this run. Multiplies every solid. */
+  esperienza: Decimal
+  /**
+   * The most ink any single run has ever earned, which is what opens the next
+   * codex. AD's `records.thisEternity.maxAM`, kept for the whole save because
+   * there is no eternity here to take it away again.
+   */
+  deepestInk: Decimal
 
   options: {
     notation: NotationId
@@ -172,6 +197,10 @@ export function newGame(now: number): GameState {
     chipMult: 0,
     breakUpgrades: [],
     breakRebuyables: {},
+    codices: CODICES.map(() => ({ bought: 0, amount: new Decimal(0) })),
+    codexOpen: 0,
+    esperienza: new Decimal(1),
+    deepestInk: new Decimal(0),
     options: {
       notation: 'mixed',
       tab: 'table',

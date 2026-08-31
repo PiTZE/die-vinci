@@ -22,6 +22,7 @@ const nearWager = (s: GameState) => s.wagers > 0 || s.inkThisWager.gte('1e290')
 const afterWager = (s: GameState) => s.wagers > 0
 const hasTarot = (s: GameState) => s.wagers > 0
 const hasMelt = (s: GameState) => (s.tarot?.death ?? 0) > 0
+const hasCodices = (s: GameState) => (s.codexOpen ?? 0) > 0
 const afterAutobuyer = (s: GameState) =>
   s.challengesDone.length > 0 || Object.values(s.autobuyers).some((a) => a.unlocked)
 
@@ -115,6 +116,15 @@ const SECTIONS: Section[] = [
       'Death lets you melt the table. Everything below your deepest solid is destroyed, and what is left carries a multiplier for all of it.',
       'The multiplier replaces the one you had rather than adding to it, so melting early for a small number gains you nothing. The question is when, not whether.',
       'It is offered only when it would beat what you already hold.',
+    ],
+  },
+  {
+    title: 'THE CODICES',
+    needs: hasCodices,
+    body: [
+      'A second chain, bought with chips. A codex feeds the one below it and the first one makes esperienza, which multiplies every solid on the table.',
+      'A Wager keeps every codex you bought and takes back everything they produced, so a long run is worth more than a short one for the first time.',
+      'They open on how deep a single run has gone, not on what you can pay. Every threshold is past the old wall, which is the reason to run past it.',
     ],
   },
   {

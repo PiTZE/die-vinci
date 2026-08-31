@@ -243,3 +243,14 @@ export function magicianBias(level: number): number {
   if (level <= 0) return 0
   return MAGICIAN_BIAS_CAP * (1 - Math.pow(1 - MAGICIAN_BIAS_RATE, level))
 }
+
+// -- the codices, which are Infinity Dimensions ---------------------------
+
+/**
+ * The exponent esperienza is raised to before it multiplies a solid.
+ *
+ * Antimatter Dimensions' `InfinityDimensions.powerConversionRate`, which is 7
+ * before any glyph touches it, applied per dimension so it compounds through
+ * the chain. See codices.ts for the rest of it.
+ */
+export const CODEX_CONVERSION = 7

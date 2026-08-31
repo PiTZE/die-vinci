@@ -13,8 +13,10 @@ import { ARCANA } from './game/tarot'
 import { CHALLENGES } from './game/challenges'
 import { AUTOBUYERS, INTERVAL_FLOOR, unlock } from './game/autobuyers'
 import { breakWager } from './game/breaks'
+import { CODEX_COUNT, PER_PURCHASE, openCodices, openEarnedCodices } from './game/codices'
 import { doWager } from './game/wager'
 import { listBackups } from './backup'
+import { format } from './format'
 import type { GameState } from './state'
 
 export interface DevDeps {
@@ -49,6 +51,8 @@ const LINES = [
   'LD.challenges()      clear all 13 and take the autobuyers they award',
   'LD.autos()           every autobuyer unlocked and down at its 0.1s floor',
   'LD.break()           break the Wager',
+  'LD.deep(1e900)       set the deepest a run has earned, which opens codices',
+  'LD.codex(3)          buy that many purchases of every open codex',
   'LD.skip("2h")        simulate time away. also 90, "30m", "3d"',
   'LD.rich()            enough of everything to poke at the late game',
   'LD.backups()         what could be restored, and how old',
@@ -232,6 +236,28 @@ export function devTools(d: DevDeps): Record<string, unknown> {
       if (!breakWager(st)) return 'refused: the Wager autobuyer is not at its floor'
       touch()
       return 'broken. A Wager now pays by the overshoot'
+    },
+    deep(v: number | string) {
+      const st = s()
+      st.deepestInk = new Decimal(v)
+      const opened = openEarnedCodices(st)
+      touch()
+      return `${format(st.deepestInk, 'scientific')} deepest, ` +
+        `${openCodices(st)}/${CODEX_COUNT} codices open (+${opened})`
+    },
+    codex(n = 1) {
+      const st = s()
+      let got = 0
+      for (let idx = 1; idx <= openCodices(st); idx++) {
+        for (let k = 0; k < n; k++) {
+          const c = st.codices[idx - 1]
+          c.bought += 1
+          c.amount = c.amount.plus(PER_PURCHASE)
+          got += 1
+        }
+      }
+      touch()
+      return got ? `${got} purchases, free` : 'no codex is open yet. LD.deep() opens them'
     },
     skip(v: number | string) {
       const secs = seconds(v)

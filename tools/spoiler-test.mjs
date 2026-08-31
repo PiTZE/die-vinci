@@ -52,7 +52,8 @@ async function everything(tab) {
 }
 
 /** Words that give away a system the player has not reached. */
-const AHEAD = ['Wager', 'folio', 'Folio', 'challenge', 'Challenge', 'autobuyer', 'Autobuyer', 'point']
+const AHEAD = ['Wager', 'folio', 'Folio', 'challenge', 'Challenge', 'autobuyer', 'Autobuyer',
+  'point', 'codex', 'Codex', 'codices', 'Codices', 'esperienza', 'Esperienza']
 
 const freshHelp = await shown('HELP', '.help-head')
 const freshHelpAll = await everything('HELP')

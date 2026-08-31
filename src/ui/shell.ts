@@ -4,6 +4,7 @@ import { consumeAway } from '../game/offline'
 import { pickThought } from './thoughts'
 import { inkPerRoll, mustWager, rollingItself } from '../game/production'
 import { checkAchievements, byId as achievementById } from '../game/achievements'
+import { codicesUnlocked, esperienzaMultiplier } from '../game/codices'
 import type { GameState, TabId } from '../state'
 
 /** What a pane is allowed to do to the game. Implemented in main.ts. */
@@ -25,6 +26,9 @@ export interface Actions {
   buyChipMult(): void
   breakWager(): void
   buyBreak(id: string): void
+  /** One codex, and every codex the chips cover. */
+  buyCodex(idx: number): void
+  buyAllCodices(): void
   enterChallenge(id: number): void
   exitChallenge(): void
   toggleAutobuyer(id: string): void
@@ -136,6 +140,8 @@ export class Shell {
   private toastTimer = 0
   private inkOut = new Readout('INK')
   private chipsOut = new Readout('CHIPS')
+  // The codices' currency. Hidden until the first codex opens, like the tab.
+  private espOut = new Readout('ESPERIENZA')
   /**
    * Chips a second, watched rather than worked out.
    *
@@ -167,7 +173,9 @@ export class Shell {
     const barInner = el('div', 'bar-inner')
     // Readouts only. Theme lives in OPTIONS, which is the only place it needs
     // to be, and the bar is for numbers that change.
-    barInner.append(this.inkOut.root, this.chipsOut.root, el('div', 'bar-spacer'))
+    barInner.append(
+      this.inkOut.root, this.chipsOut.root, this.espOut.root, el('div', 'bar-spacer'),
+    )
     bar.appendChild(barInner)
 
     const tabs = el('nav', 'tabs')
@@ -345,6 +353,15 @@ export class Shell {
         format(s.chips, n),
         s.broke ? `${format(this.chipsRate, n)}/s` : '',
       )
+    }
+
+    // What the codices are worth, rather than how many there are: the number
+    // in the bar is spent as an exponent, so the raw count says less than the
+    // multiplier it buys.
+    const showEsp = codicesUnlocked(s)
+    this.espOut.show(showEsp)
+    if (showEsp) {
+      this.espOut.set(format(s.esperienza, n), `x${format(esperienzaMultiplier(s), n)}`)
     }
 
     for (const p of this.panes) {

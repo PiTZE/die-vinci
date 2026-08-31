@@ -44,7 +44,9 @@ import { newGame, type GameState } from './state'
 
 // Decimals do not survive JSON, so every one of them goes out as a string and
 // comes back through the constructor. The field lists below are the contract.
-const DECIMAL_FIELDS = ['ink', 'inkThisWager', 'chips', 'meltPower'] as const
+const DECIMAL_FIELDS = [
+  'ink', 'inkThisWager', 'chips', 'meltPower', 'esperienza', 'deepestInk',
+] as const
 
 type Raw = Record<string, any>
 
@@ -52,6 +54,7 @@ function encode(s: GameState): Raw {
   const out: Raw = { ...s }
   for (const f of DECIMAL_FIELDS) out[f] = (s as any)[f].toString()
   out.solids = s.solids.map((d) => ({ bought: d.bought, amount: d.amount.toString() }))
+  out.codices = s.codices.map((c) => ({ bought: c.bought, amount: c.amount.toString() }))
   return out
 }
 
@@ -188,6 +191,17 @@ function decode(raw: Raw, now: number): GameState {
     if (!got) return d
     return { bought: Number(got.bought) || 0, amount: new Decimal(got.amount ?? 0) }
   })
+  s.codices = base.codices.map((c, i) => {
+    const got = Array.isArray(m.codices) ? m.codices[i] : undefined
+    if (!got) return c
+    return { bought: Number(got.bought) || 0, amount: new Decimal(got.amount ?? 0) }
+  })
+  // Esperienza multiplies from one, never from nothing. A save written before
+  // the codices existed brings back undefined, and the blanket Decimal read
+  // above would make that a zero, which is the same shape of bug meltPower had
+  // at migration 4: a multiplier of nought quietly turns the chain off.
+  if (s.esperienza.lte(0)) s.esperienza = new Decimal(1)
+  s.codexOpen = Math.max(0, Math.min(s.codices.length, Number(m.codexOpen) || 0))
   s.lastTick = Number(m.lastTick) || now
   // JSON cannot hold Infinity, so a save written before any Wager was called
   // brings this back as null. Left alone, "your fastest Wager" would read as

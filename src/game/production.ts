@@ -46,6 +46,7 @@ import {
   solidCostScale,
 } from './breaks'
 import { costAt, costScale, maxBought, type CostScale } from './cost-scaling'
+import { esperienzaMultiplier, openEarnedCodices, tickCodices } from './codices'
 
 /**
  * A study's multiplier reaches down the chain rather than across all of it.
@@ -83,6 +84,9 @@ export function solidMultiplier(s: GameState, idx: number): Decimal {
     // And whatever the break grid has bought, which is nothing until the wall
     // comes down.
     .times(breakMultiplier(s))
+    // The codices, which is AD's line for AD's reason: infinity power lands on
+    // every dimension separately, so it compounds through the whole chain.
+    .times(esperienzaMultiplier(s))
   // XI Strength reshapes the multiplier rather than adding to it, so it
   // compounds with everything above instead of sitting beside it.
   if (m.solidExp !== 1) out = out.pow(m.solidExp)
@@ -1068,6 +1072,16 @@ export function tick(s: GameState, dt: number, now: number): void {
     s.rollStartedAt = 0
     return
   }
+
+  // The high-water mark the codices open on, and the codices themselves.
+  //
+  // Raised from the tick rather than at a Wager, because AD's ID unlocks are
+  // checked against `records.thisEternity.maxAM` continuously and open in the
+  // middle of a run. Waiting for the cash-out would mean a run that earned the
+  // next codex could not spend it until the run after.
+  if (s.inkThisWager.gt(s.deepestInk)) s.deepestInk = s.inkThisWager
+  openEarnedCodices(s)
+  tickCodices(s, dt)
 
   // THE RAKE, which is AD's ipGen: a share of your best run, arriving on its
   // own. QUICK HANDS is handed to the ladder as a speed factor rather than

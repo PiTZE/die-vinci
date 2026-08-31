@@ -12,6 +12,7 @@
 import { ACHIEVEMENTS } from '../game/achievements'
 import { meltUnlocked } from '../game/production'
 import { owned } from '../game/tarot'
+import { CODEX_COUNT, openCodices } from '../game/codices'
 import { formatTime } from '../format'
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
@@ -86,6 +87,14 @@ export function statsPane(): Pane {
       const arcana = section('THE ARCANA', (s) => owned(s) > 0)
       arcana('HELD', (s) => `${owned(s)}/22`)
       arcana('LEVELS', (s) => `${Object.values(s.tarot).reduce((a, n) => a + n, 0)}`)
+
+      // One block per layer, appearing once that layer exists, which is the
+      // rule the four blocks above already follow.
+      const codices = section('THE CODICES', (s) => openCodices(s) > 0)
+      codices('OPEN', (s) => `${openCodices(s)}/${CODEX_COUNT}`)
+      codices('PURCHASES', (s) => `${s.codices.reduce((a, c) => a + c.bought, 0)}`)
+      codices('ESPERIENZA', (s) => s.esperienza.toString())
+      codices('DEEPEST RUN', (s) => s.deepestInk.toString())
 
       const melt = section('MELTING', (s) => meltUnlocked(s))
       melt('MELTS', (s) => `${s.stats.melts}`)

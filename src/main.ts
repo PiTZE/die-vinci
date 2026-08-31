@@ -61,6 +61,17 @@ import { tablePane } from './ui/table'
 import { optionsPane } from './ui/options'
 import { tarotPane } from './ui/tarot'
 import { breakPane } from './ui/break'
+import { codicesPane } from './ui/codices'
+import {
+  CODICES,
+  buyAllCodices,
+  buyCodex,
+  codexCost,
+  codexMultiplier,
+  codexUnlockAt,
+  esperienzaMultiplier,
+  openCodices,
+} from './game/codices'
 import {
   breakCost,
   breakLevel,
@@ -315,6 +326,14 @@ const actions: Actions = {
     buyBreak(state, id)
     persistSoon()
   },
+  buyCodex: (idx) => {
+    buyCodex(state, idx)
+    persistSoon()
+  },
+  buyAllCodices: () => {
+    buyAllCodices(state)
+    persistSoon()
+  },
   enterChallenge: (id) => {
     enterChallenge(state, id, resetForChallenge)
     persistSoon()
@@ -411,6 +430,7 @@ shell.build(
     challengesPane(),
     tarotPane(),
     breakPane(),
+    codicesPane(),
     automationPane(),
     archivePane(),
     statsPane(),
@@ -601,6 +621,18 @@ const hook: Record<string, unknown> = {
   // The break layer, so its suite can assert the formulas rather than watch a
   // button. Pure reads; the actions that change anything are above.
   chipsFrom,
+  // One step of the engine, against a state the caller hands in. A suite that
+  // wants to know what a second of production does should not have to wait a
+  // second and hope the frame budget was kind.
+  tick,
+  // The codices, so their suite can assert the ladder and the reset rather
+  // than infer both from a screen. Pure reads; buyCodex is an action above.
+  CODICES,
+  openCodices,
+  codexCost,
+  codexUnlockAt,
+  codexMultiplier,
+  esperienzaMultiplier,
   chipMultCost,
   chipMultUnlocked,
   chipMultiplier,

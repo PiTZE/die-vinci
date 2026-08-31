@@ -54,6 +54,22 @@ const FREE_GRID = process.env.FREE_GRID === '1'
  * wall is granted, so the codices and the break grid are still played for.
  */
 const BROKE = process.env.BROKE === '1'
+/**
+ * Play the payout threshold, which past the wall is the only lever on how deep
+ * a run goes.
+ *
+ * A codex opens on depth, and depth is not something the table produces on its
+ * own: the Wager autobuyer takes the run the moment the payout clears its
+ * threshold, so a run ends a hair past 1.8e308 unless you tell it not to. The
+ * AUTOMATION rule is what tells it. Left alone the sim never touched it and
+ * never saw past the first rung, which says nothing about the ladder and
+ * everything about the sim.
+ *
+ * The patience is the other half and it is a real cost: while a run is chasing
+ * a depth it cannot reach, no Wager is called and no chips arrive at all.
+ */
+const AIM = process.env.AIM !== '0'
+const AIM_PATIENCE_S = Number(process.env.PATIENCE ?? 600)
 
 /**
  * Which arcana a greedy player would rather have, worst to best. Ranked by what
@@ -205,14 +221,37 @@ function spendChips(): void {
     B.buyBreak(s, next)
   }
 
-  // And the codices, deepest first, which is what buyAllCodices does and the
-  // same reasoning maxAll uses: a purchase up the chain compounds through every
-  // tier below it.
+  // And the codices, in AD's own order, which buyAllCodices carries.
   for (let pass = 0; pass < 20; pass++) if (!C.buyAllCodices(s)) break
+  if (AIM) aimForNextCodex()
+}
+
+/** Sets the payout threshold to whatever a run reaching the next codex would
+ *  pay, which is how a player reads that rule off this screen. */
+function aimForNextCodex(): void {
+  const a = s.autobuyers[B.WAGER_AUTOBUYER]
+  if (!s.broke || !a) return
+  const open = C.openCodices(s)
+  const want = open >= C.CODEX_COUNT ? null : C.codexUnlockAt(open + 1)
+  if (!want || s.deepestInk.gte(want)) {
+    // Nothing left to chase. Back to the default, which rises on its own.
+    a.riseWithMult = true
+    return
+  }
+  const held = s.inkThisWager
+  s.inkThisWager = want
+  const pay = B.chipsFrom(s)
+  s.inkThisWager = held
+  // Aimed rather than climbing, so the chip multiplier does not double it out
+  // from under the target on the next purchase.
+  a.riseWithMult = false
+  a.amount = pay.toString()
 }
 
 let done = 0
 let seenWagers = 0
+/** Runs that ran out of patience chasing a codex rather than paying out. */
+let gaveUp = 0
 let lastWager = 0
 /** Seconds each Wager took, so the report can give a median rather than the
  *  one number the last run happened to land on. */
@@ -273,6 +312,18 @@ while (t < HOURS * 3600 && done < WAGERS) {
   // decides. Calling it here regardless is what kept every measurement of the
   // broken layer pinned at 1.8e308: the sim was playing past the wall the way
   // you play before it.
+  // Chasing a depth the run cannot reach is a run that never pays. A player
+  // watching that happen takes the Wager and tries something else, so this
+  // does too, and the report says how often it had to.
+  if (AIM && s.broke && W.canWager(s) && s.stats.wagerMs > AIM_PATIENCE_S * 1000) {
+    const a = s.autobuyers[B.WAGER_AUTOBUYER]
+    if (a) {
+      a.amount = '1'
+      a.riseWithMult = true
+      gaveUp += 1
+    }
+  }
+
   if (!s.broke && W.canWager(s)) {
     // Enter the next uncleared challenge before calling, because reaching the
     // threshold inside one is what clears it and what awards its autobuyer.
@@ -387,6 +438,8 @@ if (!QUIET && BROKE) {
   console.log(`  chip multiplier: x${B.chipMultiplier(s)} (${s.chipMult} bought)`)
   console.log(`  break grid: ${B.BREAK_UPGRADES.filter((u) => B.breakMaxed(s, u.id)).length}` +
     `/${B.BREAK_UPGRADES.length} full`)
+  console.log(`  runs that gave up chasing a codex: ${gaveUp}` +
+    (AIM ? '' : '   (AIM off)'))
   console.log(`  codices open: ${C.openCodices(s)}/${C.CODEX_COUNT}   ` +
     `esperienza ${format(s.esperienza, 'scientific')}`)
   for (const d of C.CODICES) {

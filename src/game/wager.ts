@@ -16,6 +16,7 @@ import { unlock } from './autobuyers'
 import { byId } from './challenges'
 import { drawOffer } from './tarot'
 import { chipsFrom } from './breaks'
+import { resetCodices } from './codices'
 import { startingFolios, startingStudies } from './upgrades'
 import { registerWager, seedForAutomator } from './production'
 import type { GameState } from '../state'
@@ -73,6 +74,13 @@ export function doWager(s: GameState): boolean {
   }
   s.challengeRunning = 0
   s.haltMs = 0
+
+  // Before the run's total is cleared, because it is what opens the next
+  // codex and a Wager is exactly when a run's deepest point is known.
+  s.deepestInk = Decimal.max(s.deepestInk, s.inkThisWager)
+  // The codices keep what was bought and lose what it grew into, which is
+  // AD's InfinityDimensions.resetAmount on a crunch.
+  resetCodices(s)
 
   s.ink = new Decimal(START_INK)
   s.inkThisWager = new Decimal(0)
