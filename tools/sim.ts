@@ -21,6 +21,7 @@ import { UPGRADES, buyUpgrade, canBuy, type UpgradeId } from '../src/game/upgrad
 import { ACHIEVEMENTS, achievementPower, checkAchievements } from '../src/game/achievements'
 import { ARCANA, drawOffer, owned, takeCard } from '../src/game/tarot'
 import * as B from '../src/game/breaks'
+import * as C from '../src/game/codices'
 import { AUTOBUYERS, isMaxed, upgrade as upgradeAuto, unlock as unlockAuto, upgradeCost }
   from '../src/game/autobuyers'
 import { CHALLENGES } from '../src/game/challenges'
@@ -43,6 +44,16 @@ const FORCE = process.env.FORCE ?? ''
  *  what a Wager costs once the grid is bought, which is the number the break
  *  grind is actually paced by and which no short run ever reaches. */
 const FREE_GRID = process.env.FREE_GRID === '1'
+/**
+ * Starts on a broken save, which is the only way to look at the layer above the
+ * wall in less than five hours of simulated time.
+ *
+ * Everything it hands over is something a real save reaching this point has
+ * already earned: the chip grid, thirteen cleared challenges, every autobuyer
+ * at its floor, and the break itself. Nothing that has to be bought past the
+ * wall is granted, so the codices and the break grid are still played for.
+ */
+const BROKE = process.env.BROKE === '1'
 
 /**
  * Which arcana a greedy player would rather have, worst to best. Ranked by what
@@ -68,6 +79,20 @@ if (FREE_GRID) {
   s.wagers = 1
   s.chipUpgrades = Object.keys(UPGRADES)
   s.autoRoll = true
+}
+if (BROKE) {
+  s.wagers = 1
+  s.chipUpgrades = Object.keys(UPGRADES)
+  s.autoRoll = true
+  s.autoRollOn = true
+  s.challengesDone = CHALLENGES.map((c) => c.id)
+  for (const a of AUTOBUYERS) {
+    unlockAuto(s, a.id)
+    const slot = s.autobuyers[a.id]
+    if (slot) slot.level = 40
+  }
+  s.broke = true
+  P.seedForAutomator(s)
 }
 let t = 0
 let ms = 0
@@ -179,10 +204,20 @@ function spendChips(): void {
     if (!next) break
     B.buyBreak(s, next)
   }
+
+  // And the codices, deepest first, which is what buyAllCodices does and the
+  // same reasoning maxAll uses: a purchase up the chain compounds through every
+  // tier below it.
+  for (let pass = 0; pass < 20; pass++) if (!C.buyAllCodices(s)) break
 }
 
 let done = 0
+let seenWagers = 0
 let lastWager = 0
+/** Seconds each Wager took, so the report can give a median rather than the
+ *  one number the last run happened to land on. */
+const wagerTimes: number[] = []
+let lastLogged = 0
 let stalledAt: string | null = null
 let peak = new Decimal(0)
 let peakAt = 0
@@ -232,7 +267,13 @@ while (t < HOURS * 3600 && done < WAGERS) {
     }
   }
 
-  if (W.canWager(s)) {
+  // Called by hand only while the ceiling holds. Past the wall a Wager is
+  // worth what the run overshot by, so cashing out at the first opportunity is
+  // simply the wrong play, and the autobuyer's own threshold is the thing that
+  // decides. Calling it here regardless is what kept every measurement of the
+  // broken layer pinned at 1.8e308: the sim was playing past the wall the way
+  // you play before it.
+  if (!s.broke && W.canWager(s)) {
     // Enter the next uncleared challenge before calling, because reaching the
     // threshold inside one is what clears it and what awards its autobuyer.
     if (!s.challengeRunning) {
@@ -240,6 +281,11 @@ while (t < HOURS * 3600 && done < WAGERS) {
       if (next && s.wagers > 0) s.challengeRunning = next.id
     }
     W.doWager(s)
+  }
+
+  // However it was called, by hand above or by the autobuyer inside the tick.
+  if (s.wagers !== seenWagers) {
+    seenWagers = s.wagers
     done += 1
     for (let pass = 0; pass < 12; pass++) {
       const next = (Object.keys(UPGRADES) as UpgradeId[])
@@ -273,6 +319,17 @@ while (t < HOURS * 3600 && done < WAGERS) {
     // finish the grid, then buy the multiplier, then buy the Wager autobuyer
     // down toward its floor, which is the only thing breaking asks for.
     spendChips()
+    if (BROKE && done > 5 && done % 250 !== 0) {
+      lastWager = t
+      studiesSeen = 0
+      foliosSeen = 0
+      marks.length = 0
+      wagerTimes.push(t - lastLogged)
+      lastLogged = t
+      continue
+    }
+    wagerTimes.push(t - lastLogged)
+    lastLogged = t
     console.log(
       `\nWAGER ${done}  after ${hms(t - lastWager)}  (total ${hms(t)})  ` +
         `chips=${s.chips}  upgrades=${s.chipUpgrades.length}/${Object.keys(UPGRADES).length}  ` +
@@ -315,6 +372,29 @@ if (!QUIET) {
   console.log("  breakable at: " + (breakableAt ? hms(breakableAt) : "never"))
   console.log("  broke at: " + (brokeAt ? hms(brokeAt) : "never"))
   console.log("  challenges cleared: " + s.challengesDone.length + "/13")
+}
+
+if (!QUIET && BROKE) {
+  const sorted = wagerTimes.slice().sort((a, b) => a - b)
+  const med = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0
+  console.log('\npast the wall')
+  console.log(`  Wagers called: ${done} in ${hms(t)}`)
+  console.log(`  Wager time: first ${wagerTimes[0]?.toFixed(2) ?? '-'}s  ` +
+    `median ${med.toFixed(2)}s  last ${wagerTimes[wagerTimes.length - 1]?.toFixed(2) ?? '-'}s`)
+  console.log(`  chips held: ${format(s.chips, 'scientific')}   ` +
+    `a Wager pays ${format(B.chipsFrom(s), 'scientific')}`)
+  console.log(`  deepest a run has earned: ${format(s.deepestInk, 'scientific')}`)
+  console.log(`  chip multiplier: x${B.chipMultiplier(s)} (${s.chipMult} bought)`)
+  console.log(`  break grid: ${B.BREAK_UPGRADES.filter((u) => B.breakMaxed(s, u.id)).length}` +
+    `/${B.BREAK_UPGRADES.length} full`)
+  console.log(`  codices open: ${C.openCodices(s)}/${C.CODEX_COUNT}   ` +
+    `esperienza ${format(s.esperienza, 'scientific')}`)
+  for (const d of C.CODICES) {
+    if (d.idx > C.openCodices(s)) break
+    console.log(`    ${d.short}  bought ${s.codices[d.idx - 1].bought}   ` +
+      `held ${format(s.codices[d.idx - 1].amount, 'scientific')}   ` +
+      `next ${format(C.codexCost(s, d.idx), 'scientific')}`)
+  }
 }
 
 if (done < WAGERS) {
