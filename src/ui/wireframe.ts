@@ -201,12 +201,23 @@ function depthOpacity(f: number): number {
  * The angle a die sits at when it is not rolling.
  *
  * One angle for every solid, and a fixed one. It used to be `Math.random()`
- * per die, which is what a tumbling die wants and the opposite of what a
- * still one does: nine solids at rest were nine arbitrary poses, and a couple
- * of them landed close enough to edge-on that vertices projected on top of
- * each other. Off-axis on purpose for the same reason.
+ * per die, which is what a tumbling die wants and the opposite of what a still
+ * one does: nine solids at rest were nine arbitrary poses.
+ *
+ * Chosen by rendering all nine across a sweep and looking, not by picking a
+ * number that was merely not degenerate. The first fixed pose was 0.62 about
+ * a (0.42, 1) axis, which is a fourteen degree tilt: the cube came out nearly
+ * face-on, a flat square with a line down it, and the tetrahedron's apex sat
+ * almost on top of an edge and read as a sideways arrow. This is the classic
+ * three-quarter view a die is drawn in, about thirty-five degrees one way and
+ * twenty-five the other, where a cube shows three faces and every solid looks
+ * like itself.
+ *
+ * Zero is the one angle to avoid. The geometry is axis-aligned, so straight on
+ * it is edge-on: five of the nine hide half their vertices behind the other
+ * half, and a d20 draws eight of its twelve.
  */
-const REST_T = 0.6
+const REST_T = 0.62
 
 /**
  * And the axes it is turned about, which the pose depends on just as much.
@@ -217,7 +228,7 @@ const REST_T = 0.6
  * stopped. These are the values a die is built with.
  */
 const REST_WY = 1
-const REST_WX = 0.42
+const REST_WX = 0.75
 
 class Wire {
   readonly el: SVGSVGElement

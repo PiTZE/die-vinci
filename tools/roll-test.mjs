@@ -600,9 +600,17 @@ check('ink is pinned at the threshold',
 // out of formulas rather than out of eight hand-written edge tables, so a
 // change to the shared vertex code could quietly turn a rhombicuboctahedron
 // into something with the wrong number of edges and nothing would say so.
+// At rest, and made to be: a die that comes to rest after a throw settles at
+// wherever that throw's own curve ended, which is a different pose every time
+// and occasionally one where two vertices project onto each other. That is
+// fine to look at and useless to count, and it is why this check has failed on
+// four different solids today for four different reasons that were all the
+// same reason. Nothing rolling puts every die at the one resting pose.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.studies = 8; s.solids.forEach(d => { d.amount = new D(10) }) })()`)
-await sleep(300)
+  s.studies = 8; s.solids.forEach(d => { d.amount = new D(10) })
+  s.autoDice = 0; s.autoDiceOff = []; s.autoRoll = false
+  s.handRollAt = 0; s.rollStartedAt = 0; s.rollAccum = 0 })()`)
+await sleep(500)
 const counts = await ev(`(() => {
   const out = {}
   const ids = ['d4','d6','d8','d12','d14','d20','d26','d32','d72']
