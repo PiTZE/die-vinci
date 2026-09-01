@@ -17,7 +17,16 @@ import Decimal from 'break_infinity.js'
 import { WAGER_AUTOBUYER, wagerThreshold } from '../game/breaks'
 import { format } from '../format'
 import type { GameState } from '../state'
-import { automatorCost, automatorUnlocked, canBuyAutomator } from '../game/production'
+import {
+  AUTO_ROLL_MAX,
+  automatorCost,
+  automatorUnlocked,
+  autoRollCost,
+  canBuyAutomator,
+  canBuyAutoRoll,
+  nextAutoRoll,
+} from '../game/production'
+import { SOLIDS } from '../game/solids'
 import { el, type Actions, type Pane } from './shell'
 
 function setText(n: HTMLElement, v: string): void {
@@ -97,10 +106,19 @@ export function automationPane(): Pane {
     }
   >()
 
+  let autobuyerSection: HTMLElement
+  let autoManualRow: HTMLElement
+  let dieNote: HTMLElement
+  const dieRows: { root: HTMLElement; state: HTMLElement; buy: HTMLButtonElement }[] = []
+
   return {
     id: 'automation',
     label: 'AUTOMATION',
-    visible: (s) => anyUnlocked(s) || automatorUnlocked(s),
+    // The first auto-roll opens this tab, which is two minutes into a first
+    // run rather than after the Wager. Everything the tab held before that is
+    // still sealed inside it; see the two hidden sections in update.
+    visible: (s) =>
+      anyUnlocked(s) || automatorUnlocked(s) || s.autoDice > 0 || nextAutoRoll(s) > 0,
 
     mount(root, actions: Actions) {
       // The roll comes first: it is the one that takes your finger off the
@@ -109,19 +127,39 @@ export function automationPane(): Pane {
       const ah = el('div', 'section-head')
       ah.appendChild(el('span', 'grow', 'THE ROLL'))
       autoSection.appendChild(ah)
+
+      // One row a die, shallowest first, which is the order they are sold in.
+      // A die opens for automation when the die below it opens for buying, so
+      // this list grows a row at a time alongside the table.
+      dieNote = el('div', 'auto-note', '')
+      autoSection.appendChild(dieNote)
+      for (let idx = 1; idx <= AUTO_ROLL_MAX; idx++) {
+        const row = el('div', 'auto-row')
+        row.appendChild(el('span', 'auto-label', SOLIDS[idx - 1].short))
+        const state = el('span', 'auto-every num dim', '')
+        row.appendChild(state)
+        const buy = el('button', 'auto-up', '')
+        buy.type = 'button'
+        buy.addEventListener('click', () => actions.buyAutoRoll())
+        row.appendChild(buy)
+        autoSection.appendChild(row)
+        dieRows.push({ root: row, state, buy })
+      }
+
       const autoRow = el('div', 'auto-row')
-      autoRow.appendChild(el('span', 'auto-label', 'ROLLS ITSELF'))
       autoBuy = el('button', 'auto-up', '')
       autoBuy.type = 'button'
       autoBuy.addEventListener('click', () => actions.buyAutomator())
       autoToggle = el('button', 'auto-toggle', 'ON')
       autoToggle.type = 'button'
       autoToggle.addEventListener('click', () => actions.toggleAutomator())
-      autoRow.append(autoToggle, autoBuy)
+      autoRow.append(el('span', 'auto-label', SOLIDS[SOLIDS.length - 1].short), autoToggle, autoBuy)
+      autoManualRow = autoRow
       autoSection.appendChild(autoRow)
       root.append(autoSection)
 
-      const section = el('div', 'section')
+      autobuyerSection = el('div', 'section')
+      const section = autobuyerSection
       const h = el('div', 'section-head')
       h.appendChild(el('span', 'grow', 'AUTOBUYERS'))
       section.appendChild(h)
@@ -213,7 +251,38 @@ export function automationPane(): Pane {
       const n = s.options.notation
       shown = s
 
-      autoSection.hidden = !automatorUnlocked(s)
+      // The tab opens on the first auto-roll now, so the two things behind
+      // the Wager have to seal themselves rather than relying on the tab
+      // being shut. A player two minutes into their first run should not be
+      // reading the word AUTOBUYERS, let alone THE WAGER inside it.
+      autobuyerSection.hidden = !anyUnlocked(s)
+      autoSection.hidden = false
+
+      const next = nextAutoRoll(s)
+      setText(
+        dieNote,
+        s.autoDice >= AUTO_ROLL_MAX
+          ? 'every die but the deepest rolls itself'
+          : 'a die rolls itself once you have opened the one below it',
+      )
+      for (let idx = 1; idx <= AUTO_ROLL_MAX; idx++) {
+        const r = dieRows[idx - 1]
+        const held = idx <= s.autoDice
+        // Sold, or for sale, and nothing further down the list. A row for a
+        // die you have not opened yet is a row about a solid you have not met.
+        const on = held || idx === next
+        r.root.hidden = !on
+        if (!on) continue
+        setText(r.state, held ? 'ROLLS ITSELF' : '')
+        r.buy.hidden = held
+        if (held) continue
+        const can = canBuyAutoRoll(s)
+        setText(r.buy, `AUTOMATE / ${format(autoRollCost(s), n)} INK`)
+        r.buy.disabled = !can
+        r.buy.classList.toggle('buyable', can)
+      }
+
+      autoManualRow.hidden = !automatorUnlocked(s)
       if (!s.autoRoll) {
         setText(autoBuy, `UNLOCK / ${automatorCost()} POINT`)
         const can = canBuyAutomator(s)

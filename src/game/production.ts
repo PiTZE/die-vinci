@@ -15,10 +15,10 @@ import {
 import {
   AUTOMATOR_COST,
   AUTOMATOR_SEED,
+  AUTO_ROLL_COSTS,
   ROLLS_DRAWN_INDIVIDUALLY,
   ROLL_COST_BASE,
   ROLL_COST_MULT,
-  CATCHUP_AFTER_S,
   ROLL_INTERVAL_BASE,
   MELT_AT,
   START_INK,
@@ -417,6 +417,7 @@ function resetTable(s: GameState): void {
   // from the solids that were just cleared.
   s.rollStartedAt = 0
   s.rollAccum = 0
+  s.handRollAt = 0
   s.faces = s.faces.map(() => 0)
 }
 
@@ -834,13 +835,42 @@ export function mustWager(s: GameState): boolean {
   return ceilingHolds(s) && s.inkThisWager.gte(WAGER_AT)
 }
 
+/**
+ * How long after a press a roll still counts as one you asked for.
+ *
+ * The hold repeat is 60ms. This has to be longer than that so a held button
+ * marks every roll, and short enough that letting go hands the table back to
+ * the automated dice within a frame or two.
+ */
+export const HAND_GRACE_MS = 250
+
+/**
+ * Whether the roll landing now is one you asked for, and throws everything.
+ *
+ * A press stays outstanding until a roll spends it, so a single click always
+ * lands a full throw however slow the interval is. What the grace is for is
+ * the other end: while the button is held the press is renewed every 60ms, so
+ * a roll landing within the grace leaves it standing and the next roll is a
+ * hand roll too. Without that, an interval shorter than the hold repeat would
+ * quietly credit one roll in four to your finger and the rest to nobody.
+ */
+export function handRolling(s: GameState): boolean {
+  return s.handRollAt > 0
+}
+
+/** Spends the press, unless the button is plainly still down. */
+function spendHandRoll(s: GameState, now: number): void {
+  if (now - s.handRollAt >= HAND_GRACE_MS) s.handRollAt = 0
+}
+
 export function startRoll(s: GameState, now: number): boolean {
   if (mustWager(s)) return false
-  if (rollingItself(s) || s.rollStartedAt > 0 || s.haltMs > 0) return false
+  if (rollingItself(s) || s.haltMs > 0) return false
+  // Marked even when a spin is already in the air, because that is what makes
+  // holding cover every roll rather than every other one.
+  s.handRollAt = now
+  if (s.rollStartedAt > 0) return false
   s.rollStartedAt = now
-  // The faces go with the throw. A die in the air is not still showing you
-  // what it landed on last time.
-  for (let i = 0; i < s.faces.length; i++) s.faces[i] = 0
   return true
 }
 
@@ -894,18 +924,24 @@ function produce(s: GameState, rolls: Decimal, factors: number[]): void {
  * A die is thrown when there is a die to throw. Locked solids are not on the
  * table, and a solid you own none of has nothing to land: showing a face on an
  * empty row said a number and then paid nothing, which reads as a bug.
+ *
+ * `hand` is whether this roll is one you asked for. A hand roll throws the
+ * whole table; a roll nobody pressed for throws only the dice that have been
+ * bought their own auto-roll. The ones sitting it out show no face, which is
+ * how the table says which half of it is still waiting on you.
  */
-function rolls(s: GameState, i: number): boolean {
-  return i < openSolids(s) && s.solids[i].amount.gt(0)
+function rolls(s: GameState, i: number, hand: boolean): boolean {
+  if (i >= openSolids(s) || s.solids[i].amount.lte(0)) return false
+  return hand || dieRollsItself(s, i + 1)
 }
 
 /** Rolls every die on the table, records the faces, and produces from them. */
-function resolveOneRoll(s: GameState): void {
+function resolveOneRoll(s: GameState, hand: boolean): void {
   const m = modifiers(s)
   const bias = faceBias(s)
   const factors: number[] = []
   for (let i = 0; i < s.solids.length; i++) {
-    if (!rolls(s, i)) {
+    if (!rolls(s, i, hand)) {
       s.faces[i] = 0
       factors.push(0)
       continue
@@ -945,24 +981,24 @@ function resolveOneRoll(s: GameState): void {
  * frame so the dice look alive, but production uses the mean, which is what a
  * thousand independent rolls a second converges to anyway.
  */
-function resolveManyRolls(s: GameState, count: Decimal): void {
+function resolveManyRolls(s: GameState, count: Decimal, hand: boolean): void {
   for (let i = 0; i < s.solids.length; i++) {
-    s.faces[i] = rolls(s, i) ? rollFace(SOLIDS[i].faces, faceBias(s)) : 0
+    s.faces[i] = rolls(s, i, hand) ? rollFace(SOLIDS[i].faces, faceBias(s)) : 0
   }
   // The mean, per die, not a flat one. A d72 averages 36.5 and a d4 averages
   // 2.5, so a flat factor here would make the automator pay a fraction of what
   // the same rolls pay by hand.
   const bias = faceBias(s)
-  produce(s, count, s.solids.map((_, i) => (rolls(s, i) ? meanFace(SOLIDS[i].faces, bias) : 0)))
+  produce(s, count, s.solids.map((_, i) => (rolls(s, i, hand) ? meanFace(SOLIDS[i].faces, bias) : 0)))
 }
 
-function applyRolls(s: GameState, count: Decimal): void {
+function applyRolls(s: GameState, count: Decimal, hand: boolean): void {
   if (count.lte(0)) return
   if (count.lte(ROLLS_DRAWN_INDIVIDUALLY)) {
     const n = count.toNumber()
-    for (let i = 0; i < n; i++) resolveOneRoll(s)
+    for (let i = 0; i < n; i++) resolveOneRoll(s, hand)
   } else {
-    resolveManyRolls(s, count)
+    resolveManyRolls(s, count, hand)
   }
 }
 
@@ -998,6 +1034,45 @@ export function buyAutomator(s: GameState): boolean {
  *  which is the only way to see a roll land one at a time once you own it. */
 export function rollingItself(s: GameState): boolean {
   return s.autoRoll && s.autoRollOn
+}
+
+// -- auto-roll, one die at a time -----------------------------------------
+
+/** Whether die `idx` takes part in a roll nobody is pressing for. */
+export function dieRollsItself(s: GameState, idx: number): boolean {
+  return rollingItself(s) || idx <= s.autoDice
+}
+
+/** How many dice can ever be automated this way. There is no tenth solid, so
+ *  the deepest never can, and the automator at the Wager is what covers it. */
+export const AUTO_ROLL_MAX = SOLIDS.length - 1
+
+/**
+ * The next die whose auto-roll is for sale, 1-based, or 0 for none.
+ *
+ * A die opens for automation when the die below it on the chain opens for
+ * buying, so the d4 waits on the d6 and the d32 waits on the d72. They fill
+ * from the shallow end in order, which is why the state is a count.
+ */
+export function nextAutoRoll(s: GameState): number {
+  const next = s.autoDice + 1
+  if (next > AUTO_ROLL_MAX) return 0
+  return unlockedSolids(s) >= next + 1 ? next : 0
+}
+
+export function autoRollCost(s: GameState): Decimal {
+  return AUTO_ROLL_COSTS[s.autoDice] ?? new Decimal(Infinity)
+}
+
+export function canBuyAutoRoll(s: GameState): boolean {
+  return nextAutoRoll(s) > 0 && s.ink.gte(autoRollCost(s))
+}
+
+export function buyAutoRoll(s: GameState): boolean {
+  if (!canBuyAutoRoll(s)) return false
+  s.ink = s.ink.minus(autoRollCost(s))
+  s.autoDice += 1
+  return true
 }
 
 // -- the tick -------------------------------------------------------------
@@ -1108,37 +1183,27 @@ export function tick(s: GameState, dt: number, now: number): void {
   // takes the continuous path, which is where it belongs anyway.
   const interval = rollDuration(s)
 
-  // By hand: nothing happens until a spin finishes, and the dice pay out when
-  // they land rather than while they are in the air.
-  if (!rollingItself(s)) {
+  // One roll clock, shared.
+  //
+  // There used to be two: a hand branch that resolved when a spin landed, and
+  // an automated branch with its own accumulator. Per-die auto-roll broke that
+  // apart, because the automated branch sets rollStartedAt for the animation
+  // and the hand branch reads rollStartedAt to decide a roll happened, so an
+  // automated roll came back round as a hand roll and threw the whole table.
+  //
+  // So there is one accumulator and one question asked when a roll lands: did
+  // you ask for this one. Yes throws everything; no throws only the dice that
+  // roll themselves.
+  const hand = handRolling(s)
+  const anyAuto = rollingItself(s) || s.autoDice > 0
+  if (!hand && !anyAuto) {
+    // Nothing is rolling, so nothing is in the air either. A spin that was
+    // asked for keeps `hand` true until it lands, so this cannot cut one off.
     s.rollAccum = 0
-    if (s.rollStartedAt && now - s.rollStartedAt >= interval * 1000) {
-      // The time in the air, not one roll, and not a count of them.
-      //
-      // One roll per tick capped a held button at ten a second, because the
-      // tick is 100ms, however fast the roll rate had become. With the
-      // automator behind the first Wager that made the first Wager
-      // unreachable by hand. Capping the roll count instead was the same
-      // mistake wearing a bigger number: at a million rolls a second a
-      // thousand per tick is still a throttle.
-      //
-      // So the bound is on elapsed time. Anything longer than a tick's worth
-      // of catch-up belongs to the away path, which has its own budget.
-      const held = Math.min(CATCHUP_AFTER_S, (now - s.rollStartedAt) / 1000)
-      s.rollStartedAt = 0
-      applyRolls(s, Decimal.max(1, rollRate(s).times(held).floor()))
-    }
+    s.rollStartedAt = 0
     return
   }
 
-  // Automated, and past the point where a roll can be watched: a rate times
-  // elapsed time, with no count of rolls anywhere in it.
-  //
-  // This is how Antimatter Dimensions runs its entire loop. Dimension.
-  // productionForDiff is productionPerSecond.times(diff / 1000) and there is no
-  // tick count in the engine at all. A count is a JS integer, and no JS integer
-  // holds 1e310 of anything; floor(accum / interval) came back Infinity, which
-  // poisoned rollAccum to -Infinity and made every Decimal it touched a zero.
   s.rollAccum += dt
 
   // Few enough in the window to draw one at a time, which is the boundary
@@ -1147,19 +1212,34 @@ export function tick(s: GameState, dt: number, now: number): void {
   // the faces it lands on.
   if (interval > 0 && s.rollAccum / interval <= ROLLS_DRAWN_INDIVIDUALLY) {
     const rolls = Math.floor(s.rollAccum / interval)
-    // When the current roll began, so the animation can run off the same clock
-    // the manual one does.
-    s.rollStartedAt = now - Math.min(s.rollAccum, interval) * 1000
+    // When the current roll began, so the animation runs off the same clock
+    // whoever started it. Written once at the head of a spin and left alone
+    // until the next one: rewritten every tick, the tumble's progress stepped
+    // at the tick rate instead of flowing with real time, which flattened the
+    // deceleration the throw is eased on.
+    if (!s.rollStartedAt) s.rollStartedAt = now - Math.min(s.rollAccum, interval) * 1000
     if (rolls <= 0) return
     s.rollAccum -= rolls * interval
-    s.rollStartedAt = now - s.rollAccum * 1000
-    applyRolls(s, new Decimal(rolls))
+    spendHandRoll(s, now)
+    // Cleared rather than pointed at the next spin. Whether there is a next
+    // spin is the gate's question, asked on the next tick, and answering it
+    // here started a throw that nothing was going to finish: the die snapped
+    // back to the top of its arc for a frame after every hand roll.
+    s.rollStartedAt = 0
+    applyRolls(s, new Decimal(rolls), hand)
     return
   }
 
   // Past that the faces were already being averaged, so nothing is lost by
   // dropping the count entirely and taking a rate times elapsed time instead.
+  //
+  // This is how Antimatter Dimensions runs its entire loop. Dimension.
+  // productionForDiff is productionPerSecond.times(diff / 1000) and there is no
+  // tick count in the engine at all. A count is a JS integer, and no JS integer
+  // holds 1e310 of anything; floor(accum / interval) came back Infinity, which
+  // poisoned rollAccum to -Infinity and made every Decimal it touched a zero.
   s.rollAccum = 0
   s.rollStartedAt = now
-  resolveManyRolls(s, rollRate(s).times(dt))
+  spendHandRoll(s, now)
+  resolveManyRolls(s, rollRate(s).times(dt), hand)
 }

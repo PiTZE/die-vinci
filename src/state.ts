@@ -58,8 +58,28 @@ export interface GameState {
   faces: number[]
   /** ms epoch the current spin began, or 0 when the dice are at rest. */
   rollStartedAt: number
+  /**
+   * ms epoch of the last time you asked for a roll.
+   *
+   * A roll thrown by hand throws the whole table; one nobody pressed for
+   * throws only the dice that roll themselves. Which it is cannot be read off
+   * rollStartedAt, because that is the animation clock and the automated path
+   * sets it too. A timestamp rather than a flag because holding repeats every
+   * 60ms and the roll interval gets shorter than that late in a run: a flag
+   * cleared on the first landing would quietly stop crediting a held button
+   * for the rolls after it.
+   */
+  handRollAt: number
   /** Seconds of elapsed time not yet spent on a roll. */
   rollAccum: number
+  /**
+   * How many of the shallow dice roll themselves.
+   *
+   * Bought one at a time, in order, and never lost. A die at index i is
+   * automated when i < autoDice, so this is a count rather than a set: the
+   * ladder only ever fills from the shallow end.
+   */
+  autoDice: number
   /** The first automator. Once bought it is never lost, not even to a Wager. */
   autoRoll: boolean
   /** And whether it is switched on. */
@@ -175,7 +195,9 @@ export function newGame(now: number): GameState {
     solids: SOLIDS.map(() => ({ bought: 0, amount: new Decimal(0) })),
     faces: SOLIDS.map(() => 0),
     rollStartedAt: 0,
+    handRollAt: 0,
     rollAccum: 0,
+    autoDice: 0,
     autoRoll: false,
     autoRollOn: true,
     rollUpgrades: 0,

@@ -86,8 +86,10 @@ for (let i = 0; i < 40 && sealedAgain === sealedTitle; i++) {
 check('the redaction animates', sealedTitle !== '' && sealedTitle !== sealedAgain,
   `${JSON.stringify(sealedTitle)} -> ${JSON.stringify(sealedAgain)}`)
 
-// THE AUTOMATOR is the first sealed topic on a fresh save.
-const REAL = 'THE AUTOMATOR'
+// The first sealed topic on a fresh save. Hardcoded on purpose: the whole
+// point of the feature is that the real title is not in the document, so the
+// test cannot read it out of the page it is checking.
+const REAL = 'ROLLS ITSELF'
 check('it keeps the shape of the real title',
   sealedTitle.length === REAL.length &&
     [...REAL].every((c, i) => (c === ' ') === (sealedTitle[i] === ' ')),
@@ -99,7 +101,8 @@ check('and it is never the real title',
   sealedTitle !== REAL && sealedAgain !== REAL, JSON.stringify(sealedTitle))
 // Word by word, because a single word settling back is the leak that matters.
 const anyWordSettled = await ev(`(() => {
-  const real = ['THE AUTOMATOR', 'STUDY AND FOLIO', 'THE WAGER', 'CHALLENGES', 'AUTOBUYERS']
+  const real = ['ROLLS ITSELF', 'THE AUTOMATOR', 'STUDY AND FOLIO', 'THE WAGER',
+    'CHALLENGES', 'AUTOBUYERS']
   const shown = [...document.querySelectorAll('.help-head.sealed span')].map(n => n.textContent)
   for (let i = 0; i < shown.length; i++) {
     const a = (shown[i] || '').split(' '), b = (real[i] || '').split(' ')

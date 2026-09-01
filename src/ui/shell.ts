@@ -2,7 +2,7 @@ import Decimal from 'break_infinity.js'
 import { format, formatTime } from '../format'
 import { consumeAway } from '../game/offline'
 import { pickThought } from './thoughts'
-import { inkPerRoll, mustWager, rollingItself } from '../game/production'
+import { dieRollsItself, inkPerRoll, mustWager } from '../game/production'
 import { checkAchievements, byId as achievementById } from '../game/achievements'
 import { codicesUnlocked, esperienzaMultiplier } from '../game/codices'
 import type { GameState, TabId } from '../state'
@@ -15,6 +15,8 @@ export interface Actions {
   /** Start a spin by hand. Refused while one is already in the air. */
   roll(): void
   buyAutomator(): void
+  /** Auto-roll for the next die on the chain. Paid in ink, kept forever. */
+  buyAutoRoll(): void
   toggleAutomator(): void
   takeCard(id: string): void
   melt(): void
@@ -326,7 +328,9 @@ export class Shell {
     // Per second once something is rolling for you, per roll until then.
     this.inkOut.set(
       format(s.ink, n),
-      rollingItself(s) ? `${format(inkRate, n)}/s` : `${format(inkPerRoll(s), n)} per roll`,
+      // Ink comes off the first solid, so the rate is a rate exactly when
+      // that one die rolls without being asked.
+      dieRollsItself(s, 1) ? `${format(inkRate, n)}/s` : `${format(inkPerRoll(s), n)} per roll`,
     )
     const showChips = s.wagers > 0 || s.chips.gt(0)
     this.chipsOut.show(showChips)

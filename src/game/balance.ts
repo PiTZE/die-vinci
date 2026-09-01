@@ -100,7 +100,64 @@ export const AUTOMATOR_SEED = 10
 
 export const AUTOMATOR_COST = 1
 
+// -- auto-roll, one die at a time -----------------------------------------
+//
+// The first run used to be twenty-four minutes of holding one button, because
+// the automator sits behind the Wager and holding is the only way to roll. AD
+// never asks for that: its first Infinity is passive and the thing you are
+// waiting on is a number, not your finger.
+//
+// So the finger comes back a die at a time. Buying auto-roll for a die means
+// that die takes part in the roll whether or not you are pressing, and it
+// unlocks when the die below it on the chain does: open the d6 and you can
+// automate the d4, open the d8 and you can automate the d6. There is no tenth
+// solid, so the d72 never gets one and the automator at the first Wager is
+// what finally covers it. That is the milestone it always was, now aimed at
+// one specific die instead of at the whole table.
+//
+// It buys no throughput. Holding already gives exactly the roll rate, because
+// a roll refuses to start while one is in the air, so what this changes is
+// whether you have to be there. What it costs is ink that would otherwise be
+// dice, which is the first real trade layer 0 has ever offered.
+//
+// The ladder is measured against when each study actually lands and what the
+// ink curve is doing at the time: the eight unlocking studies come at 12s,
+// 1m51s, 2m49s, 3m19s, 3m53s, 4m21s, 4m44s and 5m04s, and a study clears the
+// ink, so each price is set against the rebuild rather than against the peak
+// before it.
+export const AUTO_ROLL_COSTS: Decimal[] = [
+  new Decimal(1e4),
+  new Decimal(1e7),
+  new Decimal(1e11),
+  new Decimal(1e16),
+  new Decimal(1e22),
+  new Decimal(1e30),
+  new Decimal(1e40),
+  new Decimal(1e52),
+]
+
 export const ROLLS_DRAWN_INDIVIDUALLY = 12
+
+/**
+ * Below this the dice are not merely too fast to read, they are too fast to
+ * see at all: a digit changing twenty times a second is one grey smudge, and
+ * the honest number to print in its place is the die's average.
+ *
+ * Above it the column shows real faces, changing as fast as the refresh rate
+ * allows. It is a blur rather than a reading, but a blur is what the dice
+ * themselves are doing and the two should agree.
+ */
+export const FACE_AVERAGE_S = 0.05
+
+/**
+ * Seconds for the printed number to travel from the last face it landed on to
+ * the average, once it crosses that line.
+ *
+ * A d12 that landed on 9 reads 9, then walks down to 6.5 rather than cutting
+ * to it. The snap was the tell that the number had stopped being a reading and
+ * become a statistic, and it happened at the exact moment the table got fast.
+ */
+export const FACE_SETTLE_S = 0.9
 
 /** Ink cost of the first roll-rate upgrade, then x10 each. */
 export const ROLL_COST_BASE = new Decimal(1000)

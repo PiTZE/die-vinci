@@ -7,9 +7,14 @@ import Decimal from 'break_infinity.js'
 import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, START_INK, TICK_MS, UI_MS_DEFAULT } from './game/balance'
 import {
   buyFolio,
+  autoRollCost,
   buyAutomator,
+  buyAutoRoll,
   buyRollRate,
+  canBuyAutoRoll,
+  nextAutoRoll,
   buySolid,
+  rollProgress,
   startRoll,
   buyStudy,
   folioUnlocked,
@@ -324,6 +329,10 @@ const actions: Actions = {
   },
   buyBreak: (id) => {
     buyBreak(state, id)
+    persistSoon()
+  },
+  buyAutoRoll: () => {
+    buyAutoRoll(state)
     persistSoon()
   },
   buyCodex: (idx) => {
@@ -666,8 +675,17 @@ const hook: Record<string, unknown> = {
   solidMultiplier,
   inkPerSecond,
   meltUnlocked,
+  // The auto-roll ladder, so its suite can assert the unlock rule rather than
+  // count rows on a screen.
+  nextAutoRoll,
+  autoRollCost,
+  canBuyAutoRoll,
   canMelt,
   meltGain,
+  // Whether a spin is still in the air, which is now a question for the clock
+  // rather than for the faces: the engine keeps the last face it landed
+  // instead of clearing it on the throw.
+  rollProgress,
   get rollInterval() {
     return rollDuration(state)
   },

@@ -97,6 +97,7 @@ export function doWager(s: GameState): boolean {
   // finished run back a button to press is not a prestige, it is a demotion.
   s.rollStartedAt = 0
   s.rollAccum = 0
+  s.handRollAt = 0
   s.faces = s.faces.map(() => 0)
   // The automator leaves a run something to roll, or its own autobuyer waits
   // for ten times a price the empty table can never pay for.

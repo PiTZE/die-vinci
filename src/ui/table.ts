@@ -22,11 +22,12 @@ import {
   rolling,
   mustWager,
   rollingItself,
+  dieRollsItself,
   meanFace,
   faceBias,
   FACE_READABLE_S,
 } from '../game/production'
-import { WAGER_AT } from '../game/balance'
+import { FACE_AVERAGE_S, FACE_SETTLE_S, WAGER_AT } from '../game/balance'
 import { wagerProgress } from '../game/wager'
 import { modifiers } from '../game/tarot'
 import { format, formatWhole } from '../format'
@@ -49,6 +50,14 @@ interface Row {
   blocks: HTMLElement[]
   buyLabel: HTMLElement
   buyCost: HTMLElement
+  /** What the column is printing, as a float, so it can walk to the average
+   *  rather than cut to it. */
+  shownFace: number
+  /** The last face the digit was redrawn for, so a landing animates once. */
+  drawnFace: number
+  /** Where this row's walk to the average started, and which walk it was. */
+  fromFace: number
+  settledFor: number
   /** The last face this die actually landed on, so the column never blanks. */
   lastFace: number
 }
@@ -128,6 +137,15 @@ class Steady {
 
 export function tablePane(): Pane {
   let confirm: Confirmer
+  /**
+   * When the rolls crossed out of sight, or 0 while they are still visible.
+   *
+   * One clock for the whole table rather than one a row, because every row
+   * starts its walk from a different random face and they have to arrive
+   * together. A rate of approach would have the die that landed on 12 still
+   * moving long after the one that landed on 7 had stopped.
+   */
+  let settleAt = 0
   const rows: Row[] = []
   let maxBtn: HTMLButtonElement
   let barFolio: HTMLButtonElement
@@ -290,7 +308,7 @@ export function tablePane(): Pane {
         r.append(amount, rate, buy)
 
         chain.appendChild(r)
-        rows.push({ root: r, icon, face, mult, blocks, amount, rate: flow, buy, buyLabel, buyCost, lastFace: 0 })
+        rows.push({ root: r, icon, face, mult, blocks, amount, rate: flow, buy, buyLabel, buyCost, lastFace: 0, shownFace: 0, drawnFace: 0, fromFace: 0, settledFor: 0 })
       }
 
       const roll = el('div', 'section table-roll')
@@ -460,6 +478,18 @@ export function tablePane(): Pane {
       // noise rather than a reading. The dice just spin then.
       const duration = rollDuration(s)
       const readable = duration >= FACE_READABLE_S
+      // The walk to the average: a fixed window off one clock, so it takes
+      // the same nine tenths of a second at any refresh rate and every row
+      // lands on its own average at the same instant.
+      if (duration < FACE_AVERAGE_S) {
+        if (!settleAt) settleAt = now
+      } else {
+        settleAt = 0
+      }
+      const settle = settleAt ? Math.min(1, (now - settleAt) / 1000 / FACE_SETTLE_S) : 0
+      // Smoothstep, so it leaves the face it landed on gently and arrives the
+      // same way rather than braking into the average.
+      const settleEase = settle * settle * (3 - 2 * settle)
 
       // The throw itself is driven from animate(), every frame. Feeding it from
       // here would step the tumble at whatever the refresh rate is.
@@ -542,50 +572,64 @@ export function tablePane(): Pane {
         // solid does not tumble and announce a number that pays nothing.
         const rolling = st.amount.gt(0)
         setDieRolling(r.icon, rolling)
-        // Slow enough to read, and it is the face this die landed on. Faster
-        // than that, the digit was blanked, so the column emptied exactly when
-        // the table got interesting. It holds the die's average instead, which
-        // is what a run of rolls that fast actually pays.
+        // The column always has a number in it, and it never jumps.
+        //
+        // It used to empty for the whole of every throw, because startRoll
+        // zeroed the faces and the refresh rate samples on its own clock: the
+        // window where a face was set lasted about as long as the hold repeat,
+        // so at a refresh of 100ms the number was usually missed entirely. On
+        // a held button the column read blank for minutes at a time, in a game
+        // whose whole feedback is the number a die landed on.
+        //
+        // Now the engine keeps the last face it landed rather than clearing
+        // it, so there is always something true to print, and the column moves
+        // through three states as the rolls get faster:
+        //
+        //   readable   the exact face, redrawn each landing
+        //   a blur     still exact faces, changing as fast as the screen can
+        //   invisible  the die's average, walked to rather than cut to
+        //
+        // The walk is the point of the third one. A d12 that landed on 9 does
+        // not become 6.5 between two frames; it travels there over about a
+        // second, which is how the eye is told that the number stopped being a
+        // reading and became a statistic.
         if (!rolling) {
           setText(r.face, '')
           r.lastFace = 0
-        } else if (readable) {
+          r.shownFace = 0
+        } else {
           const face = s.faces[def.idx - 1]
-          if (face) {
-            // A new landing. The number is the whole point of the roll and it
-            // used to arrive as a 120ms opacity fade on a 0.95rem digit, which
-            // is the quietest thing on the screen announcing the loudest.
-            if (face !== r.lastFace) land(r.face)
-            r.lastFace = face
-            setText(r.face, String(face))
-            r.face.classList.remove('stale')
-          } else {
-            // Mid-throw. The column used to empty for the whole roll, which in
-            // a game whose feedback is numbers reads as the panel going out.
-            // The last face stays, dimmed, until this one lands on top of it.
+          if (face) r.lastFace = face
+          const mean = meanFace(def.faces, faceBias(s))
+          if (duration >= FACE_AVERAGE_S) {
+            // Fast or slow, this is a real face off a real roll. Only the rate
+            // it changes at differs, and the dice underneath are doing the
+            // same thing.
             if (r.lastFace) {
+              if (r.lastFace !== r.drawnFace) land(r.face)
+              r.shownFace = r.lastFace
               setText(r.face, String(r.lastFace))
-              r.face.classList.add('stale')
             } else {
               setText(r.face, '')
             }
+            // Dimmed only while it is genuinely stale, which is a throw still
+            // in the air at a speed where you can watch it land.
+            r.face.classList.toggle('stale', readable && rollProgress(s, now) < 1)
+          } else {
+            r.face.classList.remove('stale')
+            // Fixed from the face this die was showing when the rolls went out
+            // of sight, so the whole table walks in step.
+            if (r.settledFor !== settleAt) {
+              r.fromFace = r.shownFace > 0 ? r.shownFace : r.lastFace || mean
+              r.settledFor = settleAt
+            }
+            r.shownFace = r.fromFace + (mean - r.fromFace) * settleEase
+            // One place, because the average of a die is rarely a whole
+            // number and rounding it would land back on a face it could
+            // actually roll, which reads as a reading again.
+            setText(r.face, r.shownFace.toFixed(1))
           }
-        } else {
-          r.face.classList.remove('stale')
-          // Too fast to follow, and it still shows the face the dice landed
-          // on rather than what they average.
-          //
-          // The average was the honest number and it read as a dead one: it
-          // is the same digit every frame while the dice are visibly tumbling
-          // underneath it, so the column looked stuck exactly where the table
-          // got fast. The batched path rolls real faces every tick whether or
-          // not anything reads them, so there is always a true number to show
-          // here. It changes at the refresh rate rather than on each landing,
-          // which is a blur rather than a reading, but a blur is what the dice
-          // themselves are doing at this speed and the two now agree.
-          const face = s.faces[def.idx - 1] || r.lastFace
-          if (face) r.lastFace = face
-          setText(r.face, face ? String(face) : '')
+          r.drawnFace = r.lastFace
         }
 
         // Averaged over the faces, because that is what the row actually pays
@@ -600,9 +644,13 @@ export function tablePane(): Pane {
           .times(mult)
           .times(meanFace(def.faces, faceBias(s)))
           .times(globalMult)
-        const per = rollingItself(s) ? each.times(rate) : each
+        // Per second for a die that rolls itself, per roll for one still
+        // waiting on your finger. With the ladder half bought the table says
+        // which half is which without a word of explanation.
+        const rollsAlone = dieRollsItself(s, def.idx)
+        const per = rollsAlone ? each.times(rate) : each
         const unit = def.idx === 1 ? 'ink' : SOLIDS[def.idx - 2].short
-        setText(r.rate, `+${format(per, n)} ${unit}${rollingItself(s) ? '/s' : '/roll'}`)
+        setText(r.rate, `+${format(per, n)} ${unit}${rollsAlone ? '/s' : '/roll'}`)
 
         const count = buyCount(s, def.idx)
         const price = buyPrice(s, def.idx)

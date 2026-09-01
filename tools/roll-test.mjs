@@ -287,9 +287,10 @@ await ev(`${ROLL}.click()`); await sleep(1300)
 const heldFace = await ev(`document.querySelector('.solid-face').textContent`)
 await ev(`${ROLL}.click()`); await sleep(120)
 const air = await ev(`(() => { const f = document.querySelector('.solid-face')
-  return { face: f.textContent, stale: f.classList.contains('stale') } })()`)
+  return { face: f.textContent, stale: f.classList.contains('stale'),
+    progress: window.LD.rollProgress(window.LD.state, Date.now()) } })()`)
 check('a die in the air holds its last face, dimmed',
-  air.face === heldFace && heldFace !== "" && air.stale === true,
+  air.face === heldFace && heldFace !== "" && air.progress < 1 && air.stale === true,
   JSON.stringify({ heldFace, ...air }))
 
 // And a die that has never landed shows nothing, because there is nothing to
@@ -323,30 +324,53 @@ check('the face reads left of the solid, not over it',
 check('and the wireframe stays at full strength',
   Number(rest.opacity) === 1, rest.opacity)
 
-// Too fast to read still shows a real face rather than the die's average.
+// The column has three states as the rolls get faster, and it is never empty
+// in any of them.
 //
-// It used to print the average, which is the honest number over a run of rolls
-// and reads as a dead one: the same digit every frame with the dice visibly
-// tumbling under it, so the column looked stuck exactly where the table got
-// fast. The batched path rolls real faces every tick whether or not anything
-// reads them, so there is always a true number to show.
-await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.autoRollOn = true; s.rollUpgrades = 60 })()`)
-await sleep(150)
-const blur = await ev(`(() => {
+// Readable: the exact face, redrawn each landing. A blur: still exact faces,
+// changing as fast as the screen can. Invisible: the die's average, walked to
+// rather than cut to. The middle one exists because the average printed while
+// the dice are visibly tumbling reads as a column that has stopped working,
+// and the batched path rolls real faces every tick whether or not anything
+// reads them.
+
+// 0.889^20 is 0.095s: past reading, not past seeing.
+await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.autoRollOn = true; s.rollUpgrades = 20 })()`)
+await sleep(300)
+const sample = async (n, every) => ev(`(() => {
   const seen = []
   return new Promise(done => {
     const t = setInterval(() => {
       seen.push(document.querySelector('.solid-face').textContent)
-      if (seen.length >= 12) { clearInterval(t); done(seen) }
-    }, 60)
+      if (seen.length >= ${n}) { clearInterval(t); done(seen) }
+    }, ${every})
   })
 })()`)
+const blur = await sample(12, 60)
 const faces = blur.map(Number)
-check('an unreadable roll rate still shows a landed face',
+check('a roll too fast to read still shows a real face',
   faces.every((f) => Number.isInteger(f) && f >= 1 && f <= 4), JSON.stringify(blur))
-// A d4's average is 2.5, so the old behaviour printed a flat 2 forever. Any
+// A d4's average is 2.5, so printing the average would give a flat 2.5. Any
 // variation at all proves these are rolls and not that number.
 check('and it is a real roll, not one number held', new Set(faces).size > 1, JSON.stringify(blur))
+
+// 0.889^60 is under a millisecond: nothing to see, so the honest number is the
+// average, and it is walked to rather than jumped to.
+await ev(`(() => { const s = window.LD.state; s.rollUpgrades = 60 })()`)
+const walk = (await sample(14, 70)).map(Number)
+check('past seeing it walks to the average rather than cutting to it',
+  walk.length > 4 && walk.slice(0, 3).some((v) => Math.abs(v - 2.5) > 0.15),
+  JSON.stringify(walk))
+// A d4 averages 2.5, and the walk is nine tenths of a second.
+check('and it lands on the average and stays there',
+  Math.abs(walk[walk.length - 1] - 2.5) < 0.06 &&
+    Math.abs(walk[walk.length - 2] - 2.5) < 0.06, JSON.stringify(walk))
+check('and it moves in one direction, not in steps',
+  (() => { const d = []
+    for (let i = 1; i < walk.length; i++) d.push(walk[i] - walk[i - 1])
+    const moving = d.filter((v) => Math.abs(v) > 1e-9)
+    return moving.length > 2 && (moving.every((v) => v >= 0) || moving.every((v) => v <= 0))
+  })(), JSON.stringify(walk))
 
 // A row you own none of sits the throw out: no face, and its wireframe does
 // not move while the ones with dice on them do.
@@ -581,6 +605,107 @@ const wrong = Object.entries(SOLID_FIGURES).filter(([k, [v, e]]) => {
 check('every solid has the vertices and edges it should',
   wrong.length === 0,
   wrong.map(([k, want]) => `${k} drew ${JSON.stringify(counts[k])} not ${JSON.stringify(want)}`).join('; '))
+
+// -- auto-roll, one die at a time ----------------------------------------
+//
+// The first run was twenty-four minutes of holding one button. A die now buys
+// its own roll, and opens for it when the die below it on the chain opens for
+// buying, so the ladder fills from the shallow end alongside the table.
+
+const fresh = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  // The checks above finish on a run held at the threshold, where the engine
+  // correctly refuses to roll anything at all.
+  s.inkThisWager = new D(0); s.haltMs = 0; s.broke = false; s.handRollAt = 0
+  s.studies = 0; s.autoDice = 0; s.wagers = 0; s.autoRoll = false
+  s.ink = new D('1e30')
+  for (const d of s.solids) { d.bought = 0; d.amount = new D(0) }
+  s.solids[0].amount = new D(100)
+  return { next: window.LD.nextAutoRoll(s) } })()`)
+check('a table with one solid on it can automate nothing', fresh.next === 0,
+  JSON.stringify(fresh))
+
+const opened = await ev(`(() => { const s = window.LD.state
+  s.studies = 1
+  return { next: window.LD.nextAutoRoll(s), cost: window.LD.autoRollCost(s).toString(),
+    can: window.LD.canBuyAutoRoll(s) } })()`)
+check('opening the second solid puts the first die up for sale',
+  opened.next === 1 && opened.can === true, JSON.stringify(opened))
+
+// One at a time and in order: the d6 waits on the d8, not on your wallet.
+const inOrder = await ev(`(() => { const s = window.LD.state
+  window.LD.actions.buyAutoRoll()
+  const after = { dice: s.autoDice, next: window.LD.nextAutoRoll(s) }
+  s.studies = 2
+  return { after, then: window.LD.nextAutoRoll(s) } })()`)
+check('buying it takes the first die and offers nothing further',
+  inOrder.after.dice === 1 && inOrder.after.next === 0, JSON.stringify(inOrder))
+check('and the next solid opens the next die',  inOrder.then === 2, JSON.stringify(inOrder))
+
+// The whole point: it rolls with no finger on the button, and the rest of the
+// table sits it out.
+const alone = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 2; s.autoDice = 1; s.autoRoll = false; s.rollStartedAt = 0; s.rollAccum = 0
+  s.handRollAt = 0
+  // Small, because a few hundred ink added to 1e30 is lost to the mantissa and
+  // the check would read as nothing having happened.
+  s.ink = new D(0)
+  s.solids[0].amount = new D(100); s.solids[1].amount = new D(100)
+  s.solids[2].amount = new D(100)
+  const before = [s.ink.toString(), s.solids[0].amount.toString()]
+  for (let i = 0; i < 30; i++) window.LD.tick(s, 0.25, Date.now() + i * 250)
+  return { inkMoved: s.ink.toString() !== before[0],
+    secondFed: s.solids[0].amount.toString() !== before[1],
+    faces: s.faces.slice(0, 3) } })()`)
+check('an automated die rolls with nobody pressing', alone.inkMoved === true,
+  JSON.stringify(alone))
+check('and the dice that are not automated sit the roll out',
+  alone.secondFed === false && alone.faces[1] === 0, JSON.stringify(alone))
+
+// Pressing throws the whole table, automated or not.
+const byHand = await ev(`(async () => { const s = window.LD.state, D = window.LD.Decimal
+  s.solids[0].amount = new D(100)
+  const before = s.solids[0].amount.toString()
+  window.LD.actions.roll()
+  const at = Date.now()
+  for (let i = 0; i < 30; i++) window.LD.tick(s, 0.25, at + i * 250)
+  return { fed: s.solids[0].amount.toString() !== before } })()`)
+check('a roll you asked for throws the whole table', byHand.fed === true,
+  JSON.stringify(byHand))
+
+// There is no tenth solid, so the deepest never gets one and the automator at
+// the Wager is what covers it.
+const deepest = await ev(`(() => { const s = window.LD.state
+  s.studies = 20; s.autoDice = 8
+  return { next: window.LD.nextAutoRoll(s), solids: s.solids.length } })()`)
+check('the deepest die is never for sale', deepest.next === 0 && deepest.solids === 9,
+  JSON.stringify(deepest))
+
+// Kept through everything that clears the table, as the automator is.
+const kept = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoDice = 3; s.inkThisWager = new D('1e309'); s.ink = new D('1e309')
+  window.LD.actions.buyStudy()
+  const afterStudy = s.autoDice
+  window.LD.actions.wager()
+  return { afterStudy, afterWager: s.autoDice } })()`)
+check('a study and a Wager both leave the ladder alone',
+  kept.afterStudy === 3 && kept.afterWager === 3, JSON.stringify(kept))
+
+// The tab it lives on opens two minutes into a first run now, so the two
+// things that sat behind the Wager have to seal themselves.
+const sealed = await ev(`(async () => { const s = window.LD.state
+  s.wagers = 0; s.autoRoll = false; s.chips = new window.LD.Decimal(0)
+  for (const k of Object.keys(s.autobuyers)) s.autobuyers[k].unlocked = false
+  await new Promise(r => setTimeout(r, 250))
+  const tab = [...document.querySelectorAll('.tab')].find(t => t.textContent === 'AUTOMATION')
+  tab.click()
+  await new Promise(r => setTimeout(r, 250))
+  const pane = [...document.querySelectorAll('.pane')].find(p => !p.hidden)
+  const shown = [...pane.querySelectorAll('.section')].filter(x => !x.hidden)
+    .map(x => x.querySelector('.section-head').textContent.trim())
+  return { visible: !tab.hidden, shown } })()`)
+check('the tab is open before the Wager', sealed.visible === true, JSON.stringify(sealed))
+check('and holds nothing but the roll while it is',
+  sealed.shown.length === 1 && sealed.shown[0] === 'THE ROLL', JSON.stringify(sealed))
 
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)

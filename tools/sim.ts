@@ -68,6 +68,15 @@ const BROKE = process.env.BROKE === '1'
  * The patience is the other half and it is a real cost: while a run is chasing
  * a depth it cannot reach, no Wager is called and no chips arrive at all.
  */
+/**
+ * Buy the auto-roll ladder as it opens.
+ *
+ * The sim holds ROLL perfectly and never gets tired, so the ladder buys it
+ * nothing at all: what it does is spend ink that would have been dice. That
+ * makes this the honest measurement of what the ladder costs a player who
+ * takes it, and AUTOROLL=0 is the same run without paying for it.
+ */
+const AUTOROLL = process.env.AUTOROLL !== '0'
 const AIM = process.env.AIM !== '0'
 const AIM_PATIENCE_S = Number(process.env.PATIENCE ?? 600)
 
@@ -137,8 +146,14 @@ function mark(what: string): void {
  */
 function advance(): void {
   if (!s.autoRoll) {
-    // A roll lands whenever one is due, exactly as holding the button would.
-    if (!s.rollStartedAt) s.rollStartedAt = ms
+    // Holding the button, through the same entry point the button uses.
+    //
+    // It used to set rollStartedAt directly, which worked while that field was
+    // the only thing saying a roll had been asked for. Per-die auto-roll split
+    // that apart: a roll nobody pressed for throws only the automated dice, and
+    // the press is what says otherwise. Poking the animation clock instead
+    // meant the sim held a button that was not connected to anything.
+    P.startRoll(s, ms)
     ms += DT * 1000
     P.tick(s, DT, ms)
     return
@@ -292,6 +307,9 @@ while (t < HOURS * 3600 && done < WAGERS) {
     mark('automator')
   }
 
+  // Ahead of maxAll, because a player who wants their hands back buys it
+  // before spending the rest of the wallet on dice.
+  if (AUTOROLL) while (P.canBuyAutoRoll(s)) P.buyAutoRoll(s)
   P.maxAll(s)
   if (s.ink.lt(PUSH_AT)) {
     if (P.canBuyFolio(s)) {
@@ -385,7 +403,7 @@ while (t < HOURS * 3600 && done < WAGERS) {
       `\nWAGER ${done}  after ${hms(t - lastWager)}  (total ${hms(t)})  ` +
         `chips=${s.chips}  upgrades=${s.chipUpgrades.length}/${Object.keys(UPGRADES).length}  ` +
         `chal=${s.challengesDone.length}/13 auto=${s.autobuyers.wager?.unlocked?"y":"n"}${s.autobuyers.wager?.level ?? 0} archive=${s.achievements.length}/${ACHIEVEMENTS.length} x${achievementPower(s).toNumber().toFixed(3)}  ` +
-        `arcana=${owned(s)}`,
+        `arcana=${owned(s)} auto=${s.autoDice}/${P.AUTO_ROLL_MAX}`,
     )
     dump()
     lastWager = t

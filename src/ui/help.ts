@@ -17,6 +17,7 @@ interface Section {
 }
 
 const afterStudy = (s: GameState) => s.studies >= 1 || s.wagers > 0
+const hasAutoRoll = (s: GameState) => (s.autoDice ?? 0) > 0 || s.studies >= 1
 const afterAutomator = (s: GameState) => s.autoRoll || s.wagers > 0
 const nearWager = (s: GameState) => s.wagers > 0 || s.inkThisWager.gte('1e290')
 const afterWager = (s: GameState) => s.wagers > 0
@@ -52,6 +53,16 @@ const SECTIONS: Section[] = [
       'Each upgrade costs twenty times the last.',
       { text: 'Folios make every one of them worth more, permanently.',
         needs: (s) => s.folios > 0 || s.wagers > 0 },
+    ],
+  },
+  {
+    title: 'ROLLS ITSELF',
+    needs: hasAutoRoll,
+    body: [
+      'A die can be bought its own roll, in AUTOMATION. It opens once you have opened the die below it on the chain, so the first one arrives with your first study.',
+      'It buys you nothing but your hands back. Holding already rolls as fast as the roll rate allows, so what changes is whether you have to be there, and the price is ink you would otherwise have spent on dice.',
+      'A die that rolls itself reads per second on the table. One still waiting on you reads per roll, and shows no face when you are not pressing.',
+      'The deepest die on the chain never gets one. There is nothing under it to open.',
     ],
   },
   {
