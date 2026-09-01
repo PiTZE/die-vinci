@@ -366,6 +366,10 @@ const actions: Actions = {
     toggleAuto(state, id)
     persistSoon()
   },
+  toggleAutobuyers: () => {
+    state.autobuyersOn = state.autobuyersOn === false
+    persistSoon()
+  },
   upgradeAutobuyer: (id) => {
     upgradeAuto(state, id)
     persistSoon()

@@ -1060,7 +1060,11 @@ export function dieCanRollItself(s: GameState, idx: number): boolean {
  */
 export function dieRollsItself(s: GameState, idx: number): boolean {
   if (!dieOn(s, idx)) return false
-  if (s.autoRoll && !s.autoRollOn) return false
+  // The master switch, and it is a master over the ladder as well as over the
+  // automator now. It only ever gated the automator, which meant that for the
+  // whole of a first run, where the ladder is the only automation there is,
+  // the one switch labelled EVERY DIE was the one switch that did nothing.
+  if (!s.autoRollOn) return false
   return dieCanRollItself(s, idx)
 }
 

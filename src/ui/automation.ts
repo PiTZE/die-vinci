@@ -109,6 +109,7 @@ export function automationPane(): Pane {
   >()
 
   let autobuyerSection: HTMLElement
+  let allAutoToggle: HTMLButtonElement
   let autoManualRow: HTMLElement
   let dieNote: HTMLElement
   const dieRows: {
@@ -176,6 +177,15 @@ export function automationPane(): Pane {
       const section = autobuyerSection
       const h = el('div', 'section-head')
       h.appendChild(el('span', 'grow', 'AUTOBUYERS'))
+      // The group switch, in the head rather than in a row of its own: it is
+      // about the whole section under it, and a row would read as a fourteenth
+      // autobuyer. Each one keeps its own switch, so this stops all of them
+      // without forgetting which ones you had off.
+      allAutoToggle = el('button', 'auto-toggle', 'ON')
+      allAutoToggle.type = 'button'
+      allAutoToggle.title = 'Stop every autobuyer, keeping each one as you set it'
+      allAutoToggle.addEventListener('click', () => actions.toggleAutobuyers())
+      h.appendChild(allAutoToggle)
       section.appendChild(h)
 
       for (const a of AUTOBUYERS) {
@@ -270,6 +280,9 @@ export function automationPane(): Pane {
       // being shut. A player two minutes into their first run should not be
       // reading the word AUTOBUYERS, let alone THE WAGER inside it.
       autobuyerSection.hidden = !anyUnlocked(s)
+      const allOn = s.autobuyersOn !== false
+      setText(allAutoToggle, allOn ? 'ON' : 'OFF')
+      allAutoToggle.classList.toggle('buyable', allOn)
       autoSection.hidden = false
 
       const next = nextAutoRoll(s)
@@ -310,21 +323,25 @@ export function automationPane(): Pane {
         r.buy.classList.toggle('buyable', can)
       }
 
-      // The master over the nine below it. It stopped being a purchase when
+      // The master over the nine above it. It stopped being a purchase when
       // the Wager began granting the ladder outright: charging a chip for the
       // hands the ladder already sold you is charging twice.
-      autoManualRow.hidden = !s.autoRoll
+      //
+      // It appears with the first automated die rather than with the
+      // automator. It used to gate only the automator, so through the whole of
+      // a first run, where the ladder is the only automation there is, the one
+      // switch labelled EVERY DIE was the one switch that did nothing.
+      const anyAuto = s.autoRoll || s.autoDice > 0
+      autoManualRow.hidden = !anyAuto
+      autoToggle.hidden = !anyAuto
+      setText(autoToggle, s.autoRollOn ? 'ON' : 'OFF')
+      autoToggle.classList.toggle('buyable', s.autoRollOn)
+      autoBuy.hidden = s.autoRoll
       if (!s.autoRoll) {
         setText(autoBuy, `UNLOCK / ${automatorCost()} POINT`)
         const can = canBuyAutomator(s)
         autoBuy.disabled = !can
         autoBuy.classList.toggle('buyable', can)
-        autoToggle.hidden = true
-      } else {
-        autoBuy.hidden = true
-        autoToggle.hidden = false
-        setText(autoToggle, s.autoRollOn ? 'ON' : 'OFF')
-        autoToggle.classList.toggle('buyable', s.autoRollOn)
       }
       for (const a of AUTOBUYERS) {
         const row = rows.get(a.id)
@@ -335,8 +352,8 @@ export function automationPane(): Pane {
         if (!open) continue
 
         setText(row.every, `${(interval(s, a.id) / 1000).toFixed(2)}s`)
-        const on = s.autobuyers[a.id]?.on ?? true
-        setText(row.onBtn, on ? 'ON' : 'OFF')
+        const on = (s.autobuyers[a.id]?.on ?? true) && allOn
+        setText(row.onBtn, (s.autobuyers[a.id]?.on ?? true) ? 'ON' : 'OFF')
         row.onBtn.classList.toggle('buyable', on)
 
         const m = mode(s, a.id)

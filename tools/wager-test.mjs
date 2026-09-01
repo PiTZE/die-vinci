@@ -145,6 +145,25 @@ check('the CALL button stays shut until the run has earned it',
     .find(x => x.title === 'Call the Wager  (w)')
     return !!b && b.disabled })()`))
 
+// The CALL button holds and sticks like the rest. It is one of the three that
+// used to answer a click and nothing else.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  // canWager reads what this run has earned, not what is in hand.
+  s.ink = new D('1e309'); s.inkThisWager = new D('1e309'); s.broke = false })()`)
+await sleep(300)
+await ev(openTab('WAGER'))
+await sleep(400)
+const called = await ev(`(() => {
+  const b = [...document.querySelectorAll('.action')].find(x => x.textContent.startsWith('CALL THE WAGER'))
+  if (!b) return 'no button'
+  const r = b.getBoundingClientRect()
+  b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 41, button: 0,
+    clientX: r.x + 4, clientY: r.y + 4 }))
+  const held = b.classList.contains('held')
+  window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 41 }))
+  return held })()`)
+check('the CALL button is held rather than only clicked', called === true, String(called))
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

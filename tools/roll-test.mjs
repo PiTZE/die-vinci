@@ -674,6 +674,10 @@ const symmetry = await ev(`(() => {
   })
   return out })()`)
 const crooked = Object.entries(symmetry).filter(([, ok]) => !ok).map(([k]) => k)
+// And put the table back, because everything after this is about the dice
+// rolling themselves and the settle above turned all of that off.
+await ev(`(() => { const s = window.LD.state
+  s.autoRollOn = true; s.studies = 8 })()`)
 check('and every one of them rests mirror-symmetric',
   crooked.length === 0 && Object.keys(symmetry).length === 9,
   crooked.length ? crooked.join(', ') : `${Object.keys(symmetry).length} on the table`)

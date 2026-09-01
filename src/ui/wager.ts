@@ -11,7 +11,7 @@ import {
 import { canWager, chipsFromWager } from '../game/wager'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
-import { bindKey } from './hold'
+import { bindKey, holdable } from './hold'
 import { Confirmer } from './confirm'
 import {
   canBuyChipMult,
@@ -75,7 +75,7 @@ export function wagerPane(): Pane {
       callBtn = el('button', 'action', '')
       callBtn.type = 'button'
       callBtn.title = 'Call the Wager  (w)'
-      callBtn.addEventListener('click', () => {
+      holdable(callBtn, () => {
         if (confirm.request('wager')) actions.wager()
       })
       const cr = el('div', 'row')
@@ -140,7 +140,7 @@ export function wagerPane(): Pane {
 
       bindKey('w', () => {
         if (confirm.request('wager')) actions.wager()
-      })
+      }, callBtn)
     },
 
     update(s: GameState) {

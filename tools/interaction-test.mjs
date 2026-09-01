@@ -528,11 +528,21 @@ try {
   check('and using another button does not take it off',
     (await rings()).length === 1, JSON.stringify(await rings()))
 
-  // A ringed ROLL keeps rolling with nothing touching it and no automation.
+  // And holding another one long enough does not take it either. A ring the
+  // next long hold silently steals is a ring you have to keep an eye on, and
+  // not having to is the whole point of it.
   await pdown('.bar-roll', 14); await sleep(1200); await pup(14)
   const only = await rings()
-  check('sticking another moves the ring rather than adding one',
-    only.length === 1 && only[0].includes('bar-roll'), JSON.stringify(only))
+  check('and holding another long enough does not move it',
+    only.length === 1 && only[0].includes('max'), JSON.stringify(only))
+
+  // Off, then onto ROLL, which is the button the rest of this section wants.
+  await pdown('.bar-btn.max', 15); await sleep(120); await pup(15)
+  await pdown('.bar-roll', 16); await sleep(1200); await pup(16)
+  const handedOver = await rings()
+  check('and it goes elsewhere once the ringed button is tapped off',
+    handedOver.length === 1 && handedOver[0].includes('bar-roll'),
+    JSON.stringify(handedOver))
 
   const inkBefore = await evaluate(`window.LD.state.ink.toString()`)
   await sleep(900)
@@ -586,6 +596,31 @@ try {
   await sleep(600)
   check('and then it stops', (await evaluate(`window.LD.state.inkThisWager.eq(0)`)) === true)
 
+  // STUDY and FOLIO hold and stick like everything else. They were the last
+  // controls in the game that only answered a click. (The Wager's own button
+  // is checked in test:wager, where the pane is unsealed.)
+  // A full table with plenty of everything, because both of these buttons are
+  // disabled until the reset they stand for is affordable.
+  const resetReady = `(() => { const s = window.LD.state, D = window.LD.Decimal
+    s.studies = 8; s.folios = 1; s.ink = new D('1e40')
+    s.solids.forEach((d) => { d.bought = 200; d.amount = new D('1e6') }) })()`
+  for (const [name, sel] of [['S', '.bar-btn[title^="Take a study"]'],
+    ['F', '.bar-btn[title^="Bind a folio"]']]) {
+    await evaluate(`window.LD.releaseSticky()`)
+    await evaluate(resetReady)
+    await sleep(300)
+    if (!(await evaluate(`!!document.querySelector('${sel}')`))) {
+      check(`${name} is on the bar`, false)
+      continue
+    }
+    await pdown(sel, 20); await sleep(1200)
+    const r = await rings()
+    await pup(20)
+    check(`${name} can take the ring`, r.length === 1 && r[0].includes('bar-btn'),
+      JSON.stringify(r))
+  }
+  await evaluate(`window.LD.releaseSticky()`)
+
   // Unaffordable is not gone. MAX is disabled between one roll paying and the
   // next, and dropping the ring for that would take it off a second after you
   // put it on.
@@ -624,8 +659,8 @@ try {
     return { all: g.map(b => b.textContent.trim()),
       open: g.filter(b => !b.hidden).map(b => b.textContent.trim()),
       panes: [...document.querySelectorAll('.subtab')].length } })()`)
-  check('five groups hold the twelve panes',
-    navGroups.all.length === 5 && navGroups.panes === 12, JSON.stringify(navGroups))
+  check('six groups hold the twelve panes',
+    navGroups.all.length === 6 && navGroups.panes === 12, JSON.stringify(navGroups))
   // A group exists when anything inside it does, exactly as the flat tabs did.
   check('and a group stays sealed until something inside it is real',
     !navGroups.open.includes('WAGER') && !navGroups.open.includes('BREAK')

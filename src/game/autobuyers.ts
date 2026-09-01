@@ -231,6 +231,9 @@ export interface AutobuyerActions {
 }
 
 export function runAutobuyers(s: GameState, dtMs: number, act: AutobuyerActions): void {
+  // The group switch. Off means none of them run and all of them keep their
+  // own setting, so turning it back on puts the table exactly as it was.
+  if (s.autobuyersOn === false) return
   for (const d of AUTOBUYERS) {
     const a = slot(s, d.id)
     if (!a.unlocked || !a.on) continue

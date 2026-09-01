@@ -179,6 +179,55 @@ check('the folio autobuyer takes a cap and no lift',
   JSON.stringify(limits))
 check('and a solid autobuyer takes neither', limits.solidAlwaysAllowed === true)
 
+// The two master switches. Each is a gate over a group that keeps every
+// switch inside it exactly as it was, so turning one back on puts the table
+// where it stood rather than where the defaults put it.
+const masters = await ev(`(async () => {
+  const s = window.LD.state, D = window.LD.Decimal
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+  const out = {}
+
+  // Every autobuyer running, one of them deliberately switched off.
+  for (const k of Object.keys(s.autobuyers)) { s.autobuyers[k].unlocked = true; s.autobuyers[k].on = true }
+  s.autobuyers.rollRate.on = false
+  s.autobuyersOn = true
+  s.ink = new D('1e40'); s.solids.forEach(d => { d.amount = new D(100) })
+  const before = s.solids.reduce((a, d) => a + d.bought, 0)
+  await sleep(900)
+  out.runningWithItOn = s.solids.reduce((a, d) => a + d.bought, 0) > before
+
+  s.autobuyersOn = false
+  s.ink = new D('1e40')
+  const stopped = s.solids.reduce((a, d) => a + d.bought, 0)
+  await sleep(900)
+  out.stoppedWithItOff = s.solids.reduce((a, d) => a + d.bought, 0) === stopped
+  // And it forgot nothing while it was off.
+  out.keptEachSwitch = s.autobuyers.rollRate.on === false && s.autobuyers.solid1.on === true
+  s.autobuyersOn = true
+
+  // The dice master, over the ladder rather than only over the automator.
+  s.autoRoll = false; s.autoDice = 3; s.autoDiceOff = []; s.autoRollOn = true
+  s.rollUpgrades = 0
+  s.inkThisWager = new D(0)
+  await sleep(1400)
+  out.laddderRollsWithItOn = s.inkThisWager.gt(0)
+  s.autoRollOn = false
+  await sleep(1400)
+  s.inkThisWager = new D(0)
+  await sleep(1400)
+  out.ladderStopsWithItOff = s.inkThisWager.eq(0)
+  s.autoRollOn = true
+  return out })()`)
+check('the autobuyer master runs them with it on', masters.runningWithItOn === true,
+  JSON.stringify(masters))
+check('and stops all of them with it off', masters.stoppedWithItOff === true,
+  JSON.stringify(masters))
+check('and forgets nobody\'s own switch while it is off', masters.keptEachSwitch === true,
+  JSON.stringify(masters))
+check('the roll master covers the ladder, not just the automator',
+  masters.laddderRollsWithItOn === true && masters.ladderStopsWithItOff === true,
+  JSON.stringify(masters))
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

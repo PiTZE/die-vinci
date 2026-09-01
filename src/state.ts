@@ -91,8 +91,13 @@ export interface GameState {
   autoDiceOff: number[]
   /** The first automator. Once bought it is never lost, not even to a Wager. */
   autoRoll: boolean
-  /** And whether it is switched on. */
+  /** And whether it is switched on, which gates every automatic roll: the
+   *  ladder's nine as well as the automator's whole table. */
   autoRollOn: boolean
+  /** The same switch over the autobuyers as a group. Each one keeps its own,
+   *  and this is the one that stops all thirteen without touching them, for
+   *  the run you want to play by hand. */
+  autobuyersOn: boolean
   rollUpgrades: number
   /** The multiplier melting has left on the deepest solid. */
   meltPower: Decimal
@@ -219,6 +224,7 @@ export function newGame(now: number): GameState {
     autoDiceOff: [],
     autoRoll: false,
     autoRollOn: true,
+    autobuyersOn: true,
     rollUpgrades: 0,
     meltPower: new Decimal(1),
     studies: 0,

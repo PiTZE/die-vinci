@@ -357,14 +357,16 @@ export function tablePane(): Pane {
       folioBtn = el('button', 'action', '')
       folioBtn.type = 'button'
       folioBtn.title = 'Bind a folio  (f)'
-      folioBtn.addEventListener('click', () => {
+      // Held and stickable, like the F in the bar and like the f key. These
+      // two were the last controls in the game that only answered a click.
+      holdable(folioBtn, () => {
         if (confirm.request('folio')) actions.buyFolio()
       })
 
       studyBtn = el('button', 'action', '')
       studyBtn.type = 'button'
       studyBtn.title = 'Take a study  (s)'
-      studyBtn.addEventListener('click', () => {
+      holdable(studyBtn, () => {
         if (confirm.request('study')) actions.buyStudy()
       })
 

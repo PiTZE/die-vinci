@@ -38,6 +38,8 @@ export interface Actions {
   enterChallenge(id: number): void
   exitChallenge(): void
   toggleAutobuyer(id: string): void
+  /** The one switch over all thirteen. */
+  toggleAutobuyers(): void
   upgradeAutobuyer(id: string): void
   /** A cap on how many a reset autobuyer takes. AD's limitDimBoosts. */
   setAutobuyerLimit(id: string, on: boolean, at?: number): void

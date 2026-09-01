@@ -33,9 +33,15 @@ const STICK_MS = 900
  * one; if every button could stick, the answer would be to stick them all and
  * there would be nothing to decide.
  *
- * Pressing another button does not take the ring away, because the point is
- * that your finger is free for the others. Only holding another one long
- * enough to stick it does, and so does a tap on the ringed button itself.
+ * Nothing takes the ring off but a tap on the ringed button. Pressing another
+ * button does not, because the point is that your finger is free for the
+ * others, and neither does holding another one long enough that it would have
+ * stuck: a ring that the next long hold silently steals is a ring you have to
+ * keep an eye on, and the whole reason to have one is so you do not.
+ *
+ * So a second hold just holds. It repeats for as long as you keep your finger
+ * on it and stops when you let go, which is what every button did before any
+ * of this existed.
  */
 let sticky: { el: HTMLElement; rep: Repeater } | null = null
 
@@ -137,15 +143,19 @@ export function holdable(el: HTMLElement, action: (mods: Mods) => void): void {
 
   el.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 && e.pointerType === 'mouse') return
-    if ((el as HTMLButtonElement).disabled) return
     // A press on the ringed button takes the ring off, and does nothing else.
-    // Anything else would mean the only way to stop it is to stick something
-    // you did not want.
+    //
+    // Before the disabled guard, deliberately. A ringed MAX holds itself down
+    // until the ink runs out, and the moment it does the button goes disabled
+    // and the press that would have released it was being dropped. Now that a
+    // tap is the only way off, that left the ring stuck on a dead button with
+    // no way to take it back.
     if (isSticky(el)) {
       fromPointer = true
       releaseSticky()
       return
     }
+    if ((el as HTMLButtonElement).disabled) return
     fromPointer = true
     // Whichever finger pressed last owns the hold. Refusing a press while
     // `holding` was set looked tidier and was worse: any pointerdown whose
@@ -169,7 +179,8 @@ export function holdable(el: HTMLElement, action: (mods: Mods) => void): void {
     active = repeat(() => fire({ shift: e.shiftKey }))
     stickTimer = window.setTimeout(() => {
       if (!active) return
-      releaseSticky()
+      // Taken, and it stays taken until it is tapped off.
+      if (sticky) return
       sticky = { el, rep: active }
       stuck = true
       el.classList.add('sticky')
@@ -287,7 +298,7 @@ window.addEventListener('keydown', (e) => {
       key,
       window.setTimeout(() => {
         stickTimers.delete(key)
-        releaseSticky()
+        if (sticky) return
         sticky = { el, rep }
         stuckKeys.add(key)
         el.classList.add('sticky')
