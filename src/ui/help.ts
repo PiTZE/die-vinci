@@ -9,6 +9,15 @@ interface Section {
   title: string
   body: Line[]
   /**
+   * Topics inside a topic, each opening on its own.
+   *
+   * One section for twenty-two cards, because they are twenty-two answers to
+   * the same question and a reader wants one of them. Flat, they would be
+   * twenty-two entries in a list of twelve, and the list is the first thing
+   * the pane shows.
+   */
+  subs?: Section[]
+  /**
    * When this topic may be read. Twelve topics from the first second is a
    * table of contents for the whole game, and a player who has rolled one d4
    * should not be reading about calling the Wager.
@@ -22,6 +31,8 @@ const afterAutomator = (s: GameState) => s.autoRoll || s.wagers > 0
 const nearWager = (s: GameState) => s.wagers > 0 || s.inkThisWager.gte('1e290')
 const afterWager = (s: GameState) => s.wagers > 0
 const hasTarot = (s: GameState) => s.wagers > 0
+/** A card explains itself once you hold it, and says nothing before. */
+const holds = (id: string) => (s: GameState) => (s.tarot?.[id] ?? 0) > 0
 const hasMelt = (s: GameState) => (s.tarot?.death ?? 0) > 0
 const hasCodices = (s: GameState) => (s.codexOpen ?? 0) > 0
 const afterAutobuyer = (s: GameState) =>
@@ -124,6 +135,195 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    title: 'THE ARCANA, ONE BY ONE',
+    needs: hasTarot,
+    body: [
+      'What each card does, and what a level of it is worth. A card explains itself once you hold it: reading the deck before you have drawn from it is the one spoiler a draft cannot recover from.',
+    ],
+    subs: [
+      {
+        title: "0 THE FOOL",
+        needs: holds("fool"),
+        body: [
+          "A folio clears every study you have taken. This keeps one of them per level, so at level nine a folio costs you nine fewer studies to rebuild.",
+          "It does nothing at a study and nothing at a Wager. Only folios.",
+        ],
+      },
+      {
+        title: "I THE MAGICIAN",
+        needs: holds("magician"),
+        body: [
+          "Loads the dice. Every die is likelier to land high, and the face is what a die is worth, so this multiplies every tier of the chain at once.",
+          "Each level closes a quarter of the remaining gap to a ceiling of 0.85, so level one is worth 0.21 and level nine 0.79. Every level is worth taking and none of them reaches the end.",
+          "At level nine a d72 averages 59.8 a face rather than 36.5, and a d4 averages 3.4 rather than 2.5.",
+          "A perfectly loaded die is worth exactly twice its fair average and no more, which is why this is a middling card however far you push it.",
+        ],
+      },
+      {
+        title: "II THE HIGH PRIESTESS",
+        needs: holds("priestess"),
+        body: [
+          "Multiplies everything by 1 plus half a level: x1.5 at level one, x5.5 at level nine.",
+          "It asks nothing and it never lapses, which is what makes it a late-tier card.",
+        ],
+      },
+      {
+        title: "III THE EMPRESS",
+        needs: holds("empress"),
+        body: [
+          "Multiplies everything, hardest when you have the least ink and fading as it grows. At no ink at all it is worth up to four times its level, and by 1e12 it is worth nothing.",
+          "So it is strongest in the seconds after a study or a folio, which is exactly when a reset feels worst. It is a card about getting back on your feet rather than about being on them.",
+        ],
+      },
+      {
+        title: "IV THE EMPEROR",
+        needs: holds("emperor"),
+        body: [
+          "Multiplies the deepest solid on your table by 1 plus five a level: x6 at level one, x46 at level nine.",
+          "The deepest solid feeds every tier under it, so a multiplier there compounds all the way down to the ink. It is worth nothing on a chain of one and a great deal on a chain of nine.",
+        ],
+      },
+      {
+        title: "V THE HIEROPHANT",
+        needs: holds("hierophant"),
+        body: [
+          "A reset leaves you ink instead of nothing: ten to the power of one plus twice the level, so 1e3 at level one and 1e19 at level nine.",
+          "The ink is a gift rather than something the run earned, so it fills your table without moving you closer to the Wager. The circles on the table measure what a run has earned, and this does not touch them.",
+        ],
+      },
+      {
+        title: "VI THE LOVERS",
+        needs: holds("lovers"),
+        body: [
+          "Dice showing the same face pay more. A pair pays double at level one, and each level pays for one more die in the group, so at level nine ten matching dice would each pay ten times.",
+          "The only card in the deck that reads the faces against each other rather than one at a time. It is worth more the more dice are on the table and the fewer faces they have.",
+        ],
+      },
+      {
+        title: "VII THE CHARIOT",
+        needs: holds("chariot"),
+        body: [
+          "For the first twenty seconds after any reset, the roll rate is multiplied by 1 plus three tenths a level: x1.3 at level one, x3.7 at level nine.",
+          "The window is fixed and only the surge grows. It used to grow both, which at level five was a hundred-second surge on a run that resets every minute or two, so it never lapsed, and it made an early card the strongest in the game.",
+        ],
+      },
+      {
+        title: "VIII JUSTICE",
+        needs: holds("justice"),
+        body: [
+          "A reset leaves you one of every open solid per level, rather than an empty table.",
+          "Small in what it hands you and large in what it saves: the first die of a tier is the one you cannot buy until the tier below it has paid for it.",
+        ],
+      },
+      {
+        title: "IX THE HERMIT",
+        needs: holds("hermit"),
+        body: [
+          "Every solid costs less: eight per cent a level, down to a floor of a fifth of the original price.",
+          "It applies to the whole chain at once and it never lapses, so it compounds with everything else you hold.",
+        ],
+      },
+      {
+        title: "X WHEEL OF FORTUNE",
+        needs: holds("wheel"),
+        body: [
+          "Every die is rolled again, once per level, and keeps the best face it saw.",
+          "The first reroll is worth much more than the ninth: with one you keep the better of two, and each after that is a smaller chance of an improvement you did not already have.",
+        ],
+      },
+      {
+        title: "XI STRENGTH",
+        needs: holds("strength"),
+        body: [
+          "Raises every solid multiplier to a power, 1 plus two hundredths a level, so 1.02 at level one and 1.18 at level nine.",
+          "An exponent rather than a multiplier, which is a different shape entirely. It is worth almost nothing early, while the multipliers are small, and enormous once they are astronomical.",
+        ],
+      },
+      {
+        title: "XII THE HANGED MAN",
+        needs: holds("hanged"),
+        body: [
+          "A reset keeps a tenth of your roll rate upgrades per level, so at level ten it would keep all of them.",
+          "Roll rate multiplies the entire chain, and rebuilding it is most of what a reset costs you in time.",
+        ],
+      },
+      {
+        title: "XIII DEATH",
+        needs: holds("death"),
+        body: [
+          "Unlocks melting, and it is the only way to get it. Melting destroys the shallow end of the chain to multiply the deepest solid.",
+          "The card multiplies nothing by itself. Its level is what decides how much a melt is worth and how far it reaches.",
+        ],
+      },
+      {
+        title: "XIV TEMPERANCE",
+        needs: holds("temperance"),
+        body: [
+          "Roll rate gets cheaper the deeper the run has gone, up to nine tenths off.",
+          "It reads what this run has earned rather than what you are holding, so it is worth nothing at the start of a run and most at the end of a long one. A reset does not take the card away, but it does take away the depth it was reading.",
+        ],
+      },
+      {
+        title: "XV THE DEVIL",
+        needs: holds("devil"),
+        body: [
+          "Multiplies everything by 1 plus 1.6 a level, and takes five per cent of your roll rate per level to pay for it, down to a floor of seventy per cent.",
+          "The floor is what makes it worth holding at all. Priced without one the card is worse than not having it, because roll rate multiplies the whole chain and a straight cost on it swamps a straight bonus.",
+        ],
+      },
+      {
+        title: "XVI THE TOWER",
+        needs: holds("tower"),
+        body: [
+          "Every ninety seconds, everything you produce is multiplied by a hundred for three seconds.",
+          "Levels shorten the wait and lengthen the strike: the gap falls by fifteen per cent of the base per level and the strike grows by twenty per cent of the base per level, so level nine is a 37-second cycle with a 7.8-second strike.",
+          "The clock runs on the current run, so a Wager starts it again.",
+          "Lightning plays over the deepest die on the table while it strikes.",
+        ],
+      },
+      {
+        title: "XVII THE STARS",
+        needs: holds("stars"),
+        body: [
+          "The draft offers four cards instead of three, and weights the ones you do not own higher still.",
+          "The only card that changes the draft rather than the game, so it is worth the most while there are still cards you have never seen.",
+        ],
+      },
+      {
+        title: "XVIII THE MOON",
+        needs: holds("moon"),
+        body: [
+          "Time away counts for longer. The cap is eight hours, multiplied by 1 plus the level, so eight hours more per level, up to eighty at level nine.",
+          "Nothing else about away progress changes. It is still simulated in ticks rather than applied in one step, and it still stops at the cap.",
+        ],
+      },
+      {
+        title: "XIX THE SUN",
+        needs: holds("sun"),
+        body: [
+          "Multiplies everything by 2 plus the level: x3 at level one, x11 at level nine.",
+          "No window, no drawback, nothing to keep an eye on. It is the strongest card in the deck and the rarest thing in the draft, and its whole text is that it asks nothing.",
+        ],
+      },
+      {
+        title: "XX JUDGEMENT",
+        needs: holds("judgement"),
+        body: [
+          "Multiplies everything by the chips you are holding, half a chip per level.",
+          "Chips you have spent do not count, so it pays exactly while you are saving rather than buying. It is worth nothing while the grid is cheap and a great deal once it is nearly bought and the last upgrades cost five and seven.",
+        ],
+      },
+      {
+        title: "XXI THE WORLD",
+        needs: holds("world"),
+        body: [
+          "A run begins with one more solid already open per level.",
+          "The first studies exist to open the chain, so this hands the early ones back outright: at level nine a run starts most of the way down the table.",
+        ],
+      },
+    ],
+  },
+  {
     title: 'MELTING',
     needs: hasMelt,
     body: [
@@ -171,6 +371,12 @@ const open = new Set<string>()
 const gated: {
   head: HTMLElement
   mark: HTMLElement
+  /** What the head opens and closes. */
+  panel: HTMLElement
+  /** Where the paragraphs go, which is not the same element: a topic holding
+   *  sub-topics keeps them in its panel too, and the paragraphs are rewritten
+   *  whenever the readable set changes. Writing them into the panel took the
+   *  sub-topics out with them. */
   body: HTMLElement
   paint: () => void
   title: string
@@ -186,27 +392,24 @@ export function helpPane(): Pane {
     label: 'HELP',
 
     mount(root) {
-      // Closed by default, so the pane opens as a list of what there is to
-      // read rather than a wall of it. Twelve sections stacked out flat is
-      // three screens of scrolling before you find the one you wanted.
-      for (const s of SECTIONS) {
-        const section = el('div', 'section')
-        const h = el('button', 'section-head help-head')
+      // One topic, opened by its own head, whether it sits at the top level or
+      // inside another one. A sub-topic is the same thing a topic is: a head
+      // that seals, a body that is not written until it unseals, and a mark.
+      const build = (parent: HTMLElement, s: Section, depth: number): void => {
+        const section = el('div', depth ? 'help-sub' : 'section')
+        const h = el('button', depth ? 'help-head help-subhead' : 'section-head help-head')
         h.type = 'button'
         h.appendChild(el('span', 'grow', s.title))
         const mark = el('span', 'help-mark', '+')
         h.appendChild(mark)
         section.appendChild(h)
-
-        // The paragraphs are not written until the topic is unsealed. Building
-        // them up front and hiding the section leaves every word of the late
-        // game sitting in the document for anyone who looks at the source.
-        const body = el('div', 'help-body')
-        section.appendChild(body)
-
+        const panel = el('div', 'help-body')
+        const body = el('div', 'help-lines')
+        panel.appendChild(body)
+        section.appendChild(panel)
         const paint = () => {
           const on = open.has(s.title)
-          body.hidden = !on
+          panel.hidden = !on
           mark.textContent = on ? '\u2212' : '+'
           h.setAttribute('aria-expanded', String(on))
         }
@@ -217,10 +420,17 @@ export function helpPane(): Pane {
           paint()
         })
         paint()
-
-        root.appendChild(section)
-        gated.push({ head: h, mark, body, paint, title: s.title, text: s.body, needs: s.needs, filled: '' })
+        parent.appendChild(section)
+        gated.push({ head: h, mark, panel, body, paint, title: s.title, text: s.body, needs: s.needs, filled: '' })
+        // The children hang off the panel, so closing the parent closes them
+        // all and opening it again finds each one as it was left.
+        for (const sub of s.subs ?? []) build(panel, sub, depth + 1)
       }
+
+      // Closed by default, so the pane opens as a list of what there is to
+      // read rather than a wall of it. Twelve sections stacked out flat is
+      // three screens of scrolling before you find the one you wanted.
+      for (const s of SECTIONS) build(root, s, 0)
     },
 
     update(s: GameState) {
@@ -250,7 +460,7 @@ export function helpPane(): Pane {
           open.delete(g.title)
           g.body.replaceChildren()
           g.filled = ''
-          g.body.hidden = true
+          g.panel.hidden = true
           if (g.mark.textContent !== '?') g.mark.textContent = '?'
         }
         g.head.classList.toggle('sealed', !on)

@@ -72,8 +72,12 @@ export const ARCANA: TarotDef[] = [
     'a folio keeps your studies'),
   T('magician', 'I', 'The Magician', 'mid',
     'the dice are loaded, and land high'),
+  // The note described an effect this card has never had: the deepest solid
+  // paying ink directly, rather than the flat multiplier that is actually
+  // here. The multiplier is the thing that was measured and tuned, at 1h12m
+  // over six Wagers, so the line is what changes.
   T('priestess', 'II', 'The High Priestess', 'late',
-    'your largest solid pays ink of its own'),
+    'a multiplier on everything that never lapses'),
   T('empress', 'III', 'The Empress', 'early',
     'a multiplier that is largest when your ink is smallest'),
   T('emperor', 'IV', 'The Emperor', 'mid',

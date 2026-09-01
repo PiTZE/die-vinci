@@ -1509,6 +1509,46 @@
   border-bottom: 0;
 }
 
+/*
+ * A topic inside a topic. Twenty-two cards are twenty-two answers to the same
+ * question, so they sit under one heading rather than as twenty-two more
+ * entries in a list of twelve.
+ *
+ * Indented by a rule down the left rather than by whitespace: at this size a
+ * margin reads as a mistake, and the rule says the same thing and holds the
+ * whole group together while it is open.
+ */
+.help-sub {
+  border-left: 1px solid var(--border-faint);
+  margin-left: 10px;
+}
+
+/* The mark goes to the right edge. .section-head grows its own label and a
+   sub-head is not one, so without this the + sat against the title. */
+.help-subhead .grow {
+  flex: 1;
+}
+
+.help-subhead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  font-size: var(--t-1);
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+  border-bottom: 1px solid var(--border-faint);
+}
+
+.help-sub:last-child > .help-subhead[aria-expanded='false'] {
+  border-bottom: 0;
+}
+
+.help-sub .help-text {
+  padding-left: 14px;
+  font-size: var(--t-1);
+}
+
 /* -- generic wide action button ------------------------------------------ */
 
 .action {
