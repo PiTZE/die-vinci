@@ -178,15 +178,18 @@
 }
 
 /*
- * A switch a section carries over everything under it, at the right of its
- * heading. It is the same control as the ones in the rows below, so it has to
- * be the same size: a row is a grid and the column gives it its width, and a
- * heading is a flex line with nothing to do that, which left it 17px wide
- * against their 45.
+ * A heading that carries a switch is laid out on the same grid as the rows
+ * under it, so the switch lands in the same column at the same width without
+ * anything being matched up by hand. It was a flex line before, which left it
+ * 17px wide against the rows' 45 and sitting wherever the text ended.
  */
-.section-head .auto-toggle {
-  align-self: center;
-  width: var(--toggle-w);
+.auto-head {
+  display: grid;
+  align-items: center;
+}
+
+.auto-head .auto-toggle {
+  grid-column: 5;
   margin: -3px 0;
 }
 
@@ -623,15 +626,19 @@
 /* No box. The border made sense around a rectangle that filled, because the
    rectangle needed an edge to fill up to. The lens carries its own outline, so
    a second one around it was a box drawn around a drawing. */
+/* The two circles centred, and the number under them.
+   They were side by side, which put neither of them in the middle of anything:
+   the pair sat left of centre and the percentage right of it, and the whole
+   thing read as a label with a picture beside it rather than as a gauge. */
 .run-bar {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  min-height: var(--ctl-sm);
+  gap: 6px;
   margin-top: var(--gap);
-  padding: 5px 12px;
+  padding: 8px 12px;
   overflow: hidden;
 }
 
@@ -996,13 +1003,19 @@
    below the ninth die lined up with the ones above it. A grid keeps the column
    whether or not anything is standing in it. */
 .auto-row,
-.auto-rule {
+.auto-rule,
+.auto-head {
   display: grid;
   /* Sized for a 390px phone with four fixed columns to fit around: the two
      switches, the wide button, and whatever is left for the name and the
      interval. THE WAGER and its 12.96s is the widest pair and it decides
      these numbers. */
-  grid-template-columns: minmax(0, 1fr) auto var(--toggle-w) var(--toggle-w) 7.4rem;
+  /* The switch is the last column, so every ON in the pane stands in one line
+     down the right edge, under the master in the heading above them. It used
+     to sit third of five, between the interval and the wide button, which put
+     the nine die switches in a different place from the switch that governs
+     them. */
+  grid-template-columns: minmax(0, 1fr) auto 7.4rem var(--toggle-w) var(--toggle-w);
   align-items: center;
   gap: 7px;
   padding: 7px 8px;
@@ -1029,7 +1042,7 @@
 
 /* Every switch in the pane, in one column. */
 .auto-toggle {
-  grid-column: 3;
+  grid-column: 5;
 }
 
 .auto-mode {
@@ -1037,7 +1050,7 @@
 }
 
 .auto-up {
-  grid-column: 5;
+  grid-column: 3;
 }
 
 .auto-row:last-child {
@@ -1438,15 +1451,39 @@
   display: none;
 }
 
+/* The draft, and nothing else. It fills the pane and centres in it, because
+   while a draft is waiting it is the only thing on the screen: a section box
+   round it would be a box round the whole pane, and a heading saying DRAFT
+   would be a caption on the only picture in the room. */
+.arcana-draft {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap);
+  min-height: 100%;
+}
+
+/* The button that takes whichever card is facing you. Held near the ring's
+   own width rather than the pane's, so it reads as belonging to the card
+   above it rather than to the screen.
+   Written against .arcana-draft rather than on its own: .action sets a full
+   width later in this file, and at equal specificity the last one wins. */
+.arcana-draft .arcana-take {
+  flex: 0 0 auto;
+  width: min(100%, 16rem);
+}
+
 /* The three on offer, dealt onto a ring rather than laid out in a row.
    Their seats are placed by script, so this is a stage: a fixed height, the
    perspective the ring turns inside, and no scrolling of its own. */
 .arcana-offer {
   position: relative;
+  width: 100%;
   /* Tall enough for the front card at its largest. It is scaled up by the
      ring and again by the perspective divide, so the stage has to hold about
      a third more than the card's own height. */
-  height: 24rem;
+  height: 27rem;
   overflow: hidden;
   perspective: 900px;
   /* The ring is dragged up and down, which is the gesture a phone would
@@ -1465,7 +1502,7 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 9rem;
+  width: 11rem;
   will-change: transform, opacity, filter;
 }
 
@@ -1670,11 +1707,11 @@
 
 @media (min-width: 820px) {
   .arcana-offer {
-    height: 27rem;
+    height: 31rem;
   }
 
   .arcana-seat {
-    width: 10.5rem;
+    width: 13rem;
   }
 }
 
@@ -2081,8 +2118,9 @@
 /* Desktop has the width for the original sizes. */
 @media (min-width: 820px) {
   .auto-row,
-  .auto-rule {
-    grid-template-columns: minmax(0, 1fr) auto var(--toggle-w) var(--toggle-w) 9rem;
+  .auto-rule,
+  .auto-head {
+    grid-template-columns: minmax(0, 1fr) auto 9rem var(--toggle-w) var(--toggle-w);
     gap: 10px;
     padding: 7px 12px;
   }

@@ -87,6 +87,9 @@ export function tarotPane(): Pane {
   let towerBolt: (() => void) | null = null
   /** The turning ring the draft is dealt onto, while there is one. */
   let ring: Spiral | null = null
+  /** The ids on the ring, in the order it holds them. */
+  let shownDraft: string[] = []
+  let takeBtn: HTMLButtonElement
   const cells = new Map<string, Cell>()
   let head: HTMLElement
   let offerSection: HTMLElement
@@ -101,12 +104,20 @@ export function tarotPane(): Pane {
     visible: (s) => s.wagers > 0 || owned(s) > 0 || draftPending(s),
 
     mount(root, actions) {
-      offerSection = el('div', 'section')
-      const oh = el('div', 'section-head')
-      oh.appendChild(el('span', 'grow', 'THE DRAFT'))
-      offerSection.appendChild(oh)
+      // No section, no heading, no border. A draft is the only thing on the
+      // screen while it is waiting, so a box round it is a box round the
+      // whole pane, and a word above it saying DRAFT is a caption on the only
+      // picture in the room.
+      offerSection = el('div', 'arcana-draft')
       offerRow = el('div', 'arcana-offer')
-      offerSection.appendChild(offerRow)
+      takeBtn = el('button', 'action arcana-take', '')
+      takeBtn.type = 'button'
+      takeBtn.addEventListener('click', () => {
+        const at = ring?.facing() ?? 0
+        const id = shownDraft[at]
+        if (id) actions.takeCard(id)
+      })
+      offerSection.append(offerRow, takeBtn)
       root.appendChild(offerSection)
 
       heldSection = el('div', 'section')
@@ -129,11 +140,17 @@ export function tarotPane(): Pane {
       heldSection.appendChild(grid)
       root.appendChild(heldSection)
 
-      // Delegated, because the three on offer are rebuilt whenever they change
-      // and a listener per card would be rebound every time with them.
+      // A tap on a card brings it round rather than taking it. Taking is the
+      // button underneath, which acts on whichever card is facing you: a card
+      // that is halfway round the back is not something anyone means to
+      // choose, and on a ring that turns, the thing under your finger a
+      // moment ago is not the thing under it now.
       offerRow.addEventListener('click', (e) => {
         const card = (e.target as HTMLElement).closest('[data-arcana]')
-        if (card) actions.takeCard((card as HTMLElement).dataset.arcana ?? '')
+        if (!card) return
+        const id = (card as HTMLElement).dataset.arcana ?? ''
+        const at = shownDraft.indexOf(id)
+        if (at >= 0) ring?.bring(at)
       })
     },
 
@@ -174,8 +191,13 @@ export function tarotPane(): Pane {
           // turns by itself until the first time you touch it and then stops
           // for good: this is a choice, and a moving target is a poor thing to
           // ask anyone to hit.
+          shownDraft = [...s.pendingDraft]
           ring = spiral(offerRow, [...offerRow.children] as HTMLElement[], {
             cardsPerTurn: s.pendingDraft.length,
+            onFacing: (at) => {
+              const def = ARCANA_BY_ID[shownDraft[at] ?? '']
+              setText(takeBtn, def ? `TAKE ${def.name.toUpperCase()}` : 'TAKE')
+            },
           })
         }
         return

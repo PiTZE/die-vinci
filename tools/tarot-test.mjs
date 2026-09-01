@@ -50,10 +50,14 @@ await sleep(400)
 const offer = await ev(`document.querySelectorAll('.arcana-pick').length`)
 check('the draft shows the choice', offer >= 3, `${offer} on offer`)
 
+// The button takes whichever card is facing you. A tap on a card brings it
+// round instead: on a ring that turns, the card under your finger a moment
+// ago is not the one under it now.
 const took = await ev(`(() => {
-  const first = document.querySelector('.arcana-pick')
-  const id = first.dataset.arcana
-  first.click()
+  const seats = [...document.querySelectorAll('.arcana-seat')]
+  const front = seats.find(x => x.style.transform.includes('translate3d(0px,')) ?? seats[0]
+  const id = front.querySelector('[data-arcana]').dataset.arcana
+  document.querySelector('.arcana-take').click()
   return id })()`)
 await sleep(400)
 const held = await ev(`({ level: window.LD.state.tarot['${took}'] || 0,
@@ -273,16 +277,56 @@ check('a drag turns it', dragged.turned === true, JSON.stringify(dragged))
 check('and it snaps to the nearest card and stays there',
   dragged.stopped === true && dragged.centred === 1, JSON.stringify(dragged))
 
-// A tap on the card facing you still takes it.
+// Which way it turns. Down brings the next card round to you, which is the
+// direction a ring turns when you pull the card you are reaching for toward
+// you, and it was the other way round for a build.
+const way = await ev(`(async () => {
+  const stage = document.querySelector('.arcana-offer')
+  const seats = [...document.querySelectorAll('.arcana-seat')]
+  const at = (t) => seats.findIndex(x => x.style.transform.startsWith(t))
+  const front = () => at('translate(-50%, -50%) translate3d(0px,')
+  const before = front()
+  const b = stage.getBoundingClientRect()
+  const ev2 = (y) => ({ bubbles: true, pointerId: 9, pointerType: 'touch',
+    clientX: b.left + b.width / 2, clientY: y })
+  const y0 = b.top + b.height * 0.25
+  stage.dispatchEvent(new PointerEvent('pointerdown', ev2(y0)))
+  for (let i = 1; i <= 9; i++) {
+    stage.dispatchEvent(new PointerEvent('pointermove', ev2(y0 + i * 10)))
+    await new Promise(r => setTimeout(r, 25))
+  }
+  stage.dispatchEvent(new PointerEvent('pointerup', ev2(y0 + 90)))
+  await new Promise(r => setTimeout(r, 900))
+  return { before, after: front(), n: seats.length } })()`)
+check('dragging down brings the next card round',
+  way.after === (way.before + 1) % way.n, JSON.stringify(way))
+
+// A tap on a card brings it round rather than taking it, and the button says
+// which card it would take.
+const tapped = await ev(`(async () => {
+  const seats = [...document.querySelectorAll('.arcana-seat')]
+  const front = () => seats.findIndex(x => x.style.transform.includes('translate3d(0px,'))
+  const before = front()
+  const other = (before + 1) % seats.length
+  const name = seats[other].querySelector('.card-name').textContent
+  seats[other].querySelector('[data-arcana]').click()
+  await new Promise(r => setTimeout(r, 900))
+  const label = document.querySelector('.arcana-take').textContent
+  return { before, after: front(), other, name, label,
+    took: window.LD.state.pendingDraft.length } })()`)
+check('a tap on a card brings it round rather than taking it',
+  tapped.after === tapped.other && tapped.took === 3, JSON.stringify(tapped))
+check('and the button names the card it would take',
+  tapped.label === `TAKE ${tapped.name.toUpperCase()}`, JSON.stringify(tapped))
+
 const took2 = await ev(`(() => {
   const seats = [...document.querySelectorAll('.arcana-seat')]
   const front = seats.find(x => x.style.transform.includes('translate3d(0px,')) ?? seats[0]
-  const card = front.querySelector('[data-arcana]')
-  const id = card.dataset.arcana
-  card.click()
+  const id = front.querySelector('[data-arcana]').dataset.arcana
+  document.querySelector('.arcana-take').click()
   return { id, level: window.LD.state.tarot[id] || 0,
     pending: window.LD.state.pendingDraft.length } })()`)
-check('and a tap on it takes the card',
+check('and the button takes it',
   took2.level > 0 && took2.pending === 0, JSON.stringify(took2))
 
 ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}

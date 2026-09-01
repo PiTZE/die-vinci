@@ -1,9 +1,30 @@
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
 import { seal, unseal } from './redact'
+import { ARCANA_MAX_LEVEL, magicianBias, OFFLINE_CAP_S } from '../game/balance'
 
 /** A line that is only worth reading once the thing it names exists. */
 type Line = string | { text: string; needs: (s: GameState) => boolean }
+
+/**
+ * The nine levels of a card, worked out rather than written down.
+ *
+ * A card's levels are the one part of its text that cannot be prose: nine
+ * numbers, and nine numbers typed out by hand are nine chances to be wrong
+ * about a formula that lives somewhere else. Each of these calls the same
+ * arithmetic the engine does, so a tuning pass moves the help with it.
+ */
+function levels(each: (level: number) => string): string {
+  const out: string[] = []
+  for (let l = 1; l <= ARCANA_MAX_LEVEL; l++) out.push(`${l} ${each(l)}`)
+  return out.join('   ')
+}
+
+/** Trims a computed number to something a line of help can hold. */
+const n = (v: number, places = 2): string => {
+  const s = v.toFixed(places)
+  return s.replace(/\.?0+$/, '')
+}
 
 interface Section {
   title: string
@@ -147,6 +168,7 @@ const SECTIONS: Section[] = [
         body: [
           "A folio clears every study you have taken. This keeps one of them per level, so at level nine a folio costs you nine fewer studies to rebuild.",
           "It does nothing at a study and nothing at a Wager. Only folios.",
+          "Studies a folio keeps." + ' ' + levels((l) => `keeps ${l}`),
         ],
       },
       {
@@ -157,6 +179,7 @@ const SECTIONS: Section[] = [
           "Each level closes a quarter of the remaining gap to a ceiling of 0.85, so level one is worth 0.21 and level nine 0.79. Every level is worth taking and none of them reaches the end.",
           "At level nine a d72 averages 59.8 a face rather than 36.5, and a d4 averages 3.4 rather than 2.5.",
           "A perfectly loaded die is worth exactly twice its fair average and no more, which is why this is a middling card however far you push it.",
+          "How loaded the dice are, where 0 is fair and 1 always lands on the maximum." + ' ' + levels((l) => `bias ${n(magicianBias(l))}`),
         ],
       },
       {
@@ -165,6 +188,7 @@ const SECTIONS: Section[] = [
         body: [
           "Multiplies everything by 1 plus half a level: x1.5 at level one, x5.5 at level nine.",
           "It asks nothing and it never lapses, which is what makes it a late-tier card.",
+          "The multiplier." + ' ' + levels((l) => `x${n(1 + l * 0.5)}`),
         ],
       },
       {
@@ -173,6 +197,7 @@ const SECTIONS: Section[] = [
         body: [
           "Multiplies everything, hardest when you have the least ink and fading as it grows. At no ink at all it is worth up to four times its level, and by 1e12 it is worth nothing.",
           "So it is strongest in the seconds after a study or a folio, which is exactly when a reset feels worst. It is a card about getting back on your feet rather than about being on them.",
+          "The multiplier at no ink at all, fading to nothing by 1e12." + ' ' + levels((l) => `up to x${n(1 + l * 4)}`),
         ],
       },
       {
@@ -181,6 +206,7 @@ const SECTIONS: Section[] = [
         body: [
           "Multiplies the deepest solid on your table by 1 plus five a level: x6 at level one, x46 at level nine.",
           "The deepest solid feeds every tier under it, so a multiplier there compounds all the way down to the ink. It is worth nothing on a chain of one and a great deal on a chain of nine.",
+          "The multiplier on the deepest solid." + ' ' + levels((l) => `x${n(1 + l * 5)}`),
         ],
       },
       {
@@ -189,6 +215,7 @@ const SECTIONS: Section[] = [
         body: [
           "A reset leaves you ink instead of nothing: ten to the power of one plus twice the level, so 1e3 at level one and 1e19 at level nine.",
           "The ink is a gift rather than something the run earned, so it fills your table without moving you closer to the Wager. The circles on the table measure what a run has earned, and this does not touch them.",
+          "The ink a reset leaves you." + ' ' + levels((l) => `1e${1 + l * 2}`),
         ],
       },
       {
@@ -197,6 +224,7 @@ const SECTIONS: Section[] = [
         body: [
           "Dice showing the same face pay more. A pair pays double at level one, and each level pays for one more die in the group, so at level nine ten matching dice would each pay ten times.",
           "The only card in the deck that reads the faces against each other rather than one at a time. It is worth more the more dice are on the table and the fewer faces they have.",
+          "How many matching dice are paid for." + ' ' + levels((l) => `${l + 1} of a kind`),
         ],
       },
       {
@@ -205,6 +233,7 @@ const SECTIONS: Section[] = [
         body: [
           "For the first twenty seconds after any reset, the roll rate is multiplied by 1 plus three tenths a level: x1.3 at level one, x3.7 at level nine.",
           "The window is fixed and only the surge grows. It used to grow both, which at level five was a hundred-second surge on a run that resets every minute or two, so it never lapsed, and it made an early card the strongest in the game.",
+          "The multiplier on roll rate, for twenty seconds after a reset." + ' ' + levels((l) => `x${n(1 + l * 0.3)}`),
         ],
       },
       {
@@ -213,6 +242,7 @@ const SECTIONS: Section[] = [
         body: [
           "A reset leaves you one of every open solid per level, rather than an empty table.",
           "Small in what it hands you and large in what it saves: the first die of a tier is the one you cannot buy until the tier below it has paid for it.",
+          "How many of each open solid a reset leaves." + ' ' + levels((l) => `keeps ${l}`),
         ],
       },
       {
@@ -221,6 +251,7 @@ const SECTIONS: Section[] = [
         body: [
           "Every solid costs less: eight per cent a level, down to a floor of a fifth of the original price.",
           "It applies to the whole chain at once and it never lapses, so it compounds with everything else you hold.",
+          "What a solid costs." + ' ' + levels((l) => `x${n(Math.max(0.2, 1 - l * 0.08))}`),
         ],
       },
       {
@@ -229,6 +260,7 @@ const SECTIONS: Section[] = [
         body: [
           "Every die is rolled again, once per level, and keeps the best face it saw.",
           "The first reroll is worth much more than the ninth: with one you keep the better of two, and each after that is a smaller chance of an improvement you did not already have.",
+          "How many times a die is rolled, keeping the best." + ' ' + levels((l) => `${l + 1} rolls`),
         ],
       },
       {
@@ -237,6 +269,7 @@ const SECTIONS: Section[] = [
         body: [
           "Raises every solid multiplier to a power, 1 plus two hundredths a level, so 1.02 at level one and 1.18 at level nine.",
           "An exponent rather than a multiplier, which is a different shape entirely. It is worth almost nothing early, while the multipliers are small, and enormous once they are astronomical.",
+          "The exponent on every solid multiplier." + ' ' + levels((l) => `^${n(1 + l * 0.02)}`),
         ],
       },
       {
@@ -245,6 +278,7 @@ const SECTIONS: Section[] = [
         body: [
           "A reset keeps a tenth of your roll rate upgrades per level, so at level ten it would keep all of them.",
           "Roll rate multiplies the entire chain, and rebuilding it is most of what a reset costs you in time.",
+          "The roll rate a reset keeps." + ' ' + levels((l) => `keeps ${n(Math.min(1, l * 0.1) * 100, 0)}%`),
         ],
       },
       {
@@ -253,6 +287,7 @@ const SECTIONS: Section[] = [
         body: [
           "Unlocks melting, and it is the only way to get it. Melting destroys the shallow end of the chain to multiply the deepest solid.",
           "The card multiplies nothing by itself. Its level is what decides how much a melt is worth and how far it reaches.",
+          "Its level is read by melting rather than by anything on the table, so there is no ladder here: a melt is worth more and reaches further the higher it is.",
         ],
       },
       {
@@ -261,6 +296,7 @@ const SECTIONS: Section[] = [
         body: [
           "Roll rate gets cheaper the deeper the run has gone, up to nine tenths off.",
           "It reads what this run has earned rather than what you are holding, so it is worth nothing at the start of a run and most at the end of a long one. A reset does not take the card away, but it does take away the depth it was reading.",
+          "What roll rate costs at the deepest a run can go." + ' ' + levels((l) => `up to x${n(Math.max(0.1, 1 - Math.min(0.9, l * 0.5)))}`),
         ],
       },
       {
@@ -269,6 +305,7 @@ const SECTIONS: Section[] = [
         body: [
           "Multiplies everything by 1 plus 1.6 a level, and takes five per cent of your roll rate per level to pay for it, down to a floor of seventy per cent.",
           "The floor is what makes it worth holding at all. Priced without one the card is worse than not having it, because roll rate multiplies the whole chain and a straight cost on it swamps a straight bonus.",
+          "The multiplier, and the roll rate it is bought with." + ' ' + levels((l) => `x${n(1 + l * 1.6)} at x${n(Math.max(0.7, 1 - l * 0.05))}`),
         ],
       },
       {
@@ -276,9 +313,10 @@ const SECTIONS: Section[] = [
         needs: holds("tower"),
         body: [
           "Every ninety seconds, everything you produce is multiplied by a hundred for three seconds.",
-          "Levels shorten the wait and lengthen the strike: the gap falls by fifteen per cent of the base per level and the strike grows by twenty per cent of the base per level, so level nine is a 37-second cycle with a 7.8-second strike.",
+          "Levels shorten the wait and lengthen the strike: the gap falls by fifteen per cent of the base per level and the strike grows by twenty per cent of the base per level.",
           "The clock runs on the current run, so a Wager starts it again.",
           "Lightning plays over the deepest die on the table while it strikes.",
+          "The gap between strikes, and how long one lasts." + ' ' + levels((l) => `${n(90 / (1 + (l - 1) * 0.15), 1)}s cycle, ${n(3 * (1 + (l - 1) * 0.2), 1)}s strike`),
         ],
       },
       {
@@ -287,6 +325,7 @@ const SECTIONS: Section[] = [
         body: [
           "The draft offers four cards instead of three, and weights the ones you do not own higher still.",
           "The only card that changes the draft rather than the game, so it is worth the most while there are still cards you have never seen.",
+          "The size of the draft, which does not change with the level; what a level adds is the weight on a card you do not own." + ' ' + levels(() => 'four on offer'),
         ],
       },
       {
@@ -295,6 +334,7 @@ const SECTIONS: Section[] = [
         body: [
           "Time away counts for longer. The cap is eight hours, multiplied by 1 plus the level, so eight hours more per level, up to eighty at level nine.",
           "Nothing else about away progress changes. It is still simulated in ticks rather than applied in one step, and it still stops at the cap.",
+          "The cap on time away." + ' ' + levels((l) => `${n((OFFLINE_CAP_S * (1 + l)) / 3600, 0)}h`),
         ],
       },
       {
@@ -303,6 +343,7 @@ const SECTIONS: Section[] = [
         body: [
           "Multiplies everything by 2 plus the level: x3 at level one, x11 at level nine.",
           "No window, no drawback, nothing to keep an eye on. It is the strongest card in the deck and the rarest thing in the draft, and its whole text is that it asks nothing.",
+          "The multiplier." + ' ' + levels((l) => `x${2 + l}`),
         ],
       },
       {
@@ -311,6 +352,7 @@ const SECTIONS: Section[] = [
         body: [
           "Multiplies everything by the chips you are holding, half a chip per level.",
           "Chips you have spent do not count, so it pays exactly while you are saving rather than buying. It is worth nothing while the grid is cheap and a great deal once it is nearly bought and the last upgrades cost five and seven.",
+          "The multiplier per chip you are holding." + ' ' + levels((l) => `x${n(l * 0.5)} a chip`),
         ],
       },
       {
@@ -319,6 +361,7 @@ const SECTIONS: Section[] = [
         body: [
           "A run begins with one more solid already open per level.",
           "The first studies exist to open the chain, so this hands the early ones back outright: at level nine a run starts most of the way down the table.",
+          "Solids a run starts with, over the one it would have." + ' ' + levels((l) => `${l} more`),
         ],
       },
     ],

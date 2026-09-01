@@ -41,6 +41,8 @@ export interface SpiralOptions {
   centreScale?: number
   /** Blur on the card furthest from the front, in pixels. */
   edgeBlur?: number
+  /** Told whenever a different card comes round to face you. */
+  onFacing?: (index: number) => void
 }
 
 const clamp = (v: number, min: number, max: number): number => Math.min(Math.max(v, min), max)
@@ -51,6 +53,10 @@ const smoothstep = (a: number, b: number, v: number): number => {
 }
 
 export interface Spiral {
+  /** Which card is facing you, which is the one a choice acts on. */
+  facing(): number
+  /** Turns the ring so that card comes round to the front. */
+  bring(index: number): void
   destroy(): void
 }
 
@@ -69,6 +75,7 @@ export function spiral(stage: HTMLElement, cards: HTMLElement[], opts: SpiralOpt
   const perspective = opts.perspective ?? 900
   const centreScale = opts.centreScale ?? 1.18
   const edgeBlur = opts.edgeBlur ?? 3
+  const onFacing = opts.onFacing
 
   const n = cards.length
   const half = n / 2
@@ -113,6 +120,10 @@ export function spiral(stage: HTMLElement, cards: HTMLElement[], opts: SpiralOpt
     }
   }
 
+  /** The card nearest the front, which is the one the choice acts on. */
+  const facing = (): number => wrap(Math.round(progress), n)
+  let told = -1
+
   const frame = (ts: number): void => {
     const dt = last ? Math.min((ts - last) / 1000, 0.05) : 1 / 60
     last = ts
@@ -131,6 +142,11 @@ export function spiral(stage: HTMLElement, cards: HTMLElement[], opts: SpiralOpt
     // of stopping under your finger.
     progress += (target - progress) * (1 - Math.exp(-dt * 11))
     place()
+    const at = facing()
+    if (at !== told) {
+      told = at
+      onFacing?.(at)
+    }
     raf = requestAnimationFrame(frame)
   }
 
@@ -163,7 +179,11 @@ export function spiral(stage: HTMLElement, cards: HTMLElement[], opts: SpiralOpt
     const dy = e.clientY - lastY
     lastY = e.clientY
     if (Math.abs(dy) > 0.5) moved = true
-    target -= dy / 90
+    // Down brings the next card round to you, up sends it back. It was the
+    // other way, on the reasoning that a list follows your finger, and this is
+    // not a list: the cards travel around a ring rather than along a column,
+    // and the one you are reaching for is the one you pull toward you.
+    target += dy / 90
   }
   const onUp = (): void => {
     if (!dragging) return
@@ -208,6 +228,13 @@ export function spiral(stage: HTMLElement, cards: HTMLElement[], opts: SpiralOpt
   run(true)
 
   return {
+    facing,
+    /** Turns the ring so `index` comes round to the front, the short way. */
+    bring(index) {
+      turning = false
+      const here = Math.round(target)
+      target = here + (wrap(index - wrap(here, n) + half, n) - half)
+    },
     destroy() {
       run(false)
       ro.disconnect()

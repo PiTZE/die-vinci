@@ -111,10 +111,8 @@ export function automationPane(): Pane {
   let autobuyerSection: HTMLElement
   let allAutoToggle: HTMLButtonElement
   let autoManualRow: HTMLElement
-  let dieNote: HTMLElement
   const dieRows: {
     root: HTMLElement
-    state: HTMLElement
     on: HTMLButtonElement
     buy: HTMLButtonElement
   }[] = []
@@ -132,7 +130,7 @@ export function automationPane(): Pane {
       // The roll comes first: it is the one that takes your finger off the
       // button, and every autobuyer below it is a convenience by comparison.
       autoSection = el('div', 'section')
-      const ah = el('div', 'section-head')
+      const ah = el('div', 'section-head auto-head')
       ah.appendChild(el('span', 'grow', 'THE ROLL'))
       // The master, in the head, where the autobuyers' one is. It was the last
       // row under the nine it governs, next to a purchase, which made it read
@@ -147,13 +145,9 @@ export function automationPane(): Pane {
       // One row a die, shallowest first, which is the order they are sold in.
       // A die opens for automation when the die below it opens for buying, so
       // this list grows a row at a time alongside the table.
-      dieNote = el('div', 'auto-note', '')
-      autoSection.appendChild(dieNote)
       for (let idx = 1; idx <= AUTO_ROLL_MAX; idx++) {
         const row = el('div', 'auto-row')
         row.appendChild(el('span', 'auto-label', SOLIDS[idx - 1].short))
-        const state = el('span', 'auto-every num dim', '')
-        row.appendChild(state)
         // The same switch the automator has, a rung down, and for the same
         // reason: with it on there is no way to watch a single die land.
         const on = el('button', 'auto-toggle', 'ON')
@@ -166,7 +160,7 @@ export function automationPane(): Pane {
         buy.addEventListener('click', () => actions.buyAutoRoll())
         row.appendChild(buy)
         autoSection.appendChild(row)
-        dieRows.push({ root: row, state, on, buy })
+        dieRows.push({ root: row, on, buy })
       }
 
       const autoRow = el('div', 'auto-row')
@@ -180,7 +174,7 @@ export function automationPane(): Pane {
 
       autobuyerSection = el('div', 'section')
       const section = autobuyerSection
-      const h = el('div', 'section-head')
+      const h = el('div', 'section-head auto-head')
       h.appendChild(el('span', 'grow', 'AUTOBUYERS'))
       // The group switch, in the head rather than in a row of its own: it is
       // about the whole section under it, and a row would read as a fourteenth
@@ -291,18 +285,6 @@ export function automationPane(): Pane {
       autoSection.hidden = false
 
       const next = nextAutoRoll(s)
-      // Written when the ladder stopped at the eighth die. It has nine rungs
-      // now, the deepest waiting on the whole chain instead of on a solid
-      // under it, so the old line was telling a player who had bought every
-      // rung that one of them had not happened.
-      setText(
-        dieNote,
-        s.autoDice >= AUTO_ROLL_MAX
-          ? 'every die rolls itself'
-          : s.autoDice === AUTO_ROLL_MAX - 1
-          ? 'the deepest die rolls itself once the whole chain is on the table'
-          : 'a die rolls itself once you have opened the one below it',
-      )
       for (let idx = 1; idx <= AUTO_ROLL_MAX; idx++) {
         const r = dieRows[idx - 1]
         const held = idx <= s.autoDice
@@ -320,12 +302,12 @@ export function automationPane(): Pane {
         r.on.hidden = !auto
         r.buy.hidden = held
         if (auto) {
+          // The switch says it. ROLLS ITSELF beside an ON and WAITS FOR YOU
+          // beside an OFF is the same fact written twice, on a row that is
+          // four columns wide on a phone.
           const running = dieOn(s, idx)
           setText(r.on, running ? 'ON' : 'OFF')
           r.on.classList.toggle('buyable', running)
-          setText(r.state, running ? 'ROLLS ITSELF' : 'WAITS FOR YOU')
-        } else {
-          setText(r.state, '')
         }
         if (held) continue
         const can = canBuyAutoRoll(s)
