@@ -148,9 +148,92 @@ function sphere(meridians: number, bands: number): Geo {
   return { vs, es }
 }
 
+/**
+ * The axis each solid rests pointing at you, and how far it is then spun about
+ * that axis to sit upright.
+ *
+ * A die at rest should read as the shape it is named for: the d4 a triangle,
+ * the d6 a square, the d20 a hexagon with a triangle in it. That is not what
+ * "no rotation" gives you, because the vertex tables are written for
+ * arithmetic rather than for looking at. The tetrahedron as written is four
+ * corners of a cube, so straight on it projects to a square with an X through
+ * it, which is a d6 with a mistake in it rather than a d4.
+ *
+ * So each one is turned once, here, to face you down its own signature
+ * symmetry axis, and the rest pose is then genuinely no rotation. Every axis
+ * below is a real symmetry axis of its solid, which is what makes the result
+ * symmetrical rather than merely chosen:
+ *
+ *   tetra        a vertex toward you, so the far face draws the triangle
+ *   dodeca       a pentagonal face, five-fold: a decagon around a pentagon
+ *   icosa        a triangular face, three-fold: a hexagon with a triangle in it
+ *   icosidodeca  a pentagonal face, five-fold: a decagon
+ *
+ * The other five already face you down a four-fold axis as written. The cube
+ * is a square, the octahedron a diamond with a point at each compass mark,
+ * which is how a d8 is drawn, the truncated cube a square with its corners
+ * cut, the rhombicuboctahedron an octagon, and the sphere a globe with its
+ * pole up.
+ *
+ * The roll is which way up, and it is one number a solid rather than a rule:
+ * every one of these sits with a flat side along the bottom, which is what
+ * puts the tetrahedron's apex at the top. The icosahedron's 7.8 is a fraction
+ * of a degree because a hexagon's corner does not fall where the vertex table
+ * happens to start. The tetrahedron's sixty is the screen's y axis pointing
+ * down: flat-side-down in the arithmetic is a triangle standing on its head
+ * in the picture, and a triangle is the one shape here with no half turn to
+ * hide it.
+ *
+ * Getting an axis wrong is not obvious by eye and it was wrong once here. The
+ * icosidodecahedron sat on (0, 1, phi), which is a two-fold axis rather than
+ * the five-fold one, and what that draws is a pinwheel: symmetric enough to
+ * pass a glance, with no mirror line anywhere in it, which is exactly the
+ * "ugly and random" the straight-on pose was meant to end. What settles it is
+ * asking the drawing whether it maps onto itself under a reflection and under
+ * a turn, rather than asking whether it looks tidy.
+ */
+const REST_POSE: Partial<Record<SolidId, { axis: V3; roll: number }>> = {
+  tetra: { axis: [1, 1, 1], roll: 60 },
+  dodeca: { axis: [0, PHI, 1], roll: 0 },
+  icosa: { axis: [1, 1, 1], roll: 7.8 },
+  icosidodeca: { axis: [0, PHI, 1], roll: 0 },
+}
+
+/** Turns `axis` to face the viewer, then spins by `roll` about it. */
+function orient(vs: V3[], axis: V3, roll: number): V3[] {
+  const len = Math.hypot(...axis)
+  const w: V3 = [axis[0] / len, axis[1] / len, axis[2] / len]
+  // Any perpendicular will do for the first basis vector; the roll is what
+  // decides which way up, and it is picked by looking.
+  const seed: V3 = Math.abs(w[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]
+  const cross = (a: V3, b: V3): V3 => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ]
+  const unit = (v: V3): V3 => {
+    const n = Math.hypot(...v)
+    return [v[0] / n, v[1] / n, v[2] / n]
+  }
+  const u = unit(cross(seed, w))
+  const v = cross(w, u)
+  const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  const c = Math.cos((roll * Math.PI) / 180)
+  const s = Math.sin((roll * Math.PI) / 180)
+  return vs.map((p) => {
+    const x = dot(p, u)
+    const y = dot(p, v)
+    return [x * c - y * s, x * s + y * c, dot(p, w)] as V3
+  })
+}
+
 function geometryFor(def: { id: SolidId; shape: SolidShape }): Geo {
   if (def.shape.kind === 'sphere') return sphere(def.shape.meridians, def.shape.bands)
-  const vs = uniformVertices(def.id)
+  let vs = uniformVertices(def.id)
+  const pose = REST_POSE[def.id]
+  // Edges before the turn or after it makes no difference: it is a rotation,
+  // so it moves no vertex closer to any other.
+  if (pose) vs = orient(vs, pose.axis, pose.roll)
   return { vs, es: edgesByDistance(vs) }
 }
 

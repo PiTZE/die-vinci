@@ -627,6 +627,57 @@ check('every solid has the vertices and edges it should',
   wrong.length === 0,
   wrong.map(([k, want]) => `${k} has ${JSON.stringify(counts[k])} not ${JSON.stringify(want)}`).join('; '))
 
+// And every one of them rests mirror-symmetric, which is the thing that was
+// actually asked for and the thing a count of vertices cannot see. A solid
+// resting on the wrong symmetry axis draws a pinwheel: turn it and it maps
+// onto itself, reflect it and it does not, and what the eye reads is a shape
+// lying at a random angle. That is how the icosidodecahedron sat on a
+// two-fold axis for a build while its vertex and edge counts were perfect.
+//
+// Everything stopped and settled first, and the wall taken back down. A die
+// caught mid-throw is at whatever angle that throw's curve had reached, which
+// is a different picture every frame and none of them symmetric; and the
+// check above this one leaves ink pinned at the threshold, where the tick
+// halts and an unfinished throw never gets to finish.
+await ev(`(() => { const s = window.LD.state
+  s.ink = new window.LD.Decimal('1e6'); s.haltMs = 0
+  // The whole table, so all nine are looked at rather than the six a run has
+  // reached by this point.
+  s.studies = 8; s.solids.forEach((d) => { if (d.amount.lte(0)) d.amount = new window.LD.Decimal(10) })
+  s.autoRoll = false; s.autoRollOn = false; s.autoDice = 0; s.autoDiceOff = []
+  // And slow, because past a roll every 180ms a die stops landing and turns
+  // continuously instead, which never rests at all.
+  s.rollUpgrades = 0; s.handRollAt = 0 })()`)
+await sleep(1800)
+// Every row brought into view, because a row that scrolls off the bottom has
+// its wire paused, and a paused wire keeps in the DOM whatever pose it was
+// drawing when it stopped. The three that failed here were the last three on
+// the table, every time.
+await ev(`(() => { const rows = [...document.querySelectorAll('.pane:not([hidden]) .solid-icon')]
+  rows[rows.length - 1].scrollIntoView({ block: 'center' }) })()`)
+await sleep(700)
+const symmetry = await ev(`(() => {
+  const out = {}
+  const ids = ['tetra','hexa','octa','dodeca','trunccube','icosa','rhombi','icosidodeca','sphaera']
+  const rows = [...document.querySelectorAll('.pane:not([hidden]) .solid-icon')]
+  rows.forEach((n, i) => {
+    // A row for a solid not yet on the table has no box, and its icon keeps
+    // whatever it was last drawn as. Nothing to say about a picture nobody is
+    // being shown.
+    if (!n.getBoundingClientRect().height) return
+    const pts = []
+    for (const l of n.querySelectorAll('line')) pts.push([+l.getAttribute('x1'), +l.getAttribute('y1')], [+l.getAttribute('x2'), +l.getAttribute('y2')])
+    for (const p of n.querySelectorAll('path')) for (const m of p.getAttribute('d').matchAll(/(-?[0-9.]+) (-?[0-9.]+)/g)) pts.push([+m[1], +m[2]])
+    const key = (p) => (Math.round(p[0]*40)/40) + ',' + (Math.round(p[1]*40)/40)
+    const set = new Set(pts.map(key))
+    out[ids[i]] = pts.length > 0 && pts.every((p) => set.has(key([-p[0], p[1]])))
+  })
+  return out })()`)
+const crooked = Object.entries(symmetry).filter(([, ok]) => !ok).map(([k]) => k)
+check('and every one of them rests mirror-symmetric',
+  crooked.length === 0 && Object.keys(symmetry).length === 9,
+  crooked.length ? crooked.join(', ') : `${Object.keys(symmetry).length} on the table`)
+
 // And it is actually drawn: the count above is of the data, so something has
 // to say the drawing exists at all.
 const drawn = await ev(`[...document.querySelectorAll('.pane:not([hidden]) .solid-icon')]
