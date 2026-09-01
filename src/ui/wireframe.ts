@@ -200,13 +200,21 @@ function sphere(meridians: number, bands: number): Geo {
  * a turn, rather than asking whether it looks tidy.
  */
 const REST_POSE: Partial<Record<SolidId, { axis: V3; roll: number }>> = {
-  tetra: { axis: [1, 1, 1], roll: 60 },
-  dodeca: { axis: [0, PHI, 1], roll: 0 },
-  icosa: { axis: [1, 1, 1], roll: 7.8 },
-  icosidodeca: { axis: [0, PHI, 1], roll: 0 },
+  // A vertex above and a face below, which is the triangle a d4 is drawn as.
+  tetra: { axis: [1, 1, 1], roll: 0 },
+  hexa: { axis: [0, 0, 1], roll: 0 },
+  // Point up, point down, and four around the middle: the diamond a d8 is
+  // drawn as.
+  octa: { axis: [0, 0, 1], roll: 0 },
+  dodeca: { axis: [0, PHI, 1], roll: 18 },
+  trunccube: { axis: [0, 0, 1], roll: 0 },
+  // A five-fold vertex on top, which draws the hexagon a d20 is drawn as.
+  icosa: { axis: [0, 1, PHI], roll: 18 },
+  rhombi: { axis: [0, 0, 1], roll: 0 },
+  icosidodeca: { axis: [0, PHI, 1], roll: 18 },
 }
 
-/** Turns `axis` to face the viewer, then spins by `roll` about it. */
+/** Stands the solid on `axis`, then turns it `roll` degrees about it. */
 function orient(vs: V3[], axis: V3, roll: number): V3[] {
   const len = Math.hypot(...axis)
   const w: V3 = [axis[0] / len, axis[1] / len, axis[2] / len]
@@ -227,10 +235,16 @@ function orient(vs: V3[], axis: V3, roll: number): V3[] {
   const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
   const c = Math.cos((roll * Math.PI) / 180)
   const s = Math.sin((roll * Math.PI) / 180)
+  // The axis becomes the vertical, and the roll turns the solid about it,
+  // which is the same axis a throw turns it about.
+  //
+  // Then a half turn about x, because the screen's y points down: without it
+  // the axis a solid is standing on comes out underneath it, and the
+  // tetrahedron rests on its point with its face in the air.
   return vs.map((p) => {
     const x = dot(p, u)
-    const y = dot(p, v)
-    return [x * c - y * s, x * s + y * c, dot(p, w)] as V3
+    const z = -dot(p, v)
+    return [x * c + z * s, -dot(p, w), -(-x * s + z * c)] as V3
   })
 }
 
@@ -468,14 +482,12 @@ class Wire {
     // rate the sphere needs, which is four times slower than it can manage.
     const rate = ceilingFor(this.id) * Math.PI * 2
     this.t += dt * rate * this.speed
-    // Rolling too fast to watch. A light constant wobble, no bounce: there is
-    // no landing to settle onto.
-    const j = Math.min(1, rate / (MAX_SPIN * 2))
-    this.place(
-      Math.sin(this.t * 0.6 + this.phase * 2) * 0.9 * j,
-      Math.sin(this.t * 0.9 + this.phase) * 1.4 * j,
-      Math.sin(this.t * 0.75 + this.phase) * 3.4 * j,
-    )
+    // Rolling too fast to watch, and standing still while it does. There was a
+    // drift and a three-degree tilt riding on the spin here, on the same
+    // reasoning as the one in the hop and wrong for the same reason: the die
+    // turns about the upright axis through its top, and anything rocking that
+    // axis is the one thing on screen that answers to nothing.
+    this.place(0, 0, 0)
     this.draw()
   }
 
@@ -654,6 +666,19 @@ const FRAME_HZ = 60
  * second: one symmetry step a frame, which is the rule the old global ceiling
  * was set by. Past it the shape arrives looking as it left.
  */
+/**
+ * The per-solid spin ceiling, in radians a second.
+ *
+ * The limit is aliasing rather than taste: a shape turning more than one
+ * symmetry step per frame reads as turning backwards. The tetrahedron's step
+ * is 120 degrees and the 72-face sphere's is 30, so each one gets its own
+ * bound rather than the whole table taking the sphere's.
+ *
+ * Everything below it scales with the roll rate: the same throw inside a
+ * shorter interval is a faster throw. Above it the dice stop getting faster
+ * and simply do not stop, which is what a roll rate too high to watch should
+ * look like.
+ */
 function ceilingFor(id: SolidId): number {
   return ((SYMMETRY_STEP[id] ?? 30) / 360) * FRAME_HZ
 }
@@ -668,21 +693,6 @@ function ceilingFor(id: SolidId): number {
  */
 const EASE_PEAK = 2
 
-/**
- * The old global ceiling, in radians a second, kept only to scale the wobble
- * amplitude in the blur. Each solid has its own now; see ceilingFor.
- *
- * The limit is aliasing, not taste. A shape turning more than one symmetry
- * step per frame reads as turning backwards, or as standing still. The
- * tetrahedron's step is 120 degrees and the 72-face sphere's is 30, so the
- * sphere sets the bound, and this sits just under it.
- *
- * Everything below the ceiling scales with the roll rate: the same throw
- * inside a shorter interval is a faster throw. Above it the dice stop getting
- * faster and simply do not stop, which is what a roll rate too high to watch
- * should look like.
- */
-const MAX_SPIN = 30
 
 /**
  * Where the throw stops being a spin and becomes a landing.

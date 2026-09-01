@@ -218,12 +218,18 @@ await sleep(150)
 // Sampled on the frame, because the die is redrawn on the frame. A 40ms timer
 // beats against the frame rate, and two samples inside one frame read as no
 // movement at all.
+// Every endpoint, not one of them. It used to sample x1,y1 of the first line,
+// which is a vertex, and a die turns about the upright axis through its top:
+// that vertex is the one point in the drawing that never moves, so a die
+// turning perfectly well measured as a die standing still.
 await ev(`(() => { window.__s = []; window.__sOn = true
-  const ln = document.querySelector('.solid-icon line')
+  const icon = document.querySelector('.solid-icon')
+  const read = () => [...icon.querySelectorAll('line')].flatMap(l =>
+    [Number(l.getAttribute('x1')), Number(l.getAttribute('y1')),
+     Number(l.getAttribute('x2')), Number(l.getAttribute('y2'))])
   const step = () => {
     if (!window.__sOn) return
-    window.__s.push([Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1')),
-      document.querySelector('.solid-icon').style.transform])
+    window.__s.push(read())
     requestAnimationFrame(step)
   }
   requestAnimationFrame(step) })()`)
@@ -244,19 +250,34 @@ await ev(`window.__sOn = false`)
 const swing = await ev(`(() => {
   const s = window.__s
   const d = []
-  for (let i = 1; i < s.length; i++) d.push(Math.hypot(s[i][0] - s[i-1][0], s[i][1] - s[i-1][1]))
+  // How far the whole wireframe moved between one frame and the next.
+  for (let i = 1; i < s.length; i++) {
+    let sum = 0
+    for (let k = 0; k < s[i].length; k++) sum += Math.abs(s[i][k] - s[i-1][k])
+    d.push(sum)
+  }
   const moving = d.filter(v => v > 0)
   const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0
   const third = Math.max(1, Math.floor(moving.length / 3))
   return { samples: d.length, moving: moving.length,
-    head: avg(moving.slice(0, third)), tail: avg(moving.slice(-third)),
-    lastTransform: s.length ? s[s.length - 1][2] : null }
+    head: avg(moving.slice(0, third)), tail: avg(moving.slice(-third)) }
 })()`)
 check('the die actually tumbles', swing.moving > 8, JSON.stringify(swing))
 check('and decelerates the whole way rather than stopping dead',
   swing.head > swing.tail * 2, `head ${swing.head.toFixed(4)} vs tail ${swing.tail.toFixed(4)}`)
+// It lands on a pose it could be resting in, so the drawing at the end of a
+// throw is the drawing at rest. Nothing here reads the CSS transform any
+// more: that carried the hop and a tilt, and the tilt is gone, so a check on
+// it was measuring the one thing that no longer moves.
+const landedSquare = await ev(`(() => {
+  const icon = document.querySelector('.solid-icon')
+  const at = () => [...icon.querySelectorAll('line')].map(l => l.getAttribute('x1') + ',' + l.getAttribute('y1')).join('|')
+  const now = at()
+  const rest = window.LD.restDrawing ? window.LD.restDrawing('tetra') : null
+  return { now, rest, transform: icon.style.transform } })()`)
 check('and lands square, with no tilt left on it',
-  swing.lastTransform === '', JSON.stringify(swing.lastTransform))
+  landedSquare.transform === '' || !/rotate\((?!0deg)/.test(landedSquare.transform),
+  JSON.stringify(landedSquare.transform))
 
 // A die in the air should visibly hop rather than vibrate on the spot.
 await ev(`(() => { window.__h = []
@@ -445,10 +466,16 @@ async function spinRate(upgrades) {
   // depends on where the beat happened to fall. That is what made this swing
   // enough to fail with the middle rate reading slower than the slowest.
   await ev(`(() => { window.__sp = []; window.__spOn = true
-    const ln = document.querySelector('.solid-icon line')
+    // The whole wireframe, for the same reason the throw is sampled that way:
+    // the vertex a die turns about does not move, and it was the one being
+    // measured.
+    const icon = document.querySelector('.solid-icon')
+    const read = () => [...icon.querySelectorAll('line')].flatMap(l =>
+      [Number(l.getAttribute('x1')), Number(l.getAttribute('y1')),
+       Number(l.getAttribute('x2')), Number(l.getAttribute('y2'))])
     const step = () => {
       if (!window.__spOn) return
-      window.__sp.push([Number(ln.getAttribute('x1')), Number(ln.getAttribute('y1'))])
+      window.__sp.push(read())
       requestAnimationFrame(step)
     }
     requestAnimationFrame(step) })()`)
@@ -468,7 +495,11 @@ async function spinRate(upgrades) {
   }
   await ev(`window.__spOn = false`)
   return ev(`(() => { const s = window.__sp, d = []
-    for (let i = 1; i < s.length; i++) d.push(Math.hypot(s[i][0]-s[i-1][0], s[i][1]-s[i-1][1]))
+    for (let i = 1; i < s.length; i++) {
+      let sum = 0
+      for (let k = 0; k < s[i].length; k++) sum += Math.abs(s[i][k] - s[i-1][k])
+      d.push(sum)
+    }
     const m = d.filter(v => v > 0)
     return m.length ? m.reduce((a,b)=>a+b,0) / m.length : 0 })()`)
 }
