@@ -15,6 +15,13 @@ ROOT=/var/www/leonard
 
 case "$CHANNEL" in
   stable)
+    # Only through tools/release.sh, which is the thing that knows what the
+    # next version is. A stable deploy made by hand is how the channel ended
+    # up serving a number nothing in the repo agreed with.
+    if [ "${RELEASING:-}" != 1 ]; then
+      echo "deploy: stable is released by tools/release.sh, not by hand" >&2
+      exit 1
+    fi
     npm run build
     rsync -a --delete --exclude='dev/' dist/ "$ROOT/"
     ;;
