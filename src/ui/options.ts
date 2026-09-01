@@ -432,13 +432,22 @@ export function optionsPane(): Pane {
 
       function paintInstall() {
         const state = installState()
+        // Gone once it is installed, rather than a section headed INSTALL with
+        // the word "installed" under it. Inside the app that is a control for
+        // something you are already doing, and in the browser tab you
+        // installed from it was worse: the prompt is spent, so the state fell
+        // back to manual and it told you to add to your home screen the thing
+        // you had just added.
+        install.hidden = state === 'installed'
         installBtn.hidden = state !== 'ready'
         // The row keeps its padding even when the only thing in it is hidden.
         iRow.hidden = state !== 'ready'
         installBtn.disabled = false
         installBtn.classList.toggle('buyable', state === 'ready')
         installNote.hidden = state === 'ready'
-        installNote.textContent = state === 'installed' ? 'installed' : manualHint()
+        // Emptied rather than merely hidden. A hidden hint is still a hint in
+        // the document, and this one tells you to install something you have.
+        installNote.textContent = state === 'installed' ? '' : manualHint()
       }
       paintInstall()
       onInstallChange(paintInstall)

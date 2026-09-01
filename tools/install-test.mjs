@@ -67,6 +67,40 @@ const done = await ev(`(() => { const b = [...document.querySelectorAll('button'
   return { shown: getComputedStyle(b).display !== 'none' } })()`)
 check('button retires after the prompt is used', done.shown === false, JSON.stringify(done))
 
+// And the whole section goes once the app is installed. It used to fall back
+// to the hint, so the tab you installed from told you to add to your home
+// screen the thing you had just added, and inside the app it was a section
+// headed INSTALL saying "installed".
+await ev(`window.dispatchEvent(new Event('appinstalled'))`)
+await sleep(200)
+const installed = await ev(`(() => {
+  const b = [...document.querySelectorAll('button')].find(x => x.textContent === 'INSTALL')
+  const sec = b?.closest('.section')
+  return { section: sec ? getComputedStyle(sec).display !== 'none' : null,
+    hint: [...document.querySelectorAll('.empty')].map(n => n.textContent)
+      .some(n => /home screen|browser menu/.test(n ?? '')),
+    flag: localStorage.getItem('ld:installed') } })()`)
+check('the install section goes once it is installed',
+  installed.section === false, JSON.stringify(installed))
+check('and it stops telling you how to install it',
+  installed.hint === false, JSON.stringify(installed))
+check('and a plain browser tab remembers, having no other way to know',
+  installed.flag === '1', JSON.stringify(installed))
+
+// A browser that offers again means it is not installed after all, which is
+// what someone who uninstalls gets.
+await ev(`(() => { const e = new Event('beforeinstallprompt')
+  e.prompt = () => Promise.resolve()
+  e.userChoice = Promise.resolve({ outcome: 'accepted' })
+  window.dispatchEvent(e) })()`)
+await sleep(200)
+const back = await ev(`(() => {
+  const b = [...document.querySelectorAll('button')].find(x => x.textContent === 'INSTALL')
+  return { shown: b ? getComputedStyle(b).display !== 'none' : null,
+    flag: localStorage.getItem('ld:installed') } })()`)
+check('and an offer to install undoes it',
+  back.shown === true && back.flag === null, JSON.stringify(back))
+
 const shot = await send('Page.captureScreenshot',{format:'png'})
 writeFileSync('install.png', Buffer.from(shot.data,'base64'))
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
