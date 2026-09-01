@@ -40,7 +40,8 @@ export function challengesPane(): Pane {
       exitRow.appendChild(exitBtn)
       section.appendChild(exitRow)
 
-      const list = el('div', 'tile-grid')
+      // The thirteenth spans the row: it is the one that hands over the Wager.
+      const list = el('div', 'tile-grid wide-last')
       for (const c of CHALLENGES) {
         const btn = el('button', 'tile')
         btn.type = 'button'

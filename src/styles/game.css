@@ -775,6 +775,17 @@
   min-width: 0;
 }
 
+/* The last one takes the whole line.
+   Both grids that ask for this end on a tile that closes something: the
+   thirteenth challenge is the one that hands over the Wager, and the ninth
+   entry in an archive row is the one that completes it and pays the row
+   bonus. Nine and thirteen are both odd, so the closing tile was going to sit
+   alone at the end of a two-column phone anyway; spanning it says the row
+   ended on purpose rather than running out. */
+.tile-grid.wide-last > *:last-child {
+  grid-column: 1 / -1;
+}
+
 .tile {
   display: flex;
   flex-direction: column;

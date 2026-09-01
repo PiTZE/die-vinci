@@ -37,6 +37,18 @@ export default defineConfig({
     target: 'es2022',
     // One page, one bundle. Splitting buys nothing here and costs a round trip.
     cssCodeSplit: false,
+    rollupOptions: {
+      output: {
+        // break_infinity.js is vendored into the bundle and it is MIT, which
+        // asks for its notice to travel with the code. It used to travel on
+        // the ABOUT pane; this puts it in the thing that is actually
+        // distributed. The bang keeps it through minification, which strips
+        // every other comment.
+        banner:
+          '/*! Bundles break_infinity.js v2.2.0, MIT, Copyright (c) 2019 ' +
+          'Timothy Stiles. Full licence: src/vendor/break-infinity.LICENSE.txt */',
+      },
+    },
   },
   plugins: [
     {

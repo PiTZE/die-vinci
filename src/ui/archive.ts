@@ -46,7 +46,8 @@ export function archivePane(): Pane {
         section.appendChild(rh)
         rows.set(r.id, { head: rh, title, mark })
 
-        const grid = el('div', 'tile-grid')
+        // Nine to a row, and the ninth closes it and pays the row bonus.
+        const grid = el('div', 'tile-grid wide-last')
         for (const a of r.entries) {
           const cell = el('div', 'tile')
           const name = el('span', 'tile-name', '')
