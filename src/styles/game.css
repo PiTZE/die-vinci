@@ -1438,22 +1438,41 @@
   display: none;
 }
 
-/* The three on offer. Stacked on a phone and in a row on a desktop, which is
-   how three cards are dealt in either place. */
+/* The three on offer, dealt onto a ring rather than laid out in a row.
+   Their seats are placed by script, so this is a stage: a fixed height, the
+   perspective the ring turns inside, and no scrolling of its own. */
 .arcana-offer {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
-  gap: 12px;
-  padding: 12px;
+  position: relative;
+  /* Tall enough for the front card at its largest. It is scaled up by the
+     ring and again by the perspective divide, so the stage has to hold about
+     a third more than the card's own height. */
+  height: 24rem;
+  overflow: hidden;
   perspective: 900px;
+  /* The ring is dragged up and down, which is the gesture a phone would
+     otherwise spend on scrolling the pane. */
+  touch-action: none;
+  cursor: grab;
+}
+
+.arcana-offer:active {
+  cursor: grabbing;
+}
+
+/* One seat a card, placed on the ring. The card inside keeps its own tilt, so
+   the two transforms never share an element. */
+.arcana-seat {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 9rem;
+  will-change: transform, opacity, filter;
 }
 
 /* Not dimmed, and not accented either. The accent means held, and three
    full-bleed accent cards is the whole screen shouting one thing. */
 .arcana-pick {
   width: 100%;
-  max-width: 13rem;
   opacity: 1;
   cursor: pointer;
 }
@@ -1651,7 +1670,11 @@
 
 @media (min-width: 820px) {
   .arcana-offer {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    height: 27rem;
+  }
+
+  .arcana-seat {
+    width: 10.5rem;
   }
 }
 

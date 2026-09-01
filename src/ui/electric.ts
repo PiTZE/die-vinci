@@ -157,11 +157,17 @@ export function electricBorder(host: HTMLElement, opts: ElectricOptions = {}): (
   let h = 0
   let dpr = 1
   const size = (): void => {
-    const r = host.getBoundingClientRect()
-    if (!r.width || !r.height) return
+    // The laid-out size, not the drawn one. getBoundingClientRect returns the
+    // box after every transform on the element and its ancestors, and this now
+    // draws around a card sitting on a ring that scales it every frame: the
+    // canvas resized on each of those frames and the border pulsed with the
+    // card instead of staying on it.
+    const bw = host.offsetWidth
+    const bh = host.offsetHeight
+    if (!bw || !bh) return
     dpr = Math.min(window.devicePixelRatio || 1, 2)
-    w = r.width
-    h = r.height
+    w = bw
+    h = bh
     reach = Math.min(w, h) * chaos
     bleed = Math.ceil(reach + thickness * 5)
     // Here, not at construction. The canvas is bigger than the element by

@@ -223,6 +223,68 @@ const shown = await ev(`(() => {
 check('numbers carry no trailing zeros',
   shown.every((t) => !/\.0+($|[A-Za-z])/.test(t)), JSON.stringify(shown))
 
+// The draft is dealt onto a ring: dragged with a finger, snapping to whichever
+// card is nearest when you let go, and a tap on the one facing you takes it.
+await ev(`(() => { const s = window.LD.state
+  s.pendingDraft = ['sun','fool','wheel']
+  for (const a of window.LD.ARCANA) s.tarot[a.id] = 0 })()`)
+await ev(openTab('TAROT'))
+await sleep(700)
+const ring = await ev(`(() => {
+  const stage = document.querySelector('.arcana-offer')
+  const seats = [...document.querySelectorAll('.arcana-seat')]
+  const box = stage.getBoundingClientRect()
+  return { seats: seats.length,
+    placed: seats.every(x => /translate3d/.test(x.style.transform)),
+    // Every card inside the stage rather than spilling out of it.
+    inside: seats.every(x => { const r = x.getBoundingClientRect()
+      return r.top >= box.top - 2 && r.bottom <= box.bottom + 2 }),
+    // One of them is facing you: the largest, and the only unblurred one.
+    sharp: seats.filter(x => !x.style.filter).length } })()`)
+check('the draft is dealt onto a ring', ring.seats === 3 && ring.placed === true,
+  JSON.stringify(ring))
+check('and every card sits inside the stage', ring.inside === true, JSON.stringify(ring))
+check('and one of them faces you', ring.sharp === 1, JSON.stringify(ring))
+
+// Dragged, and it lands square rather than wherever the finger stopped.
+const dragged = await ev(`(async () => {
+  const stage = document.querySelector('.arcana-offer')
+  const b = stage.getBoundingClientRect()
+  const at = (y) => ({ bubbles: true, pointerId: 7, pointerType: 'touch',
+    clientX: b.left + b.width / 2, clientY: y })
+  stage.dispatchEvent(new PointerEvent('pointerdown', at(b.top + b.height * 0.7)))
+  for (let i = 1; i <= 6; i++) {
+    stage.dispatchEvent(new PointerEvent('pointermove', at(b.top + b.height * 0.7 - i * 12)))
+    await new Promise(r => setTimeout(r, 30))
+  }
+  stage.dispatchEvent(new PointerEvent('pointerup', at(b.top + b.height * 0.3)))
+  const moved = [...document.querySelectorAll('.arcana-seat')].map(x => x.style.transform)
+  await new Promise(r => setTimeout(r, 900))
+  const settled = [...document.querySelectorAll('.arcana-seat')].map(x => x.style.transform)
+  await new Promise(r => setTimeout(r, 500))
+  const still = [...document.querySelectorAll('.arcana-seat')].map(x => x.style.transform)
+  // Square means one card at dead centre: no sideways offset on it.
+    // Read back from style.transform, so the browser's own normalisation: it
+  // writes 0.0px and hands back 0px.
+  const centred = still.filter(t => t.startsWith('translate(-50%, -50%) translate3d(0px,')).length
+  return { turned: moved.join() !== settled.join(), stopped: settled.join() === still.join(), centred,
+    show: still.map(t => t.slice(t.indexOf('translate3d'), t.indexOf('translate3d') + 26)) } })()`)
+check('a drag turns it', dragged.turned === true, JSON.stringify(dragged))
+check('and it snaps to the nearest card and stays there',
+  dragged.stopped === true && dragged.centred === 1, JSON.stringify(dragged))
+
+// A tap on the card facing you still takes it.
+const took2 = await ev(`(() => {
+  const seats = [...document.querySelectorAll('.arcana-seat')]
+  const front = seats.find(x => x.style.transform.includes('translate3d(0px,')) ?? seats[0]
+  const card = front.querySelector('[data-arcana]')
+  const id = card.dataset.arcana
+  card.click()
+  return { id, level: window.LD.state.tarot[id] || 0,
+    pending: window.LD.state.pendingDraft.length } })()`)
+check('and a tap on it takes the card',
+  took2.level > 0 && took2.pending === 0, JSON.stringify(took2))
+
 ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

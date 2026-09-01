@@ -10,6 +10,7 @@ import { el, type Pane } from './shell'
 import { seal, unseal } from './redact'
 import { tiltable } from './tilt'
 import { electricBorder } from './electric'
+import { spiral, type Spiral } from './spiral'
 
 interface Cell {
   root: HTMLElement
@@ -84,6 +85,8 @@ function setText(n: HTMLElement, v: string): void {
 export function tarotPane(): Pane {
   /** The lightning on the Tower's card in the deck, once it is held. */
   let towerBolt: (() => void) | null = null
+  /** The turning ring the draft is dealt onto, while there is one. */
+  let ring: Spiral | null = null
   const cells = new Map<string, Cell>()
   let head: HTMLElement
   let offerSection: HTMLElement
@@ -143,6 +146,8 @@ export function tarotPane(): Pane {
         const key = s.pendingDraft.join(',')
         if (key !== shownOffer) {
           shownOffer = key
+          ring?.destroy()
+          ring = null
           offerRow.replaceChildren(
             ...s.pendingDraft.map((id) => {
               const def = ARCANA_BY_ID[id]
@@ -158,13 +163,30 @@ export function tarotPane(): Pane {
               setText(c.name, def?.name ?? id)
               setText(c.note, def?.note ?? '')
               setText(c.level, at ? `HELD, LEVEL ${at} TO ${at + 1}` : 'NEW')
-              return c.root
+              // The ring turns a seat and the card turns itself toward the
+              // pointer, so the two transforms never share an element.
+              const seat = el('div', 'arcana-seat')
+              seat.appendChild(c.root)
+              return seat
             }),
           )
+          // Three cards on a turn, which is a spread rather than a row. It
+          // turns by itself until the first time you touch it and then stops
+          // for good: this is a choice, and a moving target is a poor thing to
+          // ask anyone to hit.
+          ring = spiral(offerRow, [...offerRow.children] as HTMLElement[], {
+            cardsPerTurn: s.pendingDraft.length,
+          })
         }
         return
       }
       shownOffer = ''
+      // The ring goes with the draft it was dealt for.
+      if (ring) {
+        ring.destroy()
+        ring = null
+        offerRow.replaceChildren()
+      }
 
       const have = owned(s)
       setText(head, `${have}/${ARCANA.length}`)
