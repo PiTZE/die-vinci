@@ -312,7 +312,10 @@ const way = await ev(`(async () => { const s = window.LD.state
     await new Promise(r => setTimeout(r, 120))
   }
   stage.dispatchEvent(new PointerEvent('pointerup', ev2(y0 + step * 5)))
-  await new Promise(r => setTimeout(r, 900))
+  // Waited for rather than slept through: the ring eases to its snap, and
+  // under load 900ms is not always enough, which reads as no card centred at
+  // all rather than as the wrong one.
+  for (let i = 0; i < 60 && centre() < 0; i++) await new Promise(r => setTimeout(r, 100))
   return { before, after: centre(), n: seats.length } })()`)
 check('dragging down brings the next card round',
   way.after === (way.before + 1) % way.n, JSON.stringify(way))
@@ -326,7 +329,7 @@ const tapped = await ev(`(async () => {
   const other = (before + 1) % seats.length
   const name = seats[other].querySelector('.card-name').textContent
   seats[other].querySelector('[data-arcana]').click()
-  await new Promise(r => setTimeout(r, 900))
+  for (let i = 0; i < 60 && front() !== other; i++) await new Promise(r => setTimeout(r, 100))
   const label = document.querySelector('.arcana-take').textContent
   return { before, after: front(), other, name, label,
     took: window.LD.state.pendingDraft.length } })()`)
