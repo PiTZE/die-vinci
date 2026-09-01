@@ -74,6 +74,7 @@ import { codicesPane } from './ui/codices'
 import { releaseSticky } from './ui/hold'
 import { solidFigure, solidFold } from './ui/wireframe'
 import { checkMarks } from './game/marks'
+import { towerStriking } from './game/tarot'
 import {
   CODICES,
   buyAllCodices,
@@ -720,6 +721,8 @@ const hook: Record<string, unknown> = {
   // How often a solid maps onto itself in one turn about the vertical, which
   // is what a throw is quantised to.
   solidFold,
+  // Whether XVI is mid-strike, which the top bar draws over the ink.
+  towerStriking,
   rollProgress,
   // Whether a roll you asked for is in the air, which since the roll clock
   // became shared is no longer the same question as rollStartedAt.

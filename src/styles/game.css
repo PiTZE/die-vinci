@@ -58,6 +58,8 @@
   line-height: 1.25;
   flex-shrink: 0;
   min-width: 7rem;
+  /* So the Tower's strike has something to be positioned against. */
+  position: relative;
 }
 
 .res-label {
@@ -1265,6 +1267,15 @@
  * pointed at. A card sitting in a grid shimmering on its own would be the
  * loudest thing on a screen that is otherwise all 1px rules.
  */
+/* The electric border's canvas. It sits outside the element it belongs to,
+   because the filament strays off the border and a glow clipped at the border
+   is a hard edge, which is the one thing it must not have. */
+.electric {
+  position: absolute;
+  pointer-events: none;
+  z-index: 4;
+}
+
 .card-foil,
 .card-glare {
   position: absolute;

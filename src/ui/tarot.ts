@@ -9,6 +9,7 @@ import type { GameState } from '../state'
 import { el, type Pane } from './shell'
 import { seal, unseal } from './redact'
 import { tiltable } from './tilt'
+import { electricBorder } from './electric'
 
 interface Cell {
   root: HTMLElement
@@ -81,6 +82,8 @@ function setText(n: HTMLElement, v: string): void {
 }
 
 export function tarotPane(): Pane {
+  /** The lightning on the Tower's card in the deck, once it is held. */
+  let towerBolt: (() => void) | null = null
   const cells = new Map<string, Cell>()
   let head: HTMLElement
   let offerSection: HTMLElement
@@ -145,6 +148,11 @@ export function tarotPane(): Pane {
               const def = ARCANA_BY_ID[id]
               const c = card(id, def?.numeral ?? '?', 'button')
               c.root.classList.add('arcana-pick')
+              // XVI is a tower struck by lightning, in the deck this game
+              // borrowed its cards from and in every deck since. It is the one
+              // card whose picture is an event rather than a figure, so it is
+              // the one card whose border is.
+              if (id === 'tower') electricBorder(c.root, { thickness: 1, speed: 1.1 })
               c.root.dataset.arcana = id
               const at = levelOf(s, id as never)
               setText(c.name, def?.name ?? id)
@@ -188,6 +196,17 @@ export function tarotPane(): Pane {
         setText(cell.level, at > 0 ? (isFull(s, a.id) ? `LEVEL ${at}  FULL` : `LEVEL ${at}`) : '')
         cell.root.classList.toggle('sealed', at === 0)
         cell.root.classList.toggle('held', at > 0)
+        // Struck once you hold it, and not before: a lightning bolt playing
+        // over one sealed card in a grid of twenty-two says which one it is
+        // as plainly as its name would.
+        if (a.id === 'tower') {
+          if (at > 0 && !towerBolt) {
+            towerBolt = electricBorder(cell.root, { thickness: 1, speed: 1.1 })
+          } else if (at === 0 && towerBolt) {
+            towerBolt()
+            towerBolt = null
+          }
+        }
       }
     },
   }
