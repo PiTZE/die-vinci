@@ -31,7 +31,8 @@
     "test:tarot": "node tools/tarot-test.mjs",
     "test:break": "node tools/break-test.mjs",
     "test:codices": "node tools/codex-test.mjs",
-    "test:arcana": "node tools/arcana-test.mjs"
+    "test:arcana": "node tools/arcana-test.mjs",
+    "test:offline": "node tools/offline-test.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

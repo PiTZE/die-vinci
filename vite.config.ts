@@ -101,7 +101,19 @@ export default defineConfig({
       // script, and that plain registration is the one that cannot reload the
       // page when a new worker takes over.
       injectRegister: null,
-      includeAssets: ['icon-192.png', 'icon-512.png', 'icon-512-maskable.png'],
+      // Nothing here, and no manifest icons either. Both of these add files to
+      // the precache list that globPatterns below already matches, and Workbox
+      // throws on a duplicate URL whose two entries disagree about the
+      // revision: the install fails, nothing is cached, and the app is a
+      // browser error page the moment the connection goes. It had been that
+      // way and nobody had tried it offline.
+      //
+      // The manifest was the worst of them. The plugin precaches it itself and
+      // the glob picks up the generated file, and the two are hashed at
+      // different moments, so the list carried manifest.webmanifest twice with
+      // two different revisions.
+      includeAssets: [],
+      includeManifestIcons: false,
       manifest: {
         // One installable app, whichever channel you install from. The name,
         // the identity, the scope and the start url are all the stable ones,
@@ -150,7 +162,11 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest,woff2,mp3}'],
+        // No webmanifest here: the plugin precaches the manifest it generated
+        // and the glob would pick up the same file from disk, hashed at a
+        // different moment, which is a duplicate URL with two revisions and a
+        // precache that refuses to install.
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2,mp3}'],
         cleanupOutdatedCaches: true,
         // Navigations into the other channel go to the network. Without this
         // the stable worker answers /dev/ with its own precached index.html.
