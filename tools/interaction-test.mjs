@@ -748,6 +748,27 @@ try {
   check('looking at it is what clears it',
     !navCleared.marks.includes('tarot'), JSON.stringify(navCleared))
 
+  // A mark has to point at something. The WAGER tab used to take one whenever
+  // a run reached the threshold, which was right while that tab held the
+  // button that called it: the button is in the action bar now and the tab
+  // holds nothing but what chips buy, so the dot pointed at a grid with
+  // nothing new in it. Reported from playing.
+  const emptyMark = await evaluate(`(async () => { const s = window.LD.state, D = window.LD.Decimal
+    s.wagers = 3; s.marks = []; s.marksArmed = []; s.pendingDraft = []
+    s.broke = false; s.chips = new D(0); s.chipUpgrades = []
+    s.inkThisWager = new D('1e309'); s.ink = new D('1e309')
+    await new Promise(r => setTimeout(r, 400))
+    return { marks: s.marks.slice(), callable: window.LD.canWager ? window.LD.canWager(s) : null } })()`)
+  check('a callable Wager does not mark the tab that cannot call it',
+    !emptyMark.marks.includes('wager'), JSON.stringify(emptyMark))
+  // And the one thing that pane does hold still marks it.
+  const chipMark = await evaluate(`(async () => { const s = window.LD.state, D = window.LD.Decimal
+    s.marks = []; s.marksArmed = []; s.chips = new D(50)
+    await new Promise(r => setTimeout(r, 400))
+    return s.marks.slice() })()`)
+  check('and chips you could spend still do', chipMark.includes('wager'),
+    JSON.stringify(chipMark))
+
   // Never on a tab the player has not met. A mark on a navSealed pane would be the
   // loudest spoiler in the game.
   const navSealed = await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal

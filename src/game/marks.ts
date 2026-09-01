@@ -21,7 +21,6 @@
 // which gives AD's once-ever behaviour for free on any condition that latches.
 import type { GameState, TabId } from '../state'
 import { canBuyAutoRoll } from './production'
-import { canWager } from './wager'
 import { canBreak, chipsFromInk, wagerThreshold } from './breaks'
 import { canBuyAnyCodex, codexUnlockAt, openCodices, CODEX_COUNT } from './codices'
 import { UPGRADES, canBuy, type UpgradeId } from './upgrades'
@@ -44,8 +43,14 @@ export const MARK_RULES: MarkRule[] = [
   // ladder is bought in a tab you have no other reason to open.
   { id: 'autoRoll', tab: 'automation', when: (s) => canBuyAutoRoll(s) },
 
-  // The run is over and the only move left is on another tab.
-  { id: 'wagerReady', tab: 'wager', when: (s) => !s.broke && canWager(s) },
+  // There used to be a wagerReady rule here, marking the WAGER tab whenever a
+  // run reached the threshold. It was right when the tab held the button that
+  // called it. The button lives in the action bar now and the tab holds
+  // nothing but what chips buy, so what the rule actually did was put a dot on
+  // a tab, mid-game, with nothing behind it: the run halting is already the
+  // loudest thing in the game, because the bar gives itself over to one
+  // button. Reported from playing, and it is the only mark that ever pointed
+  // at nothing.
 
   // Chips you have not spent, on a grid you may not have opened since.
   {
