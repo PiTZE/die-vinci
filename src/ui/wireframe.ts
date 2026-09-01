@@ -159,6 +159,21 @@ function normalize(g: Geo): Geo {
   return { vs: g.vs.map((v) => [v[0] / r, v[1] / r, v[2] / r] as V3), es: g.es }
 }
 
+/**
+ * How many vertices and edges a solid actually has, from the generated
+ * geometry rather than from a picture of it.
+ *
+ * The suite used to count distinct points in the drawn SVG, which asks the
+ * right question through the wrong window: at any pose down a symmetry axis
+ * two vertices legitimately project onto one point, and at the resting pose
+ * every solid is down a symmetry axis. It failed on four different solids in
+ * one afternoon and each time the drawing was correct.
+ */
+export function solidFigure(id: SolidId): [number, number] {
+  const g = geometry(id)
+  return [g.vs.length, g.es.length]
+}
+
 const CACHE = new Map<SolidId, Geo>()
 
 function geometry(id: SolidId): Geo {
@@ -200,24 +215,26 @@ function depthOpacity(f: number): number {
 /**
  * The angle a die sits at when it is not rolling.
  *
- * One angle for every solid, and a fixed one. It used to be `Math.random()`
- * per die, which is what a tumbling die wants and the opposite of what a still
- * one does: nine solids at rest were nine arbitrary poses.
+ * No rotation at all: the solid as its vertices are written.
  *
- * Chosen by rendering all nine across a sweep and looking, not by picking a
- * number that was merely not degenerate. The first fixed pose was 0.62 about
- * a (0.42, 1) axis, which is a fourteen degree tilt: the cube came out nearly
- * face-on, a flat square with a line down it, and the tetrahedron's apex sat
- * almost on top of an edge and read as a sideways arrow. This is the classic
- * three-quarter view a die is drawn in, about thirty-five degrees one way and
- * twenty-five the other, where a cube shows three faces and every solid looks
- * like itself.
+ * Every one of these is authored about its own axes, so straight on is down a
+ * symmetry axis and the projection comes out symmetric. A cube is a square, an
+ * octahedron a diamond crossed through the middle, an icosahedron a regular
+ * hexagon, the sphere a globe with its pole up. That is what a die sitting
+ * still should look like.
  *
- * Zero is the one angle to avoid. The geometry is axis-aligned, so straight on
- * it is edge-on: five of the nine hide half their vertices behind the other
- * half, and a d20 draws eight of its twelve.
+ * Two goes at a three-quarter view came first, on the reasoning that a die is
+ * usually drawn tilted. It is, while it is being thrown. A still one wants to
+ * be square to you, and any tilt away from that is a pose the eye reads as
+ * arbitrary because it is: nothing distinguishes thirty-five degrees from
+ * thirty-four.
+ *
+ * Straight on does mean vertices land on each other, a cube's eight projecting
+ * to four. That is symmetry doing its job rather than a fault, and it is why
+ * the suite counts the vertex and edge tables themselves rather than counting
+ * points in a picture of them.
  */
-const REST_T = 0.62
+const REST_T = 0
 
 /**
  * And the axes it is turned about, which the pose depends on just as much.
@@ -225,10 +242,10 @@ const REST_T = 0.62
  * `throw()` re-picks these on every throw so nine dice do not turn in
  * lockstep, so winding the angle back without them left a die at the right
  * angle about the wrong pair of axes: still a different picture every time it
- * stopped. These are the values a die is built with.
+ * stopped. Zero through zero is no rotation, which is the whole point.
  */
 const REST_WY = 1
-const REST_WX = 0.75
+const REST_WX = 0
 
 class Wire {
   readonly el: SVGSVGElement

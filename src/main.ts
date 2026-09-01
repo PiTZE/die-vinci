@@ -72,6 +72,7 @@ import { tarotPane } from './ui/tarot'
 import { breakPane } from './ui/break'
 import { codicesPane } from './ui/codices'
 import { releaseSticky } from './ui/hold'
+import { solidFigure } from './ui/wireframe'
 import { checkMarks } from './game/marks'
 import {
   CODICES,
@@ -709,6 +710,9 @@ const hook: Record<string, unknown> = {
   // what a finger does can say plainly that the ring is not part of the
   // question it is asking.
   releaseSticky,
+  // Vertices and edges as generated, so the suite can check the tables rather
+  // than count points in a drawing of them.
+  solidFigure,
   rollProgress,
   // Whether a roll you asked for is in the air, which since the roll clock
   // became shared is no longer the same question as rollStartedAt.
