@@ -291,10 +291,16 @@ export function automationPane(): Pane {
       autoSection.hidden = false
 
       const next = nextAutoRoll(s)
+      // Written when the ladder stopped at the eighth die. It has nine rungs
+      // now, the deepest waiting on the whole chain instead of on a solid
+      // under it, so the old line was telling a player who had bought every
+      // rung that one of them had not happened.
       setText(
         dieNote,
         s.autoDice >= AUTO_ROLL_MAX
-          ? 'every die but the deepest rolls itself'
+          ? 'every die rolls itself'
+          : s.autoDice === AUTO_ROLL_MAX - 1
+          ? 'the deepest die rolls itself once the whole chain is on the table'
           : 'a die rolls itself once you have opened the one below it',
       )
       for (let idx = 1; idx <= AUTO_ROLL_MAX; idx++) {

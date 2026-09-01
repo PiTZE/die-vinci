@@ -27,6 +27,51 @@
   --safe-r: env(safe-area-inset-right, 0px);
   /* Numbers get their own width so a growing value never reflows a row. */
   --num-w: 9.5rem;
+
+  /*
+   * The type scale, and every size in the game is one of these five.
+   *
+   * There were seventeen before, from 0.525rem to 0.95rem, each one picked
+   * against whatever it happened to sit next to. Nothing was wrong with any of
+   * them on its own and the set had no rule in it, which is what a screen full
+   * of labels and numbers reads as: 8.4px beside 8.7px beside 9px is not three
+   * sizes, it is one size drawn badly three times.
+   *
+   * A major second, 1.125, from 0.62rem. Five steps covers everything from a
+   * tile's index to the resource readout, and the smallest is 9.9px rather
+   * than the 8.4px some labels had sunk to.
+   */
+  --t-1: 0.62rem;
+  --t-2: 0.7rem;
+  --t-3: 0.78rem;
+  --t-4: 0.88rem;
+  --t-5: 0.99rem;
+
+  /*
+   * And the control heights, which had the same problem: ten of them between
+   * 26px and 56px. Three now.
+   *
+   * The middle one is 44px because that is the smallest thing a thumb hits
+   * reliably, which is the number the whole mobile layout is built on. The
+   * small one is for controls that sit inside a row and are read more than
+   * they are pressed, and the large one is for the roll button, which is
+   * pressed more than everything else in the game together.
+   */
+  /* The buy button's width, and the grid track that has to hold it. They were
+     written out separately in five places, so widening the button on desktop
+     to 12rem left the codices' own grid still reserving 8.7rem for it: the
+     row overflowed its pane by 21px and the whole page scrolled sideways. */
+  --buy-w: 8.7rem;
+
+  /* A switch's column, so the one in a section heading is the same size as
+     the ones in the rows it governs. Written out separately they were 45px
+     against 54px on a desktop, which is the sort of difference you cannot
+     name and can see. */
+  --toggle-w: 3rem;
+
+  --ctl-sm: 34px;
+  --ctl-md: 44px;
+  --ctl-lg: 56px;
 }
 
 /* Installed, nothing sits below the viewport, and Safari collapses the live
