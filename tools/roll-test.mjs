@@ -683,6 +683,64 @@ const byHand = await ev(`(async () => { const s = window.LD.state, D = window.LD
 check('a roll you asked for throws the whole table', byHand.fed === true,
   JSON.stringify(byHand))
 
+// Every die that rolls itself can be handed back to your finger, which is the
+// switch the automator has always had a rung up. Its reason is the automator's
+// reason: with it on there is no way to watch a single die land.
+const switched = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 3; s.autoDice = 2; s.autoDiceOff = []; s.autoRoll = false
+  s.handRollAt = 0; s.rollStartedAt = 0; s.rollAccum = 0; s.ink = new D(0)
+  s.solids[0].amount = new D(500); s.solids[1].amount = new D(500)
+  const both = [window.LD.dieRollsItself(s, 1), window.LD.dieRollsItself(s, 2)]
+  window.LD.actions.toggleDie(1)
+  const after = [window.LD.dieRollsItself(s, 1), window.LD.dieRollsItself(s, 2)]
+  const before = s.ink.toString()
+  for (let i = 0; i < 20; i++) window.LD.tick(s, 0.25, Date.now() + i * 250)
+  return { both, after, off: s.autoDiceOff.slice(), inkMoved: s.ink.toString() !== before,
+    face: s.faces[0] } })()`)
+check('a die that rolls itself can be switched off',
+  switched.both.join() === 'true,true' && switched.after.join() === 'false,true',
+  JSON.stringify(switched))
+check('and then it sits the roll out like an unautomated one',
+  switched.inkMoved === false && switched.face === 0, JSON.stringify(switched))
+
+const backOn = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  window.LD.actions.toggleDie(1)
+  s.ink = new D(0); s.handRollAt = 0
+  const before = s.ink.toString()
+  for (let i = 0; i < 20; i++) window.LD.tick(s, 0.25, Date.now() + i * 250)
+  return { off: s.autoDiceOff.slice(), inkMoved: s.ink.toString() !== before } })()`)
+check('and switching it back on starts it again',
+  backOn.off.length === 0 && backOn.inkMoved === true, JSON.stringify(backOn))
+
+// A switch is only worth offering for a die something would roll without you.
+const noSwitch = await ev(`(() => { const s = window.LD.state
+  return { two: window.LD.dieCanRollItself(s, 2), five: window.LD.dieCanRollItself(s, 5) } })()`)
+check('a die nothing would roll is offered no switch',
+  noSwitch.two === true && noSwitch.five === false, JSON.stringify(noSwitch))
+
+// The automator covers the whole table, so it hands every row a switch the
+// ladder had not sold yet.
+const underAutomator = await ev(`(() => { const s = window.LD.state
+  s.autoRoll = true; s.autoRollOn = true
+  const before = window.LD.dieCanRollItself(s, 5)
+  window.LD.actions.toggleDie(5)
+  const after = window.LD.dieRollsItself(s, 5)
+  window.LD.actions.toggleDie(5)
+  s.autoRoll = false
+  return { before, after } })()`)
+check('the automator hands a switch to every die, and it still bites',
+  underAutomator.before === true && underAutomator.after === false,
+  JSON.stringify(underAutomator))
+
+// Kept, because a switch you have to set again on every reload is not one.
+const kept2 = await ev(`(() => { const s = window.LD.state
+  s.autoDiceOff = [1, 3]
+  const back = window.LD.importSave(window.LD.exportSave(s), Date.now())
+  return { off: back.autoDiceOff } })()`)
+check('a save carries which dice are switched off',
+  JSON.stringify(kept2.off) === '[1,3]', JSON.stringify(kept2))
+await ev(`(() => { window.LD.state.autoDiceOff = [] })()`)
+
 // There is no tenth solid, so the deepest never gets one and the automator at
 // the Wager is what covers it.
 const deepest = await ev(`(() => { const s = window.LD.state

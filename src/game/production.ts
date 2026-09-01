@@ -1038,9 +1038,32 @@ export function rollingItself(s: GameState): boolean {
 
 // -- auto-roll, one die at a time -----------------------------------------
 
+/** Whether a die that could roll itself has been left switched on. */
+export function dieOn(s: GameState, idx: number): boolean {
+  return !(s.autoDiceOff ?? []).includes(idx)
+}
+
+/** Whether anything at all would roll this die without your finger, which is
+ *  what decides whether it is worth offering a switch for. */
+export function dieCanRollItself(s: GameState, idx: number): boolean {
+  return rollingItself(s) || idx <= s.autoDice
+}
+
 /** Whether die `idx` takes part in a roll nobody is pressing for. */
 export function dieRollsItself(s: GameState, idx: number): boolean {
-  return rollingItself(s) || idx <= s.autoDice
+  return dieCanRollItself(s, idx) && dieOn(s, idx)
+}
+
+/**
+ * Hands one die back to your finger, or takes it away again.
+ *
+ * The same switch the automator has always had, a rung down. Its reason is
+ * the automator's reason: with it on there is no way to watch a single die
+ * land, and watching one land is most of what the table is for.
+ */
+export function toggleDie(s: GameState, idx: number): void {
+  const off = s.autoDiceOff ?? []
+  s.autoDiceOff = off.includes(idx) ? off.filter((i) => i !== idx) : [...off, idx]
 }
 
 /** How many dice can ever be automated this way. There is no tenth solid, so

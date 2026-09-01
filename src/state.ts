@@ -80,6 +80,15 @@ export interface GameState {
    * ladder only ever fills from the shallow end.
    */
   autoDice: number
+  /**
+   * Dice that roll themselves and have been switched off, 1-based.
+   *
+   * Separate from autoDice rather than turning it into a list of flags,
+   * because the ladder only ever fills from the shallow end and a count is
+   * what says how far it has filled. This says which of them are paused, and
+   * the automator's own switch is autoRollOn, one level up.
+   */
+  autoDiceOff: number[]
   /** The first automator. Once bought it is never lost, not even to a Wager. */
   autoRoll: boolean
   /** And whether it is switched on. */
@@ -207,6 +216,7 @@ export function newGame(now: number): GameState {
     handRollAt: 0,
     rollAccum: 0,
     autoDice: 0,
+    autoDiceOff: [],
     autoRoll: false,
     autoRollOn: true,
     rollUpgrades: 0,

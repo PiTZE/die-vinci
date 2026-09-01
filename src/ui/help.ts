@@ -63,6 +63,7 @@ const SECTIONS: Section[] = [
       'It buys you nothing but your hands back. Holding already rolls as fast as the roll rate allows, so what changes is whether you have to be there, and the price is ink you would otherwise have spent on dice.',
       'A die that rolls itself reads per second on the table. One still waiting on you reads per roll, and shows no face when you are not pressing.',
       'The deepest die on the chain never gets one. There is nothing under it to open.',
+      'Any die that rolls itself can be switched off again, which is the only way to watch a single one land once it is automated.',
     ],
   },
   {

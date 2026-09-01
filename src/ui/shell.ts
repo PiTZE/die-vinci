@@ -19,6 +19,8 @@ export interface Actions {
   buyAutomator(): void
   /** Auto-roll for the next die on the chain. Paid in ink, kept forever. */
   buyAutoRoll(): void
+  /** Hands one die back to your finger, or takes it away again. */
+  toggleDie(idx: number): void
   toggleAutomator(): void
   takeCard(id: string): void
   melt(): void

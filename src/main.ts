@@ -12,7 +12,10 @@ import {
   buyAutoRoll,
   buyRollRate,
   canBuyAutoRoll,
+  dieCanRollItself,
+  dieRollsItself,
   nextAutoRoll,
+  toggleDie,
   buySolid,
   rollProgress,
   startRoll,
@@ -334,6 +337,10 @@ const actions: Actions = {
   },
   buyAutoRoll: () => {
     buyAutoRoll(state)
+    persistSoon()
+  },
+  toggleDie: (idx) => {
+    toggleDie(state, idx)
     persistSoon()
   },
   buyCodex: (idx) => {
@@ -689,6 +696,8 @@ const hook: Record<string, unknown> = {
   nextAutoRoll,
   autoRollCost,
   canBuyAutoRoll,
+  dieCanRollItself,
+  dieRollsItself,
   canMelt,
   meltGain,
   // Whether a spin is still in the air, which is now a question for the clock

@@ -176,6 +176,7 @@ function decode(raw: Raw, now: number): GameState {
     challengesDone: Array.isArray(m.challengesDone) ? [...m.challengesDone] : [],
     autobuyers: { ...base.autobuyers, ...(m.autobuyers ?? {}) },
     achievements: Array.isArray(m.achievements) ? [...m.achievements] : [],
+    autoDiceOff: Array.isArray(m.autoDiceOff) ? [...m.autoDiceOff] : [],
     marks: Array.isArray(m.marks) ? [...m.marks] : [],
     marksArmed: Array.isArray(m.marksArmed) ? [...m.marksArmed] : [],
   }

@@ -24,6 +24,8 @@ import {
   autoRollCost,
   canBuyAutomator,
   canBuyAutoRoll,
+  dieCanRollItself,
+  dieOn,
   nextAutoRoll,
 } from '../game/production'
 import { SOLIDS } from '../game/solids'
@@ -109,7 +111,12 @@ export function automationPane(): Pane {
   let autobuyerSection: HTMLElement
   let autoManualRow: HTMLElement
   let dieNote: HTMLElement
-  const dieRows: { root: HTMLElement; state: HTMLElement; buy: HTMLButtonElement }[] = []
+  const dieRows: {
+    root: HTMLElement
+    state: HTMLElement
+    on: HTMLButtonElement
+    buy: HTMLButtonElement
+  }[] = []
 
   return {
     id: 'automation',
@@ -138,12 +145,19 @@ export function automationPane(): Pane {
         row.appendChild(el('span', 'auto-label', SOLIDS[idx - 1].short))
         const state = el('span', 'auto-every num dim', '')
         row.appendChild(state)
+        // The same switch the automator has, a rung down, and for the same
+        // reason: with it on there is no way to watch a single die land.
+        const on = el('button', 'auto-toggle', 'ON')
+        on.type = 'button'
+        on.title = 'Hand this die back to your finger'
+        on.addEventListener('click', () => actions.toggleDie(idx))
+        row.appendChild(on)
         const buy = el('button', 'auto-up', '')
         buy.type = 'button'
         buy.addEventListener('click', () => actions.buyAutoRoll())
         row.appendChild(buy)
         autoSection.appendChild(row)
-        dieRows.push({ root: row, state, buy })
+        dieRows.push({ root: row, state, on, buy })
       }
 
       const autoRow = el('div', 'auto-row')
@@ -268,13 +282,27 @@ export function automationPane(): Pane {
       for (let idx = 1; idx <= AUTO_ROLL_MAX; idx++) {
         const r = dieRows[idx - 1]
         const held = idx <= s.autoDice
-        // Sold, or for sale, and nothing further down the list. A row for a
-        // die you have not opened yet is a row about a solid you have not met.
-        const on = held || idx === next
+        // Sold, or for sale, or automated by the automator, and nothing
+        // further down the list. A row for a die you have not opened yet is a
+        // row about a solid you have not met.
+        const on = held || idx === next || dieCanRollItself(s, idx)
         r.root.hidden = !on
         if (!on) continue
-        setText(r.state, held ? 'ROLLS ITSELF' : '')
+        // A switch is only worth offering for a die something would roll
+        // without you, which past the Wager is every one of them: the
+        // automator covers the whole table, so it hands each row a switch it
+        // did not have when the ladder was the only way to get one.
+        const auto = dieCanRollItself(s, idx)
+        r.on.hidden = !auto
         r.buy.hidden = held
+        if (auto) {
+          const running = dieOn(s, idx)
+          setText(r.on, running ? 'ON' : 'OFF')
+          r.on.classList.toggle('buyable', running)
+          setText(r.state, running ? 'ROLLS ITSELF' : 'WAITS FOR YOU')
+        } else {
+          setText(r.state, '')
+        }
         if (held) continue
         const can = canBuyAutoRoll(s)
         setText(r.buy, `AUTOMATE / ${format(autoRollCost(s), n)} INK`)
