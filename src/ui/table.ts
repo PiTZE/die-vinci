@@ -578,9 +578,22 @@ export function tablePane(): Pane {
         for (let i = 0; i < 10; i++) r.blocks[i].classList.toggle('on', i < into)
         setText(r.amount, formatWhole(st.amount, n))
         // A row with no dice on it sits the throw out entirely, so an empty
-        // solid does not tumble and announce a number that pays nothing.
-        const rolling = st.amount.gt(0)
-        setDieRolling(r.icon, rolling)
+        // solid does not tumble and announce a number that pays nothing. And
+        // so does one that is not in this roll: the clock is shared, so a
+        // single automated die keeps it running, and without this every die
+        // on the table span along with the one that was actually rolling.
+        // Two different questions, and they had been sharing one answer.
+        //
+        // The wireframe asks whether this die is in the roll happening now.
+        // The column asks whether the row has dice at all, and then whether
+        // the last roll passed it by, which the engine already says by
+        // leaving its face at zero. Narrowing both to the first question
+        // blanked the number the instant a hand roll was spent, which is a
+        // tenth of a second after it landed.
+        const hasDice = st.amount.gt(0)
+        const takesPart = handRolling(s) || dieRollsItself(s, def.idx)
+        setDieRolling(r.icon, hasDice && takesPart)
+        const rolling = hasDice
         // The column always has a number in it, and it never jumps.
         //
         // It used to empty for the whole of every throw, because startRoll

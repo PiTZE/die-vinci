@@ -717,6 +717,27 @@ check('and with your hands off, only the automated die keeps a number',
 check('and the ROLL button does not fill itself',
   leftAlone.fill === '0%' && leftAlone.hand === false, JSON.stringify(leftAlone))
 
+// And the wireframes. A die that is not in the roll must not tumble either:
+// the clock is shared, so one automated die kept it running and every solid on
+// the table span along with it. Measured as motion over a second rather than
+// as one snapshot, because a die at rest and a die mid-turn look alike in a
+// single frame.
+const turning = await ev(`(() => new Promise(done => {
+  const icons = [...document.querySelectorAll('.pane:not([hidden]) .solid-icon')].slice(0, 4)
+  const read = () => icons.map(n => [...n.querySelectorAll('line, path')]
+    .map(l => l.getAttribute('d') || l.getAttribute('x1') + ',' + l.getAttribute('y1')).join('|'))
+  const first = read()
+  const changed = icons.map(() => false)
+  let n = 0
+  const t = setInterval(() => {
+    const now = read()
+    now.forEach((v, i) => { if (v !== first[i]) changed[i] = true })
+    if (++n >= 32) { clearInterval(t); done(changed) }
+  }, 25)
+}))()`)
+check('and only the automated die is still turning',
+  turning[0] === true && turning.slice(1).every((v) => v === false), JSON.stringify(turning))
+
 // Every die that rolls itself can be handed back to your finger, which is the
 // switch the automator has always had a rung up. Its reason is the automator's
 // reason: with it on there is no way to watch a single die land.
