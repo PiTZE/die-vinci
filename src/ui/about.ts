@@ -46,6 +46,25 @@ export function aboutPane(): Pane {
         { label: 'CHANNEL', value: __CHANNEL__ },
         { label: 'BUILT', value: __BUILD_ID__ },
       ], __VERSION__)
+
+      // The work this is built out of.
+      //
+      // Only one of these four is obliged to be here: break_infinity.js is
+      // MIT, and MIT asks for its notice to travel with the code. The other
+      // three are CC0 or OFL and ask for nothing. They were credited anyway,
+      // in a comment or a text file beside the asset, which left the game in
+      // the odd position of thanking everyone who did not require it and
+      // nobody who did.
+      block(root, 'BUILT ON', [
+        { label: 'NUMBERS', value: 'break_infinity.js, MIT' },
+        { label: 'TYPE', value: 'IBM Plex Mono, OFL' },
+        { label: 'DICE', value: 'Kenney, CC0' },
+        { label: 'ARCANA', value: 'OpenGameArt, CC0' },
+      ])
+      const note = el('div', 'kv-note',
+        'break_infinity.js is by Patashu and is the library Antimatter ' +
+        'Dimensions uses. Its licence ships with the source.')
+      root.lastElementChild?.appendChild(note)
     },
 
     update() {

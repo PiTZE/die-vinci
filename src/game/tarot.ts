@@ -13,7 +13,7 @@
 //
 // Every effect scales with the card's level, so a duplicate draw is never a
 // wasted draw.
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import type { GameState } from '../state'
 import { ARCANA_MAX_LEVEL, magicianBias } from './balance'
 import { restrictions } from './challenges'

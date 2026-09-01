@@ -12,7 +12,7 @@
 //
 //   AD base cost  [10, 100, 1e4, 1e6, 1e9, 1e13, 1e18, 1e24]  -> 1e31
 //   AD cost mult  [1e3, 1e4, 1e5, 1e6, 1e8, 1e10, 1e12, 1e15] -> 1e18
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 
 export type SolidId =
   | 'tetra'

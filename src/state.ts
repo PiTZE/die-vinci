@@ -1,4 +1,4 @@
-import Decimal from 'break_infinity.js'
+import Decimal from './vendor/break-infinity'
 import { SOLIDS, SOLID_COUNT } from './game/solids'
 import { CODICES } from './game/codices'
 import {

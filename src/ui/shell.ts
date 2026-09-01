@@ -1,4 +1,4 @@
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import { format, formatTime } from '../format'
 import { consumeAway } from '../game/offline'
 import { pickThought } from './thoughts'

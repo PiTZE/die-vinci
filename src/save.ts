@@ -1,4 +1,4 @@
-import Decimal from 'break_infinity.js'
+import Decimal from './vendor/break-infinity'
 import { rollBackups, writeBackup } from './backup'
 import { SAVE_KEY, SAVE_VERSION, UI_MS_DEFAULT } from './game/balance'
 

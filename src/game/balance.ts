@@ -1,6 +1,6 @@
 // Every tunable constant. Nothing else in the codebase hardcodes a number
 // that a balance pass would want to touch.
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import { SOLID_COUNT } from './solids'
 
 export const TICK_MS = 100

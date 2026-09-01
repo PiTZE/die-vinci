@@ -10,7 +10,7 @@
 //
 // Break Infinity does not exist here yet, so a Wager pays one Point, and the
 // upgrade grid is priced for that: seven of its eleven cost a single Point.
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import { START_INK, WAGER_AT } from './balance'
 import { unlock } from './autobuyers'
 import { byId } from './challenges'

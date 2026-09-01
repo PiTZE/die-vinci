@@ -8,7 +8,7 @@
 //
 // Each is unlocked by clearing the challenge that awards it, which is what
 // turns "start slowly" into "automate everything".
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import { SOLIDS, SOLID_COUNT } from './solids'
 import type { GameState } from '../state'
 

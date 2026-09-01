@@ -7,7 +7,7 @@
 // depends on machinery this game does not have yet, and the paired-solid
 // upgrades cover three solids in the middle rather than two, because nine
 // solids do not divide into pairs.
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import type { GameState } from '../state'
 
 export type UpgradeId =

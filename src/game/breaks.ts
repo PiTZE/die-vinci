@@ -16,7 +16,7 @@
 //
 // The wall stays where it is. Breaking does not raise it; it stops the run
 // ending there and starts paying for the overshoot.
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import type { GameState } from '../state'
 import { AUTOBUYERS, INTERVAL_FLOOR, isMaxed, upgrade } from './autobuyers'
 import { UPGRADES, chipsPerSecondFromGrid, wagerChipMultiplier } from './upgrades'

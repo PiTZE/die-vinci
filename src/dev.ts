@@ -2,7 +2,7 @@
 //
 // Everything here writes straight into live state and then saves, so the game
 // keeps whatever you did. Nothing validates affordability: that is the point.
-import Decimal from 'break_infinity.js'
+import Decimal from './vendor/break-infinity'
 import { SOLIDS, SOLID_COUNT } from './game/solids'
 import { STUDIES_THAT_UNLOCK } from './game/balance'
 import { simulateAway } from './game/offline'

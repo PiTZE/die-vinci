@@ -3,7 +3,7 @@ import './styles/themes.css'
 import './styles/base.css'
 import './styles/game.css'
 
-import Decimal from 'break_infinity.js'
+import Decimal from './vendor/break-infinity'
 import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, START_INK, TICK_MS, UI_MS_DEFAULT } from './game/balance'
 import {
   buyFolio,

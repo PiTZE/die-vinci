@@ -14,7 +14,7 @@
 // once the gap is long enough to need it. A four second gap gets forty real
 // ticks rather than a thousand pointless ones, and a twelve hour gap gets the
 // budget.
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import { OFFLINE_CAP_S } from './balance'
 import { tick } from './production'
 import { modifiers } from './tarot'

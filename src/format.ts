@@ -1,6 +1,6 @@
 // Number formatting. Incrementals live and die on this, so it gets its own
 // module and a notation the player picks.
-import Decimal from 'break_infinity.js'
+import Decimal from './vendor/break-infinity'
 
 export type NotationId = 'mixed' | 'scientific' | 'engineering' | 'letters'
 

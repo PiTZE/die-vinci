@@ -4,7 +4,7 @@
 // eight, and pays for a finished row on top of paying for each entry. This is
 // the same idea in rows of nine, named after the notebooks rather than the
 // genre.
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import { unlockedSolids, type GameState } from '../state'
 import { SOLIDS, SOLID_COUNT } from './solids'
 import { AUTOBUYERS } from './autobuyers'

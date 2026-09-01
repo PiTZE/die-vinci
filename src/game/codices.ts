@@ -33,7 +33,7 @@
 // the daughter of experience -- and experience for him is the thing that
 // accumulates from doing the work and then makes every later piece of work
 // better. That is what this quantity does, so it is what it is called.
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import { CODEX_CONVERSION } from './balance'
 import type { GameState } from '../state'
 

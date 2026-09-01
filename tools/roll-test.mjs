@@ -357,7 +357,10 @@ check('and it is a real roll, not one number held', new Set(faces).size > 1, JSO
 // 0.889^60 is under a millisecond: nothing to see, so the honest number is the
 // average, and it is walked to rather than jumped to.
 await ev(`(() => { const s = window.LD.state; s.rollUpgrades = 60 })()`)
-const walk = (await sample(14, 70)).map(Number)
+// Sampled past the length of the walk rather than across it. At 14 samples
+// 70ms apart the window was 980ms against a walk of 900, so under load it
+// only just landed and the second-to-last reading was still moving.
+const walk = (await sample(20, 100)).map(Number)
 check('past seeing it walks to the average rather than cutting to it',
   walk.length > 4 && walk.slice(0, 3).some((v) => Math.abs(v - 2.5) > 0.15),
   JSON.stringify(walk))

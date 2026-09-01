@@ -11,7 +11,7 @@
 //   npm run sim              eight simulated hours
 //   npm run sim -- 24        twenty-four
 //   WAGERS=3 npm run sim     play out three runs and compare them
-import Decimal from 'break_infinity.js'
+import Decimal from '../src/vendor/break-infinity'
 import { newGame } from '../src/state'
 import * as P from '../src/game/production'
 import * as W from '../src/game/wager'

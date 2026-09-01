@@ -24,7 +24,7 @@
 // All of it is done in log space with plain doubles. The only Decimals are
 // `money.log10()` on the way in and `Decimal.pow10` on the way out, which is
 // AD's arrangement and the reason MAX can be O(1).
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 
 export interface CostScale {
   logBase: number

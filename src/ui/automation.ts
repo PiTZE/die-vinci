@@ -13,7 +13,7 @@ import {
   untilOn,
   upgradeCost,
 } from '../game/autobuyers'
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import { WAGER_AUTOBUYER, wagerThreshold } from '../game/breaks'
 import { format } from '../format'
 import type { GameState } from '../state'

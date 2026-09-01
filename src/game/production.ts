@@ -1,6 +1,6 @@
 // The engine. Solid N produces solid N-1, solid 1 produces Ink, and roll rate
 // scales all of it. Antimatter Dimensions' math with Leonardo's geometry.
-import Decimal from 'break_infinity.js'
+import Decimal from '../vendor/break-infinity'
 import { SOLIDS } from './solids'
 import {
   folioStrength,
