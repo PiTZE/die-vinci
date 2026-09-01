@@ -8,7 +8,6 @@ import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, START_INK, TICK_MS, UI_MS_
 import {
   buyFolio,
   autoRollCost,
-  buyAutomator,
   buyAutoRoll,
   buyRollRate,
   canBuyAutoRoll,
@@ -262,10 +261,6 @@ const actions: Actions = {
     // Below this the shake loop is carrying the sound, and a throw on top of
     // it would be one more thing in an already continuous rattle.
     if (state.options.sound && rollDuration(state) >= THROW_ABOVE_S) playThrow()
-  },
-  buyAutomator: () => {
-    buyAutomator(state)
-    persistSoon()
   },
   takeCard: (id) => {
     if (takeCard(state, id)) persist()

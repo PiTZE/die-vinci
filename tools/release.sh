@@ -109,6 +109,14 @@ SERVED=$(curl -fsS "https://leo.generis.ir/version.json?cachebust=$$" |
   sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
 [ "$SERVED" = "$NEXT" ] || die "deployed, but stable reports \"$SERVED\" rather than $NEXT"
 
+# And that the thing that ships can be played with the wire cut, asked of the
+# channel that just went out rather than of the one it was tested on. Stable
+# shipped a build whose precache never installed, and the suite that would have
+# caught it only ever ran against dev.
+say
+say 'checking stable offline'
+node tools/offline-test.mjs 'https://leo.generis.ir/'
+
 # dev carries the release commit, and main is where releases live.
 git push -q origin dev
 git push -q origin "$TAG"

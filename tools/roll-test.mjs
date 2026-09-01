@@ -139,8 +139,10 @@ await sleep(1300)
 const afterKey = await ev(`window.LD.state.ink.toString()`)
 check('space rolls', Number(afterKey) > Number(beforeKey), `${beforeKey} -> ${afterKey}`)
 
-// The automator is a post-Wager purchase now, bought with a point in the
-// AUTOMATION tab, so the whole first run is your finger on the button.
+// The automator is not a purchase at all. The first Wager hands over the whole
+// ladder, so there is nothing in the pane offering to sell it: a button
+// offering it could only ever be seen before that Wager, and before that
+// Wager it is a thing the player has not met.
 const beforeWager = await ev(`(() => {
   const t = [...document.querySelectorAll('.tab, .subtab')].find(x => x.textContent.trim() === 'AUTOMATION')
   return !t || t.hidden })()`)
@@ -151,10 +153,17 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
 await sleep(400)
 await ev(openTab('AUTOMATION'))
 await sleep(300)
-await ev(`[...document.querySelectorAll('.auto-up')].find(b => b.textContent.includes('UNLOCK')).click()`)
+check('and nothing in it offers to sell the automator',
+  (await ev(`[...document.querySelectorAll('.auto-up, .auto-toggle')]
+    .some(b => /UNLOCK|POINT/.test(b.textContent))`)) === false)
+// It is granted rather than bought, so the switch is what says you have it.
+await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.autoRollOn = true })()`)
 await sleep(300)
-check('it costs a point', (await ev(`Number(window.LD.state.chips)`)) === 2,
-  `points now ${await ev(`Number(window.LD.state.chips)`)}`)
+check('the master switch is there once the ladder is yours',
+  (await ev(`(() => { const h = [...document.querySelectorAll('.auto-head')]
+    .find(x => x.textContent.includes('THE ROLL'))
+    const b = h?.querySelector('.auto-toggle')
+    return !!b && !b.hidden && /ON|OFF/.test(b.textContent) })()`)) === true)
 await ev(openTab('TABLE'))
 await sleep(300)
 const auto = await ev(`({ auto: window.LD.state.autoRoll,

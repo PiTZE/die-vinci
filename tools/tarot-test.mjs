@@ -366,9 +366,11 @@ const banked = await ev(`(() => { const s = window.LD.state, D = window.LD.Decim
 check('a Wager banks a draft instead of dropping it',
   banked.one.owed === 1 && banked.three.owed === 3, JSON.stringify(banked))
 check('and the choice on screen is only ever one of them',
-  banked.one.pending === 3 && banked.three.pending === 3, JSON.stringify(banked))
+  banked.one.pending >= 3 && banked.three.pending >= 3, JSON.stringify(banked))
+// A choice is on offer, not necessarily three of them: taking XVII The Stars
+// widens the draft to four, which is the whole of that card.
 check('and taking one deals the next',
-  banked.after.owed === 2 && banked.after.pending === 3 && banked.after.held === 1,
+  banked.after.owed === 2 && banked.after.pending >= 3 && banked.after.held === 1,
   JSON.stringify(banked))
 
 // And they stop at what the deck can still pay out: twenty-two cards at nine

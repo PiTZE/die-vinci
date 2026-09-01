@@ -19,10 +19,8 @@ import { format } from '../format'
 import type { GameState } from '../state'
 import {
   AUTO_ROLL_MAX,
-  automatorCost,
   automatorUnlocked,
   autoRollCost,
-  canBuyAutomator,
   canBuyAutoRoll,
   dieCanRollItself,
   dieOn,
@@ -86,7 +84,6 @@ export function automationPane(): Pane {
   /** The last state update() saw, so a click can read the current setting. */
   let shown: GameState
   let autoSection: HTMLElement
-  let autoBuy: HTMLButtonElement
   let autoToggle: HTMLButtonElement
   const rows = new Map<
     string,
@@ -110,7 +107,6 @@ export function automationPane(): Pane {
 
   let autobuyerSection: HTMLElement
   let allAutoToggle: HTMLButtonElement
-  let autoManualRow: HTMLElement
   const dieRows: {
     root: HTMLElement
     on: HTMLButtonElement
@@ -164,13 +160,15 @@ export function automationPane(): Pane {
         dieRows.push({ root: row, on, buy })
       }
 
-      const autoRow = el('div', 'auto-row')
-      autoBuy = el('button', 'auto-up', '')
-      autoBuy.type = 'button'
-      autoBuy.addEventListener('click', () => actions.buyAutomator())
-      autoRow.append(el('span', 'auto-label', 'EVERY DIE'), autoBuy)
-      autoManualRow = autoRow
-      autoSection.appendChild(autoRow)
+      // No UNLOCK EVERY DIE row. The automator stopped being something you
+      // buy when the first Wager began granting the whole ladder outright, so
+      // the button was a leftover that could only ever be seen before that
+      // Wager: it offered a purchase nobody should make, priced in a currency
+      // this game stopped having when Points became chips, and it named a
+      // thing a player on their first run has not met.
+      //
+      // What is left of it is the master switch, which lives in the heading
+      // and appears with the first automated die.
       root.append(autoSection)
 
       autobuyerSection = el('div', 'section')
@@ -333,16 +331,6 @@ export function automationPane(): Pane {
       autoToggle.hidden = !anyAuto
       setText(autoToggle, s.autoRollOn ? 'ON' : 'OFF')
       autoToggle.classList.toggle('buyable', s.autoRollOn)
-      // The automator, while it is still something to buy. Once the Wager has
-      // granted it there is nothing left in this row: the switch it used to
-      // carry is in the heading.
-      autoManualRow.hidden = s.autoRoll
-      if (!s.autoRoll) {
-        setText(autoBuy, `UNLOCK / ${automatorCost()} POINT`)
-        const can = canBuyAutomator(s)
-        autoBuy.disabled = !can
-        autoBuy.classList.toggle('buyable', can)
-      }
       for (const a of AUTOBUYERS) {
         const row = rows.get(a.id)
         if (!row) continue
