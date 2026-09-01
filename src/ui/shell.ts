@@ -179,6 +179,9 @@ export class Shell {
   // made, one layer up.
   private chipsRate: Decimal = new Decimal(0)
   private active: TabId = 'table'
+  /** The pane last opened inside each group, so leaving one and coming back
+   *  returns you to where you were rather than to the top of it. */
+  private lastPane = new Map<string, TabId>()
 
   constructor(
     private root: HTMLElement,
@@ -265,14 +268,22 @@ export class Shell {
   }
 
   /**
-   * Opening a group opens the first pane in it that the player can see.
+   * Opening a group returns you to the pane you were last on inside it.
    *
-   * Not the last one they were on. A group is a place rather than a memory,
-   * and re-entering WAGER to find CHALLENGES because that is where you were
-   * four Wagers ago is the kind of state nobody asked to keep.
+   * It used to open the first one every time, on the reasoning that a group is
+   * a place rather than a memory. In use that is wrong: the panes inside a
+   * group are where you are working, and leaving AUTOMATION to check the table
+   * and coming back to find TABLE again means re-choosing the same thing on
+   * every trip. Reported from playing.
+   *
+   * Kept for the life of the tab rather than in the save. It is a reading
+   * position, not progress, and the same argument the help section's open
+   * topics are held under.
    */
   private openGroup(g: NavGroup): void {
-    const first = g.panes.find((id) => this.paneVisible(id))
+    const last = this.lastPane.get(g.id)
+    const back = last && g.panes.includes(last) && this.paneVisible(last) ? last : undefined
+    const first = back ?? g.panes.find((id) => this.paneVisible(id))
     if (first) this.select(first)
   }
 
@@ -294,7 +305,10 @@ export class Shell {
   select(id: TabId): void {
     this.active = id
     const g = groupOf(id)
-    if (g) this.activeGroup = g.id
+    if (g) {
+      this.activeGroup = g.id
+      this.lastPane.set(g.id, id)
+    }
     // Looking at it is what clears it, which is AD's rule.
     if (this.lastState) clearMark(this.lastState, id)
     for (const [gid, btn] of this.groupButtons) {

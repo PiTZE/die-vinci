@@ -125,9 +125,22 @@ export default defineConfig({
         orientation: 'any',
         background_color: '#000000',
         theme_color: '#000000',
+        // Every size a launcher, a tab or a tile asks for. A platform picks
+        // the nearest and scales, until it does not: an install offered only
+        // 192 and 512 came out with a blank tile on an iPhone, which is what
+        // started this list.
         icons: [
-          { src: `${BASE}icon-192.png`, sizes: '192x192', type: 'image/png' },
-          { src: `${BASE}icon-512.png`, sizes: '512x512', type: 'image/png' },
+          ...[32, 48, 72, 96, 120, 144, 152, 167, 180, 192, 256, 384, 512].map((n) => ({
+            src: `${BASE}icon-${n}.png`,
+            sizes: `${n}x${n}`,
+            type: 'image/png',
+          })),
+          {
+            src: `${BASE}icon-192-maskable.png`,
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
           {
             src: `${BASE}icon-512-maskable.png`,
             sizes: '512x512',

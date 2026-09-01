@@ -769,6 +769,24 @@ try {
   check('and chips you could spend still do', chipMark.includes('wager'),
     JSON.stringify(chipMark))
 
+  // A group returns you to the pane you were last on inside it. Leaving
+  // AUTOMATION to look at the table and coming back to TABLE means choosing
+  // the same thing again on every trip.
+  const remembered = await evaluate(`(async () => { const s = window.LD.state
+    const click = (sel, text) => [...document.querySelectorAll(sel)]
+      .find(b => !b.hidden && b.textContent.trim().startsWith(text))?.click()
+    const wait = () => new Promise(r => setTimeout(r, 260))
+    click('.tab', 'OPTIONS'); await wait()
+    click('.subtab', 'HELP'); await wait()
+    const inGroup = s.options.tab
+    click('.tab', 'TABLE'); await wait()
+    const away = s.options.tab
+    click('.tab', 'OPTIONS'); await wait()
+    return { inGroup, away, back: s.options.tab } })()`)
+  check('a group opens on the pane you were last on inside it',
+    remembered.inGroup === 'help' && remembered.away === 'table'
+      && remembered.back === 'help', JSON.stringify(remembered))
+
   // Never on a tab the player has not met. A mark on a navSealed pane would be the
   // loudest spoiler in the game.
   const navSealed = await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal

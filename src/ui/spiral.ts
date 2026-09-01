@@ -161,16 +161,44 @@ export function spiral(stage: HTMLElement, cards: HTMLElement[], opts: SpiralOpt
     }
   }
 
+  /**
+   * How a swipe becomes a card, which is Swiper's model and Android's numbers.
+   *
+   * The web carousel everyone uses follows the finger one to one, advances on
+   * a slow drag once it has covered half a slide (longSwipesRatio: 0.5), and
+   * advances on a gesture shorter than 300ms whatever distance it covered
+   * (shortSwipes, longSwipesMs: 300). Android draws the line between a tap and
+   * a drag at 8dp of travel, from ViewConfiguration's touch slop.
+   *
+   * All three are here. One to one is the card's own width per card, measured
+   * rather than guessed so it holds at both sizes; the half-a-slide threshold
+   * falls out of rounding to the nearest; and a quick flick counts even when
+   * it barely moved. It was forty pixels a card with a velocity term bolted
+   * on, which is four times finger speed: the card changed before the gesture
+   * felt like a swipe.
+   */
+  const SLOP = 8
+  const FLICK_MS = 300
+  /** One card per card-width of travel. */
+  const travel = (): number => Math.max(60, cards[0]?.offsetWidth || 160)
+
   // Dragged up and down, which is the axis the cards travel on. A drag that
   // moved is not a tap, so the click it would otherwise fire is swallowed.
   let dragging = false
   let lastY = 0
+  /** Where and when the gesture began, which is what decides a flick. */
+  let fromY = 0
+  let fromT = 0
+  let fromProgress = 0
   let moved = false
   const onDown = (e: PointerEvent): void => {
     turning = false
     dragging = true
     moved = false
     lastY = e.clientY
+    fromY = e.clientY
+    fromT = performance.now()
+    fromProgress = progress
     target = progress
     stage.setPointerCapture?.(e.pointerId)
   }
@@ -178,21 +206,24 @@ export function spiral(stage: HTMLElement, cards: HTMLElement[], opts: SpiralOpt
     if (!dragging) return
     const dy = e.clientY - lastY
     lastY = e.clientY
-    if (Math.abs(dy) > 0.5) moved = true
+    // Android's touch slop: under this the gesture is still a tap.
+    if (Math.abs(e.clientY - fromY) > SLOP) moved = true
     // Down brings the next card round to you, up sends it back. It was the
     // other way, on the reasoning that a list follows your finger, and this is
     // not a list: the cards travel around a ring rather than along a column,
     // and the one you are reaching for is the one you pull toward you.
-    target += dy / 90
+    target += dy / travel()
   }
+
   const onUp = (): void => {
     if (!dragging) return
     dragging = false
-    // Snapped to whichever card is nearest where you left it, rather than
-    // stopped wherever the finger came off. The follow is eased, so the ring
-    // travels the last few degrees rather than jumping them, and it always
-    // settles with one card square to you.
-    target = Math.round(target)
+    // A quick gesture counts as one card whatever distance it covered, and a
+    // slow one counts once it has passed halfway, which is what rounding to
+    // the nearest does. Either way the ring settles with a card square to you.
+    const quick = performance.now() - fromT < FLICK_MS
+    if (quick && moved) target = Math.round(fromProgress) + Math.sign(lastY - fromY)
+    else target = Math.round(target)
   }
   const onClick = (e: MouseEvent): void => {
     if (!moved) return
@@ -221,7 +252,27 @@ export function spiral(stage: HTMLElement, cards: HTMLElement[], opts: SpiralOpt
     run(onScreen && !document.hidden)
   })
   io.observe(stage)
-  const onVisible = (): void => run(onScreen && !document.hidden)
+  /**
+   * Back from another app, and drawing again.
+   *
+   * The flag this used to read is set by the observer, and a page that goes
+   * away can leave it false with no callback to put it right: coming back,
+   * this asked "is it on screen" of a stale answer, said no, and left the
+   * loop stopped. The pointer handlers went on working and nothing moved,
+   * which reads as the whole thing having died until you change tabs and it
+   * is built again. Reported from a phone.
+   *
+   * So it measures rather than remembers.
+   */
+  const onVisible = (): void => {
+    if (document.hidden) {
+      run(false)
+      return
+    }
+    const r = stage.getBoundingClientRect()
+    onScreen = r.bottom > 0 && r.top < innerHeight && r.width > 0
+    run(onScreen)
+  }
   document.addEventListener('visibilitychange', onVisible)
 
   place()

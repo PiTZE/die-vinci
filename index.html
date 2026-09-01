@@ -29,8 +29,21 @@
         root.style.colorScheme = id === 'modus-operandi' ? 'light' : 'dark'
       })()
     </script>
-    <link rel="icon" href="/icon-192.png" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="icon" sizes="32x32" href="/icon-32.png" />
+    <link rel="icon" sizes="192x192" href="/icon-192.png" />
+    <!--
+      iOS reads this one, and it is fussy about the size in a way nothing else
+      is: Apple documents 180x180 for an iPhone at 3x, and an install offered
+      only 192 and 512 can end up on the home screen with no icon at all rather
+      than a scaled one. Reported by somebody who installed it and got a blank
+      tile. The sizes attribute is what lets iOS pick without guessing.
+    -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png" />
+    <link rel="apple-touch-icon" sizes="167x167" href="/icon-167.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icon-152.png" />
+    <link rel="apple-touch-icon" sizes="120x120" href="/icon-120.png" />
+    <!-- The name under the icon, which otherwise comes from <title>. -->
+    <meta name="apple-mobile-web-app-title" content="die Vinci" />
   </head>
   <body>
     <div class="scanlines" aria-hidden="true"></div>

@@ -3,7 +3,7 @@
 // Two states in one pane. With a draft waiting it is a choice between three
 // cards and nothing else, because a choice competing with a grid of things you
 // already own is a choice people click past. Otherwise it is what you hold.
-import { ARCANA, ARCANA_BY_ID, draftPending, isFull, levelOf, owned } from '../game/tarot'
+import { ARCANA, ARCANA_BY_ID, draftPending, draftsOwed, isFull, levelOf, owned } from '../game/tarot'
 import { ARCANA_ART } from './arcana-art'
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
@@ -90,6 +90,7 @@ export function tarotPane(): Pane {
   /** The ids on the ring, in the order it holds them. */
   let shownDraft: string[] = []
   let takeBtn: HTMLButtonElement
+  let queueLine: HTMLElement
   const cells = new Map<string, Cell>()
   let head: HTMLElement
   let offerSection: HTMLElement
@@ -110,14 +111,17 @@ export function tarotPane(): Pane {
       // picture in the room.
       offerSection = el('div', 'arcana-draft')
       offerRow = el('div', 'arcana-offer')
-      takeBtn = el('button', 'action arcana-take', '')
+      takeBtn = el('button', 'action arcana-take', 'TAKE')
       takeBtn.type = 'button'
       takeBtn.addEventListener('click', () => {
         const at = ring?.facing() ?? 0
         const id = shownDraft[at]
         if (id) actions.takeCard(id)
       })
-      offerSection.append(offerRow, takeBtn)
+      // How many more are behind this one. Silent at one, because a line
+      // saying 1 MORE WAITING under the only draft you have is noise.
+      queueLine = el('div', 'arcana-queue', '')
+      offerSection.append(offerRow, takeBtn, queueLine)
       root.appendChild(offerSection)
 
       heldSection = el('div', 'section')
@@ -160,6 +164,8 @@ export function tarotPane(): Pane {
       heldSection.hidden = pending
 
       if (pending) {
+        const owed = draftsOwed(s)
+        setText(queueLine, owed > 1 ? `${owed - 1} MORE WAITING` : '')
         const key = s.pendingDraft.join(',')
         if (key !== shownOffer) {
           shownOffer = key
@@ -194,10 +200,11 @@ export function tarotPane(): Pane {
           shownDraft = [...s.pendingDraft]
           ring = spiral(offerRow, [...offerRow.children] as HTMLElement[], {
             cardsPerTurn: s.pendingDraft.length,
-            onFacing: (at) => {
-              const def = ARCANA_BY_ID[shownDraft[at] ?? '']
-              setText(takeBtn, def ? `TAKE ${def.name.toUpperCase()}` : 'TAKE')
-            },
+            // The card facing you is the one it takes, and that card is the
+            // largest thing on the screen with its name written on it. Saying
+            // the name again on the button was the same word twice, and it
+            // made the button change width every time the ring turned.
+            onFacing: () => setText(takeBtn, 'TAKE'),
           })
         }
         return

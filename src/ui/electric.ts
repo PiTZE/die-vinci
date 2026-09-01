@@ -256,15 +256,35 @@ export function electricBorder(host: HTMLElement, opts: ElectricOptions = {}): (
 
   // Only while it is on screen. A draft sitting behind another tab is three
   // canvases redrawing a border nobody is looking at.
+  let onScreen = true
   const io = new IntersectionObserver((entries) => {
     if (REDUCED.matches) return
-    run(entries.some((e) => e.isIntersecting) && !document.hidden)
+    onScreen = entries.some((e) => e.isIntersecting)
+    run(onScreen && !document.hidden)
   })
   io.observe(host)
 
+  /**
+   * Back from another app, and drawing again.
+   *
+   * The flag this used to read is set by the observer, and a page that goes
+   * away can leave it false with no callback to put it right: coming back,
+   * this asked "is it on screen" of a stale answer, said no, and left the
+   * loop stopped. The pointer handlers went on working and nothing moved,
+   * which reads as the whole thing having died until you change tabs and it
+   * is built again. Reported from a phone.
+   *
+   * So it measures rather than remembers.
+   */
   const onVisible = (): void => {
     if (REDUCED.matches) return
-    if (document.hidden) run(false)
+    if (document.hidden) {
+      run(false)
+      return
+    }
+    const r = host.getBoundingClientRect()
+    onScreen = r.bottom > 0 && r.top < innerHeight && r.width > 0
+    run(onScreen)
   }
   document.addEventListener('visibilitychange', onVisible)
 

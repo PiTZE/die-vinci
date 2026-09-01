@@ -1461,7 +1461,28 @@
   align-items: center;
   justify-content: center;
   gap: var(--gap);
-  min-height: 100%;
+  /* Fills the pane and centres in it. The pane is a block box whose height
+     comes from the shell's grid, so a percentage height on a child inside it
+     resolves against nothing: min-height: 100% left the draft its own size,
+     sitting at the top with the rest of the pane empty under it. The pane the
+     draft is in becomes a flex column instead, and this takes what is left of
+     it. */
+  flex: 1;
+}
+
+/* Flexed the whole way down rather than measured in percentages: the pane's
+   height comes from the shell's grid, so a percentage on anything inside it
+   has nothing definite to resolve against, and the draft kept its own size at
+   the top of an empty pane. Only the pane holding a draft, because every other
+   pane is a column of sections that should sit at the top. */
+.pane:has(.arcana-draft),
+.pane:has(.arcana-draft) > .pane-inner {
+  display: flex;
+  flex-direction: column;
+}
+
+.pane:has(.arcana-draft) > .pane-inner {
+  flex: 1;
 }
 
 /* The button that takes whichever card is facing you. Held near the ring's
@@ -1472,6 +1493,14 @@
 .arcana-draft .arcana-take {
   flex: 0 0 auto;
   width: min(100%, 16rem);
+}
+
+/* What is still queued behind this choice. */
+.arcana-queue {
+  font-size: var(--t-1);
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+  min-height: 1em;
 }
 
 /* The three on offer, dealt onto a ring rather than laid out in a row.
@@ -1518,9 +1547,10 @@
   color: var(--fg);
 }
 
-.arcana-pick:hover {
-  border-color: var(--accent);
-}
+/* No border colour on hover. A touch leaves the hover state stuck on a phone,
+   so tapping a card to bring it round lit its border and left it lit, which
+   reads as a selection the card does not have: the card facing you is the
+   selection, and the button underneath says which one that is. */
 
 
 /* -- help ---------------------------------------------------------------- */
@@ -2090,7 +2120,10 @@
    border as everything else and a width that holds four digits, which is more
    folios than anyone will bind. */
 .auto-num {
-  grid-column: 5;
+  /* The wide column, which is where the buttons above it sit, rather than the
+     switch's. It shared column 5 with the switch on its own row, and two items
+     asking for one column puts the second on a row of its own. */
+  grid-column: 3;
   justify-self: stretch;
   width: auto;
   min-height: var(--ctl-sm);

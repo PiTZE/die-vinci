@@ -418,6 +418,29 @@ export function draftPending(s: GameState): boolean {
 }
 
 /**
+ * Levels left in the whole deck, which is the ceiling on drafts owed.
+ *
+ * Twenty-two cards at nine levels each. Past that there is nothing a draft
+ * could hand you, so banking them would be banking nothing.
+ */
+export function levelsLeft(s: GameState): number {
+  let n = 0
+  for (const a of ARCANA) n += Math.max(0, a.max - (s.tarot?.[a.id] ?? 0))
+  return n
+}
+
+/** How many choices are waiting, the one on screen included. */
+export function draftsOwed(s: GameState): number {
+  return Math.max(0, Math.min(s.draftsOwed ?? 0, levelsLeft(s)))
+}
+
+/** Earns one, up to what the deck can still pay out. */
+export function earnDraft(s: GameState): void {
+  s.draftsOwed = Math.min((s.draftsOwed ?? 0) + 1, levelsLeft(s))
+  if (!s.pendingDraft.length && s.draftsOwed > 0) s.pendingDraft = drawOffer(s)
+}
+
+/**
  * The very first draft interrupts and the rest wait. Someone who has never
  * seen the mechanic will not open a tab they have no reason to know about.
  */
@@ -433,6 +456,11 @@ export function takeCard(s: GameState, id: string): boolean {
   // before a card's cap existed could still be offering a full one.
   if ((s.tarot[id] ?? 0) >= def.max) return false
   s.tarot[id] = (s.tarot[id] ?? 0) + 1
-  s.pendingDraft = []
+  // One off the queue, and the next choice straight away if any are left. A
+  // Wager called while a draft was still waiting used to throw the new one
+  // away, so a run of Wagers without opening the tab cost you every draft but
+  // the first.
+  s.draftsOwed = Math.max(0, (s.draftsOwed ?? 1) - 1)
+  s.pendingDraft = s.draftsOwed > 0 && levelsLeft(s) > 0 ? drawOffer(s) : []
   return true
 }

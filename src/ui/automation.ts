@@ -154,11 +154,12 @@ export function automationPane(): Pane {
         on.type = 'button'
         on.title = 'Hand this die back to your finger'
         on.addEventListener('click', () => actions.toggleDie(idx))
-        row.appendChild(on)
         const buy = el('button', 'auto-up', '')
         buy.type = 'button'
         buy.addEventListener('click', () => actions.buyAutoRoll())
-        row.appendChild(buy)
+        // Appended in the order the columns run, which is not the order they
+        // were written in. See the note on the autobuyer rows below.
+        row.append(buy, on)
         autoSection.appendChild(row)
         dieRows.push({ root: row, on, buy })
       }
@@ -207,7 +208,12 @@ export function automationPane(): Pane {
         up.type = 'button'
         up.addEventListener('click', () => actions.upgradeAutobuyer(a.id))
 
-        row.append(onBtn, modeBtn, up)
+        // In the order the columns run, which is not the order they were
+        // written in. A grid item with a column but no row is placed at the
+        // first free slot in that column at or after the cursor, so appending
+        // the switch first and the wide button last sent each of them to a row
+        // of its own: three staggered lines where there should be one.
+        row.append(up, modeBtn, onBtn)
         section.appendChild(row)
 
         // A cap on how many to take, and for studies a folio count that lifts
@@ -226,9 +232,8 @@ export function automationPane(): Pane {
           riseOn.title = 'Raise it whenever the payout doubles'
           riseOn.addEventListener('click', () =>
             actions.setWagerRise(!(shown.autobuyers[WAGER_AUTOBUYER]?.riseWithMult !== false)))
-          payRow.append(el('span', 'auto-rule-label', 'ONLY AT'), riseOn)
           const payAt = bigBox('chips', (v) => actions.setWagerThreshold(v))
-          payRow.appendChild(payAt)
+          payRow.append(el('span', 'auto-rule-label', 'ONLY AT'), payAt, riseOn)
           box.appendChild(payRow)
           section.appendChild(box)
           rules = { root: box, capOn: riseOn, capAt: payAt }
@@ -240,10 +245,11 @@ export function automationPane(): Pane {
           capOn.type = 'button'
           capOn.title = 'Stop after this many'
           capOn.addEventListener('click', () => actions.setAutobuyerLimit(a.id, !limitOn(shown, a.id)))
-          capRow.append(el('span', 'auto-rule-label', 'STOP AFTER'), capOn)
           const capAt = numberBox(a.id === 'study' ? 'studies' : 'folios', (v) =>
             actions.setAutobuyerLimit(a.id, limitOn(shown, a.id), v))
-          capRow.appendChild(capAt)
+          // Column order again: the field is column three and the switch is
+          // column five, so the field is appended first.
+          capRow.append(el('span', 'auto-rule-label', 'STOP AFTER'), capAt, capOn)
           box.appendChild(capRow)
 
           let untilRow: HTMLElement | undefined
@@ -256,10 +262,9 @@ export function automationPane(): Pane {
             untilBtn.title = 'Ignore the cap once you hold this many folios'
             untilBtn.addEventListener('click', () =>
               actions.setAutobuyerUntil(a.id, !untilOn(shown, a.id)))
-            untilRow.append(el('span', 'auto-rule-label', 'UNLESS FOLIOS'), untilBtn)
             untilAt = numberBox('folios', (v) =>
               actions.setAutobuyerUntil(a.id, untilOn(shown, a.id), v))
-            untilRow.appendChild(untilAt)
+            untilRow.append(el('span', 'auto-rule-label', 'UNLESS FOLIOS'), untilAt, untilBtn)
             box.appendChild(untilRow)
           }
           section.appendChild(box)

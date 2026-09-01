@@ -134,6 +134,9 @@ export interface GameState {
   /** A draft offered and not yet taken. Held in the save so closing the tab
    *  mid-choice does not lose it. */
   pendingDraft: string[]
+  /** Drafts earned and not yet taken, the one on screen included. A Wager
+   *  called while a choice is still waiting used to throw the new one away. */
+  draftsOwed: number
 
   // Layer 1, broken. Antimatter Dimensions calls this Break Infinity: the
   // prestige stops paying a flat one and starts paying by how far past the old
@@ -242,6 +245,7 @@ export function newGame(now: number): GameState {
     tarot: {},
     draftProgress: 0,
     pendingDraft: [],
+    draftsOwed: 0,
     broke: false,
     chipMult: 0,
     breakUpgrades: [],

@@ -263,7 +263,10 @@ const dragged = await ev(`(async () => {
   }
   stage.dispatchEvent(new PointerEvent('pointerup', at(b.top + b.height * 0.3)))
   const moved = [...document.querySelectorAll('.arcana-seat')].map(x => x.style.transform)
-  await new Promise(r => setTimeout(r, 900))
+  // Long enough for the flick to spend itself. A quick swipe carries the ring
+  // on by up to a card past where the finger left, so the ease has further to
+  // travel than it did when distance was the only thing that moved it.
+  await new Promise(r => setTimeout(r, 1600))
   const settled = [...document.querySelectorAll('.arcana-seat')].map(x => x.style.transform)
   await new Promise(r => setTimeout(r, 500))
   const still = [...document.querySelectorAll('.arcana-seat')].map(x => x.style.transform)
@@ -280,24 +283,37 @@ check('and it snaps to the nearest card and stays there',
 // Which way it turns. Down brings the next card round to you, which is the
 // direction a ring turns when you pull the card you are reaching for toward
 // you, and it was the other way round for a build.
-const way = await ev(`(async () => {
+//
+// Measured on a ring dealt for this check rather than on one three other
+// checks have already turned, so what it reports is the drag and nothing
+// else.
+const way = await ev(`(async () => { const s = window.LD.state
+  s.pendingDraft = ['sun','fool','wheel']
+  for (const a of window.LD.ARCANA) s.tarot[a.id] = 0
+  await new Promise(r => setTimeout(r, 600))
   const stage = document.querySelector('.arcana-offer')
   const seats = [...document.querySelectorAll('.arcana-seat')]
-  const at = (t) => seats.findIndex(x => x.style.transform.startsWith(t))
-  const front = () => at('translate(-50%, -50%) translate3d(0px,')
-  const before = front()
+  const centre = () => seats.findIndex(x => x.style.transform.startsWith('translate(-50%, -50%) translate3d(0px,'))
   const b = stage.getBoundingClientRect()
   const ev2 = (y) => ({ bubbles: true, pointerId: 9, pointerType: 'touch',
     clientX: b.left + b.width / 2, clientY: y })
+  // Settled first: the ring turns on its own until it is touched.
   const y0 = b.top + b.height * 0.25
   stage.dispatchEvent(new PointerEvent('pointerdown', ev2(y0)))
-  for (let i = 1; i <= 9; i++) {
-    stage.dispatchEvent(new PointerEvent('pointermove', ev2(y0 + i * 10)))
-    await new Promise(r => setTimeout(r, 25))
-  }
-  stage.dispatchEvent(new PointerEvent('pointerup', ev2(y0 + 90)))
+  stage.dispatchEvent(new PointerEvent('pointerup', ev2(y0)))
   await new Promise(r => setTimeout(r, 900))
-  return { before, after: front(), n: seats.length } })()`)
+  const before = centre()
+  // Past half a card, slowly, which is the long-swipe rule: a gesture over
+  // 300ms advances only once it has covered half a card's width.
+  const step = Math.round((seats[0].offsetWidth * 0.7) / 5)
+  stage.dispatchEvent(new PointerEvent('pointerdown', ev2(y0)))
+  for (let i = 1; i <= 5; i++) {
+    stage.dispatchEvent(new PointerEvent('pointermove', ev2(y0 + i * step)))
+    await new Promise(r => setTimeout(r, 120))
+  }
+  stage.dispatchEvent(new PointerEvent('pointerup', ev2(y0 + step * 5)))
+  await new Promise(r => setTimeout(r, 900))
+  return { before, after: centre(), n: seats.length } })()`)
 check('dragging down brings the next card round',
   way.after === (way.before + 1) % way.n, JSON.stringify(way))
 
@@ -316,8 +332,10 @@ const tapped = await ev(`(async () => {
     took: window.LD.state.pendingDraft.length } })()`)
 check('a tap on a card brings it round rather than taking it',
   tapped.after === tapped.other && tapped.took === 3, JSON.stringify(tapped))
-check('and the button names the card it would take',
-  tapped.label === `TAKE ${tapped.name.toUpperCase()}`, JSON.stringify(tapped))
+// One word, because the card facing you is the largest thing on the screen
+// with its own name written on it, and a button that renamed itself changed
+// width every time the ring turned.
+check('and the button just says TAKE', tapped.label === 'TAKE', JSON.stringify(tapped))
 
 const took2 = await ev(`(() => {
   const seats = [...document.querySelectorAll('.arcana-seat')]
@@ -328,6 +346,48 @@ const took2 = await ev(`(() => {
     pending: window.LD.state.pendingDraft.length } })()`)
 check('and the button takes it',
   took2.level > 0 && took2.pending === 0, JSON.stringify(took2))
+
+// Drafts bank rather than drop. A Wager called while a choice is still
+// waiting used to throw the new one away, so a run of Wagers without opening
+// the tab cost every draft but the first.
+const banked = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.tarot = {}; s.pendingDraft = []; s.draftsOwed = 0
+  const wager = () => { s.ink = new D('1e309'); s.inkThisWager = new D('1e309')
+    window.LD.actions.wager() }
+  wager(); const one = { owed: s.draftsOwed, pending: s.pendingDraft.length }
+  wager(); wager()
+  const three = { owed: s.draftsOwed, pending: s.pendingDraft.length }
+  // Taking one hands over the next straight away.
+  const first = s.pendingDraft[0]
+  window.LD.actions.takeCard(first)
+  const after = { owed: s.draftsOwed, pending: s.pendingDraft.length,
+    held: Object.values(s.tarot).reduce((a, b) => a + b, 0) }
+  return { one, three, after } })()`)
+check('a Wager banks a draft instead of dropping it',
+  banked.one.owed === 1 && banked.three.owed === 3, JSON.stringify(banked))
+check('and the choice on screen is only ever one of them',
+  banked.one.pending === 3 && banked.three.pending === 3, JSON.stringify(banked))
+check('and taking one deals the next',
+  banked.after.owed === 2 && banked.after.pending === 3 && banked.after.held === 1,
+  JSON.stringify(banked))
+
+// And they stop at what the deck can still pay out: twenty-two cards at nine
+// levels, and nothing past that.
+const capped = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  for (const a of window.LD.ARCANA) s.tarot[a.id] = 9
+  s.pendingDraft = []; s.draftsOwed = 0
+  s.ink = new D('1e309'); s.inkThisWager = new D('1e309')
+  window.LD.actions.wager()
+  const full = { owed: s.draftsOwed, pending: s.pendingDraft.length }
+  // One level short, and exactly one draft is owed.
+  s.tarot.sun = 8; s.draftsOwed = 0; s.pendingDraft = []
+  s.ink = new D('1e309'); s.inkThisWager = new D('1e309')
+  window.LD.actions.wager()
+  return { full, room: { owed: s.draftsOwed, pending: s.pendingDraft.length } } })()`)
+check('a full deck earns no more drafts',
+  capped.full.owed === 0 && capped.full.pending === 0, JSON.stringify(capped))
+check('and one level of room earns exactly one',
+  capped.room.owed === 1 && capped.room.pending > 0, JSON.stringify(capped))
 
 ws.close();chrome.kill();await sleep(300);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
