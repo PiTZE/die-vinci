@@ -17,6 +17,7 @@ import {
   nextAutoRoll,
   toggleDie,
   buySolid,
+  handRolling,
   rollProgress,
   startRoll,
   buyStudy,
@@ -704,6 +705,9 @@ const hook: Record<string, unknown> = {
   // rather than for the faces: the engine keeps the last face it landed
   // instead of clearing it on the throw.
   rollProgress,
+  // Whether a roll you asked for is in the air, which since the roll clock
+  // became shared is no longer the same question as rollStartedAt.
+  handRolling,
   get rollInterval() {
     return rollDuration(state)
   },

@@ -23,6 +23,7 @@ import {
   mustWager,
   rollingItself,
   dieRollsItself,
+  handRolling,
   meanFace,
   faceBias,
   FACE_READABLE_S,
@@ -447,6 +448,13 @@ export function tablePane(): Pane {
       // than a bar. It sits full instead, which is the same thing the dice do
       // when they stop being throws and become one continuous turn.
       if (s.autoRoll || rollNow.hidden) return
+      // Only for a roll you asked for. The roll clock is shared now, so it
+      // runs whenever anything is automated, and reading progress off it made
+      // the button sweep on its own with nobody touching it.
+      if (!handRolling(s)) {
+        if (rollFill.style.width !== '0%') rollFill.style.width = '0%'
+        return
+      }
       const pct = readable ? `${Math.round(rollProgress(s, now) * 100)}%` : '100%'
       if (rollFill.style.width !== pct) rollFill.style.width = pct
     },
@@ -511,7 +519,9 @@ export function tablePane(): Pane {
       if (!s.autoRoll) {
         rollNow.classList.toggle(
           'buyable',
-          steady.on('roll', !s.rollStartedAt && s.haltMs <= 0, now),
+          // Ready when no roll of yours is in the air. Asking rollStartedAt
+          // stopped meaning that once the automated dice began setting it.
+          steady.on('roll', !handRolling(s) && s.haltMs <= 0, now),
         )
       }
       // Both the look and the disabled flag come off the held value. A press
@@ -593,6 +603,19 @@ export function tablePane(): Pane {
         // second, which is how the eye is told that the number stopped being a
         // reading and became a statistic.
         if (!rolling) {
+          setText(r.face, '')
+          r.lastFace = 0
+          r.shownFace = 0
+        } else if (!s.faces[def.idx - 1] && !r.lastFace) {
+          // Nothing has landed on this row yet.
+          setText(r.face, '')
+          r.shownFace = 0
+        } else if (!s.faces[def.idx - 1] && !dieRollsItself(s, def.idx) && !handRolling(s)) {
+          // It sat the last roll out. Since the engine stopped clearing faces
+          // on a throw, a zero here means exactly that and nothing else, and
+          // holding the number it landed on three minutes ago made a table
+          // where one die was automated look like a table where all of them
+          // were.
           setText(r.face, '')
           r.lastFace = 0
           r.shownFace = 0

@@ -683,6 +683,40 @@ const byHand = await ev(`(async () => { const s = window.LD.state, D = window.LD
 check('a roll you asked for throws the whole table', byHand.fed === true,
   JSON.stringify(byHand))
 
+// One automated die must not look like nine.
+//
+// Both halves of this were reported from playing it. The column stopped
+// blanking itself so that a held button did not read empty for minutes, and
+// the code kept the last face whenever the engine reported a zero. But a zero
+// means "this die sat the roll out", so every unautomated die held the number
+// it landed on the last time you pressed, and a table with one die automated
+// looked like a table with all of them automated. And the roll clock became
+// shared, so the ROLL button read its fill off a clock the automated dice were
+// driving and swept across on its own with nobody touching it.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 3; s.autoDice = 1; s.autoDiceOff = []; s.autoRoll = false
+  s.inkThisWager = new D(0); s.haltMs = 0; s.broke = false
+  s.ink = new D('1e12'); s.handRollAt = 0; s.rollStartedAt = 0; s.rollAccum = 0
+  s.solids.forEach((d, i) => { d.bought = i < 4 ? 20 : 0; d.amount = new D(i < 4 ? 300 : 0) }) })()`)
+await ev(`window.LD.actions.roll()`)
+await sleep(1400)
+const handThrow = await ev(`[...document.querySelectorAll('.pane:not([hidden]) .solid-face')]
+  .map(n => n.textContent.trim()).slice(0, 4)`)
+check('a roll you asked for lands a face on every die',
+  handThrow.every((f) => f !== ''), JSON.stringify(handThrow))
+
+await sleep(2200)
+const leftAlone = await ev(`(() => ({
+  faces: [...document.querySelectorAll('.pane:not([hidden]) .solid-face')]
+    .map(n => n.textContent.trim()).slice(0, 4),
+  fill: document.querySelector('.bar-roll-fill').style.width,
+  hand: window.LD.handRolling(window.LD.state) }))()`)
+check('and with your hands off, only the automated die keeps a number',
+  leftAlone.faces[0] !== '' && leftAlone.faces.slice(1).every((f) => f === ''),
+  JSON.stringify(leftAlone))
+check('and the ROLL button does not fill itself',
+  leftAlone.fill === '0%' && leftAlone.hand === false, JSON.stringify(leftAlone))
+
 // Every die that rolls itself can be handed back to your finger, which is the
 // switch the automator has always had a rung up. Its reason is the automator's
 // reason: with it on there is no way to watch a single die land.
