@@ -435,12 +435,16 @@ const shell = new Shell(root, actions)
 shell.build(
   [
     tablePane(),
+    // Beside the table, because that is what it is about now. It used to sit
+    // after the prestige tabs, which was right while the only thing in it was
+    // a purchase made after the first Wager; the auto-roll ladder opens with
+    // your first study, so it belongs next to the dice it automates.
+    automationPane(),
     wagerPane(),
     challengesPane(),
     tarotPane(),
     breakPane(),
     codicesPane(),
-    automationPane(),
     archivePane(),
     statsPane(),
     optionsPane(),
