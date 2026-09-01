@@ -61,18 +61,20 @@ const SECTIONS: Section[] = [
     body: [
       'A die can be bought its own roll, in AUTOMATION. It opens once you have opened the die below it on the chain, so the first one arrives with your first study.',
       'It buys you nothing but your hands back. Holding already rolls as fast as the roll rate allows, so what changes is whether you have to be there, and the price is ink you would otherwise have spent on dice.',
+      'Your first Wager hands over whatever you have not bought, for nothing, and it stays handed over. It also leaves you some ink, because a table that rolls itself with one die on it takes a while to say anything.',
       'A die that rolls itself reads per second on the table. One still waiting on you reads per roll, and shows no face when you are not pressing.',
-      'The deepest die on the chain never gets one. There is nothing under it to open.',
+      'The deepest die opens once the whole chain is on the table, and costs more than the eight below it together.',
       'Any die that rolls itself can be switched off again, which is the only way to watch a single one land once it is automated.',
     ],
   },
   {
-    title: 'THE AUTOMATOR',
+    title: 'EVERY DIE AT ONCE',
     needs: afterAutomator,
     body: [
-      'One chip, once you have called the Wager, and the dice roll on their own. You can switch it off again in AUTOMATION.',
-      'Until you own it you hold ROLL, and holding gives exactly the roll rate: a roll refuses to start while one is in the air. It buys you your finger back rather than any extra speed. It is also what makes time away from the game count.',
-      'You never lose it. Not to a study, not to a folio, not to the Wager.',
+      'Your first Wager hands over the whole ladder, free, and you never lose it. Not to a study, not to a folio, not to another Wager.',
+      'It used to be a purchase of its own, one chip. It is not any more: the ladder already sells you your hands back a die at a time, and charging again at the prestige would be charging twice for the same thing.',
+      'AUTOMATION grows a master switch above the nine. Turn it off and the whole table waits for you again, which is the only way to watch a run land one throw at a time once everything is automatic.',
+      'Holding ROLL gives exactly the roll rate, because a roll refuses to start while one is in the air. None of this is extra speed. It is only whether you have to be there.',
     ],
   },
   {

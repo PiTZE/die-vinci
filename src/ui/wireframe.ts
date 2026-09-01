@@ -197,17 +197,39 @@ function depthOpacity(f: number): number {
   return 0.22 + 0.78 * c * c
 }
 
+/**
+ * The angle a die sits at when it is not rolling.
+ *
+ * One angle for every solid, and a fixed one. It used to be `Math.random()`
+ * per die, which is what a tumbling die wants and the opposite of what a
+ * still one does: nine solids at rest were nine arbitrary poses, and a couple
+ * of them landed close enough to edge-on that vertices projected on top of
+ * each other. Off-axis on purpose for the same reason.
+ */
+const REST_T = 0.6
+
+/**
+ * And the axes it is turned about, which the pose depends on just as much.
+ *
+ * `throw()` re-picks these on every throw so nine dice do not turn in
+ * lockstep, so winding the angle back without them left a die at the right
+ * angle about the wrong pair of axes: still a different picture every time it
+ * stopped. These are the values a die is built with.
+ */
+const REST_WY = 1
+const REST_WX = 0.42
+
 class Wire {
   readonly el: SVGSVGElement
   private lines: SVGLineElement[] = []
   private paths: SVGPathElement[] = []
   private id: SolidId
-  private t = Math.random() * Math.PI * 2
+  private t = REST_T
   /** Tumble axis weights, re-picked on every throw. A fixed pair made nine
    *  dice turn in lockstep like a row of gears, which is the one thing a
    *  handful of thrown dice never looks like. */
-  private wy = 1
-  private wx = 0.42
+  private wy = REST_WY
+  private wx = REST_WX
   /** Each die leaves the hand a little differently. */
   private speed = 1
   /** Revolutions this throw, picked against this solid's own ceiling. */
@@ -220,9 +242,22 @@ class Wire {
   /** A row with no dice on it. It stays where it is. */
   rolls = true
 
-  /** Puts it back square, for when it stops taking part mid-throw. */
+  /**
+   * Puts it back where it started, for when it stops taking part.
+   *
+   * Both halves. Clearing the transform drops the hop and the tilt, which is
+   * what this used to do and all it used to do; the solid itself is drawn from
+   * `t`, so without winding that back the die kept whatever orientation the
+   * throw abandoned it in, and a table with one die automated was eight solids
+   * frozen at eight arbitrary angles.
+   */
   rest(): void {
     if (this.el.style.transform) this.el.style.transform = ''
+    if (this.t === REST_T && this.wy === REST_WY && this.wx === REST_WX) return
+    this.t = REST_T
+    this.wy = REST_WY
+    this.wx = REST_WX
+    this.draw()
   }
 
   /** A new throw. Fresh axis, fresh rate. */

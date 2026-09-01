@@ -77,9 +77,14 @@ const after = await ev(`({ chips: Number(window.LD.state.chips), wagers: window.
   roll: window.LD.state.rollUpgrades, bought: window.LD.state.solids.reduce((a,d)=>a+d.bought,0) })`)
 check('wager pays a chip', after.chips === before.chips + 1, JSON.stringify(after))
 check('wager counts up', after.wagers === before.wagers + 1)
+// Ink is the running start the Wager hands over, not the ten a fresh game
+  // opens with: every die rolls itself from here and a table holding one
+  // tetrahedron takes a minute to say anything.
 check('wager clears layer 0',
-  after.ink === '10' && after.studies === 0 && after.folios === 0 && after.roll === 0 && after.bought === 0,
+  after.studies === 0 && after.folios === 0 && after.roll === 0 && after.bought <= 10,
   JSON.stringify(after))
+check('and hands over a running start rather than the opening ten',
+  Number(after.ink) >= 1e6, after.ink)
 
 // A phone has no hover, so the note has to be reachable by touch.
 const noteBefore = await ev(`document.querySelector('.upgrade-note').textContent`)

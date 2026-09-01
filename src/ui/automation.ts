@@ -167,7 +167,7 @@ export function automationPane(): Pane {
       autoToggle = el('button', 'auto-toggle', 'ON')
       autoToggle.type = 'button'
       autoToggle.addEventListener('click', () => actions.toggleAutomator())
-      autoRow.append(el('span', 'auto-label', SOLIDS[SOLIDS.length - 1].short), autoToggle, autoBuy)
+      autoRow.append(el('span', 'auto-label', 'EVERY DIE'), autoToggle, autoBuy)
       autoManualRow = autoRow
       autoSection.appendChild(autoRow)
       root.append(autoSection)
@@ -310,7 +310,10 @@ export function automationPane(): Pane {
         r.buy.classList.toggle('buyable', can)
       }
 
-      autoManualRow.hidden = !automatorUnlocked(s)
+      // The master over the nine below it. It stopped being a purchase when
+      // the Wager began granting the ladder outright: charging a chip for the
+      // hands the ladder already sold you is charging twice.
+      autoManualRow.hidden = !s.autoRoll
       if (!s.autoRoll) {
         setText(autoBuy, `UNLOCK / ${automatorCost()} POINT`)
         const can = canBuyAutomator(s)

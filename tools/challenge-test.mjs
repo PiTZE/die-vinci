@@ -79,7 +79,13 @@ await ev(`[...document.querySelectorAll('.pane:not([hidden]) .tile')][6].click()
 await sleep(150)
 const inC7 = await ev(`({ running: window.LD.state.challengeRunning,
   studies: window.LD.state.studies, bought: window.LD.state.solids.reduce((a,d)=>a+d.bought,0) })`)
-check('entering a challenge resets layer 0', inC7.running === 7 && inC7.studies === 0 && inC7.bought === 0,
+// The seed is not a leftover: a Wager has been called by now, so every die
+// rolls itself, and a reset that left the table empty would leave the
+// automation with nothing to roll. resetTable has seeded it since the
+// automator existed; the Wager granting that automation is what makes this
+// path reachable in the suite.
+check('entering a challenge resets layer 0',
+  inC7.running === 7 && inC7.studies === 0 && inC7.bought <= 10,
   JSON.stringify(inC7))
 
 // Entering reset the studies, so the cap only shows once enough are taken to

@@ -764,6 +764,35 @@ const turning = await ev(`(() => new Promise(done => {
 check('and only the automated die is still turning',
   turning[0] === true && turning.slice(1).every((v) => v === false), JSON.stringify(turning))
 
+// A die that stops taking part goes back where it started.
+//
+// rest() used to clear the CSS transform and nothing else, which drops the hop
+// and the tilt but not the solid: that is drawn from an angle and a pair of
+// tumble axes, both of which a throw re-picks. So a die kept whatever
+// orientation the throw abandoned it in, and a table with one die automated
+// was eight solids frozen at eight arbitrary angles.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 3; s.autoDice = 0; s.autoRoll = false; s.autoDiceOff = []
+  s.handRollAt = 0; s.rollStartedAt = 0; s.inkThisWager = new D(0); s.broke = false
+  s.ink = new D('1e12')
+  s.solids.forEach((d, i) => { d.bought = i < 4 ? 10 : 0
+    d.amount = new D(i < 4 ? 50 : 0) }) })()`)
+await sleep(400)
+const shape = `[...document.querySelectorAll('.pane:not([hidden]) .solid-icon')].slice(0,4)
+  .map(n => [...n.querySelectorAll('line, path')]
+    .map(l => l.getAttribute('d') || (l.getAttribute('x1') + ',' + l.getAttribute('y1'))).join('|'))`
+const startPose = await ev(shape)
+await ev(`window.LD.actions.roll()`)
+await sleep(700)
+await ev(`(() => { window.LD.state.autoDice = 1 })()`)
+await sleep(2000)
+const restPose = await ev(shape)
+const same = startPose.map((g, i) => g === restPose[i])
+check('a die that stops rolling goes back where it started',
+  same.slice(1).every(Boolean), JSON.stringify(same))
+// The one still rolling is somewhere else, or the check above proves nothing.
+check('and the one still rolling is not', same[0] === false, JSON.stringify(same))
+
 // Every die that rolls itself can be handed back to your finger, which is the
 // switch the automator has always had a rung up. Its reason is the automator's
 // reason: with it on there is no way to watch a single die land.
@@ -822,23 +851,35 @@ check('a save carries which dice are switched off',
   JSON.stringify(kept2.off) === '[1,3]', JSON.stringify(kept2))
 await ev(`(() => { window.LD.state.autoDiceOff = [] })()`)
 
-// There is no tenth solid, so the deepest never gets one and the automator at
-// the Wager is what covers it.
+// The deepest die has nothing under it to wait for, so it waits on itself: it
+// opens once the whole chain is on the table, and it is the last thing ink
+// ever buys, priced past the eight below it.
 const deepest = await ev(`(() => { const s = window.LD.state
-  s.studies = 20; s.autoDice = 8
-  return { next: window.LD.nextAutoRoll(s), solids: s.solids.length } })()`)
-check('the deepest die is never for sale', deepest.next === 0 && deepest.solids === 9,
+  s.studies = 3; s.autoDice = 8
+  const early = window.LD.nextAutoRoll(s)
+  s.studies = 20
+  return { early, next: window.LD.nextAutoRoll(s), cost: window.LD.autoRollCost(s).toString(),
+    solids: s.solids.length } })()`)
+check('the deepest die waits for the whole chain to be on the table',
+  deepest.early === 0 && deepest.next === 9, JSON.stringify(deepest))
+check('and costs more than the eight below it', Number(deepest.cost) > 1e52,
   JSON.stringify(deepest))
 
 // Kept through everything that clears the table, as the automator is.
 const kept = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
-  s.autoDice = 3; s.inkThisWager = new D('1e309'); s.ink = new D('1e309')
+  s.autoDice = 3; s.autoRoll = false; s.inkThisWager = new D('1e309'); s.ink = new D('1e309')
   window.LD.actions.buyStudy()
   const afterStudy = s.autoDice
   window.LD.actions.wager()
-  return { afterStudy, afterWager: s.autoDice } })()`)
-check('a study and a Wager both leave the ladder alone',
-  kept.afterStudy === 3 && kept.afterWager === 3, JSON.stringify(kept))
+  return { afterStudy, afterWager: s.autoDice, auto: s.autoRoll,
+    ink: s.ink.toString() } })()`)
+check('a study leaves the ladder alone', kept.afterStudy === 3, JSON.stringify(kept))
+// The automator used to be a chip here. The ladder already sells what it sold,
+// so the prestige hands over the rest of it instead of charging twice.
+check('and a Wager hands over the whole of it, for nothing',
+  kept.afterWager === 9 && kept.auto === true, JSON.stringify(kept))
+check('with some ink to start on, because a table with one die on it is slow',
+  Number(kept.ink) >= 1e6, JSON.stringify(kept))
 
 // The tab it lives on opens two minutes into a first run now, so the two
 // things that sat behind the Wager have to seal themselves.

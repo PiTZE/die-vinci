@@ -11,14 +11,14 @@
 // Break Infinity does not exist here yet, so a Wager pays one Point, and the
 // upgrade grid is priced for that: seven of its eleven cost a single Point.
 import Decimal from '../vendor/break-infinity'
-import { START_INK, WAGER_AT } from './balance'
+import { START_INK, WAGER_AT, WAGER_INK_GIFT } from './balance'
 import { unlock } from './autobuyers'
 import { byId } from './challenges'
 import { drawOffer } from './tarot'
 import { chipsFrom } from './breaks'
 import { resetCodices } from './codices'
 import { startingFolios, startingStudies } from './upgrades'
-import { registerWager, seedForAutomator } from './production'
+import { grantAutoRoll, registerWager, seedForAutomator } from './production'
 import type { GameState } from '../state'
 
 /**
@@ -82,7 +82,14 @@ export function doWager(s: GameState): boolean {
   // AD's InfinityDimensions.resetAmount on a crunch.
   resetCodices(s)
 
-  s.ink = new Decimal(START_INK)
+  // Every die rolls itself from here on, for nothing. See grantAutoRoll: the
+  // ladder already sells what the automator used to charge a chip for, so the
+  // prestige hands over the rest of it rather than selling it again.
+  grantAutoRoll(s)
+
+  // And a running start, because a table that rolls itself with one
+  // tetrahedron on it and ten ink takes a minute to say anything.
+  s.ink = Decimal.max(new Decimal(START_INK), WAGER_INK_GIFT)
   s.inkThisWager = new Decimal(0)
   // ONE AHEAD and the two behind it, and ALREADY BOUND. AD's skipResets: the
   // next run opens further along than the last one did.

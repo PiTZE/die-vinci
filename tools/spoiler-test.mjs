@@ -101,7 +101,7 @@ check('and it is never the real title',
   sealedTitle !== REAL && sealedAgain !== REAL, JSON.stringify(sealedTitle))
 // Word by word, because a single word settling back is the leak that matters.
 const anyWordSettled = await ev(`(() => {
-  const real = ['ROLLS ITSELF', 'THE AUTOMATOR', 'STUDY AND FOLIO', 'THE WAGER',
+  const real = ['ROLLS ITSELF', 'EVERY DIE AT ONCE', 'STUDY AND FOLIO', 'THE WAGER',
     'CHALLENGES', 'AUTOBUYERS']
   const shown = [...document.querySelectorAll('.help-head.sealed span')].map(n => n.textContent)
   for (let i = 0; i < shown.length; i++) {
@@ -166,7 +166,7 @@ await ev(`(() => { const s = window.LD.state; s.studies = 3; s.autoRoll = true }
 await sleep(150)
 const midHelp = await shown('HELP', '.help-head')
 check('a study opens the automator and the resets',
-  midHelp.includes('THE AUTOMATOR') && midHelp.includes('STUDY AND FOLIO'), midHelp)
+  midHelp.includes('EVERY DIE AT ONCE') && midHelp.includes('STUDY AND FOLIO'), midHelp)
 check('but not the Wager, challenges or autobuyers',
   !midHelp.includes('THE WAGER') && !midHelp.includes('CHALLENGES') && !midHelp.includes('AUTOBUYERS'),
   midHelp)

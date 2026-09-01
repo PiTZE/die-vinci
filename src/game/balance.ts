@@ -110,10 +110,9 @@ export const AUTOMATOR_COST = 1
 // So the finger comes back a die at a time. Buying auto-roll for a die means
 // that die takes part in the roll whether or not you are pressing, and it
 // unlocks when the die below it on the chain does: open the d6 and you can
-// automate the d4, open the d8 and you can automate the d6. There is no tenth
-// solid, so the d72 never gets one and the automator at the first Wager is
-// what finally covers it. That is the milestone it always was, now aimed at
-// one specific die instead of at the whole table.
+// automate the d4, open the d8 and you can automate the d6. The d72 has no
+// tenth solid under it, so it opens on itself, once the whole chain is on the
+// table, and it costs more than the eight below it put together.
 //
 // It buys no throughput. Holding already gives exactly the roll rate, because
 // a roll refuses to start while one is in the air, so what this changes is
@@ -134,7 +133,28 @@ export const AUTO_ROLL_COSTS: Decimal[] = [
   new Decimal(1e30),
   new Decimal(1e40),
   new Decimal(1e52),
+  // The d72. Past the eighth by the same step the ladder has been taking, and
+  // the last thing ink ever buys you: after it there is nothing left on the
+  // table that waits for a finger.
+  new Decimal(1e66),
 ]
+
+/**
+ * What the first Wager hands over, on the house.
+ *
+ * The automator used to be a purchase, one chip, and the point of it was your
+ * hands back. The ladder sells that a die at a time now, so charging again for
+ * the same thing at the prestige would be charging twice. A Wager grants the
+ * whole ladder instead, for good, and it is the milestone it always was: the
+ * run before it is played by hand, every run after it is not.
+ *
+ * The ink is the other half. A Wager clears the table, and a table that rolls
+ * itself with one tetrahedron on it and ten ink is a table that takes a minute
+ * to say anything. This is a running start, not a windfall: it buys into the
+ * third tier and is gone inside the first few seconds of a run that ends at
+ * 1.8e308.
+ */
+export const WAGER_INK_GIFT = new Decimal(1e6)
 
 export const ROLLS_DRAWN_INDIVIDUALLY = 12
 

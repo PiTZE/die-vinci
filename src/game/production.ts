@@ -1046,12 +1046,29 @@ export function dieOn(s: GameState, idx: number): boolean {
 /** Whether anything at all would roll this die without your finger, which is
  *  what decides whether it is worth offering a switch for. */
 export function dieCanRollItself(s: GameState, idx: number): boolean {
-  return rollingItself(s) || idx <= s.autoDice
+  return s.autoRoll || idx <= s.autoDice
 }
 
-/** Whether die `idx` takes part in a roll nobody is pressing for. */
+/**
+ * Whether die `idx` takes part in a roll nobody is pressing for.
+ *
+ * Three switches, and all of them have to be on. The Wager's grant is what
+ * makes the deepest die automatic at all; `autoRollOn` is the master over the
+ * lot, which is the switch the automator has always carried and which would
+ * have gone inert the moment the grant filled the ladder; and `dieOn` is this
+ * die's own.
+ */
 export function dieRollsItself(s: GameState, idx: number): boolean {
-  return dieCanRollItself(s, idx) && dieOn(s, idx)
+  if (!dieOn(s, idx)) return false
+  if (s.autoRoll && !s.autoRollOn) return false
+  return dieCanRollItself(s, idx)
+}
+
+/** Whether the whole table rolls itself, which is when a ROLL button has
+ *  nothing left to do. Switch one die back to your finger and it returns. */
+export function allRollThemselves(s: GameState): boolean {
+  for (let i = 1; i <= openSolids(s); i++) if (!dieRollsItself(s, i)) return false
+  return openSolids(s) > 0
 }
 
 /**
@@ -1066,9 +1083,8 @@ export function toggleDie(s: GameState, idx: number): void {
   s.autoDiceOff = off.includes(idx) ? off.filter((i) => i !== idx) : [...off, idx]
 }
 
-/** How many dice can ever be automated this way. There is no tenth solid, so
- *  the deepest never can, and the automator at the Wager is what covers it. */
-export const AUTO_ROLL_MAX = SOLIDS.length - 1
+/** Every die on the table, the deepest included. */
+export const AUTO_ROLL_MAX = SOLIDS.length
 
 /**
  * The next die whose auto-roll is for sale, 1-based, or 0 for none.
@@ -1076,11 +1092,15 @@ export const AUTO_ROLL_MAX = SOLIDS.length - 1
  * A die opens for automation when the die below it on the chain opens for
  * buying, so the d4 waits on the d6 and the d32 waits on the d72. They fill
  * from the shallow end in order, which is why the state is a count.
+ *
+ * The d72 has nothing under it to wait for, so it waits on itself: it opens
+ * once the whole chain is on the table, which is the same sentence one solid
+ * further along.
  */
 export function nextAutoRoll(s: GameState): number {
   const next = s.autoDice + 1
   if (next > AUTO_ROLL_MAX) return 0
-  return unlockedSolids(s) >= next + 1 ? next : 0
+  return unlockedSolids(s) >= Math.min(next + 1, SOLIDS.length) ? next : 0
 }
 
 export function autoRollCost(s: GameState): Decimal {
@@ -1096,6 +1116,19 @@ export function buyAutoRoll(s: GameState): boolean {
   s.ink = s.ink.minus(autoRollCost(s))
   s.autoDice += 1
   return true
+}
+
+/**
+ * The whole ladder, handed over by the first Wager and never taken back.
+ *
+ * The automator used to be a purchase here, one chip, and what it bought was
+ * your hands back. The ladder sells that a die at a time now, so charging for
+ * it again at the prestige would be charging twice for the same thing.
+ */
+export function grantAutoRoll(s: GameState): void {
+  s.autoDice = AUTO_ROLL_MAX
+  s.autoRoll = true
+  s.autoRollOn = true
 }
 
 // -- the tick -------------------------------------------------------------

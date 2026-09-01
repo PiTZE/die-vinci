@@ -21,7 +21,7 @@ import {
   rollProgress,
   rolling,
   mustWager,
-  rollingItself,
+  allRollThemselves,
   dieRollsItself,
   handRolling,
   meanFace,
@@ -529,7 +529,11 @@ export function tablePane(): Pane {
       // Once the automator is in, the button has nothing left to do, since it can
       // never beat the roll rate, and the bar is better off giving the space
       // back to MAX.
-      rollNow.hidden = rollingItself(s) || full
+      // Hidden only when every die on the table rolls itself. It used to go on
+      // the automator flag alone, which after the Wager grants the whole
+      // ladder would take the button away and leave a die switched back to
+      // your finger with nothing to press it.
+      rollNow.hidden = allRollThemselves(s) || full
       if (!s.autoRoll) {
         ready(
           rollNow,
