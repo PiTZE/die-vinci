@@ -64,6 +64,7 @@ import {
   readFileMirror,
   restoreFileMirror,
 } from './durability'
+import { unlockedSolids } from './state'
 import type { GameState } from './state'
 import { Shell, type Actions } from './ui/shell'
 import { tablePane } from './ui/table'
@@ -74,7 +75,7 @@ import { codicesPane } from './ui/codices'
 import { releaseSticky } from './ui/hold'
 import { solidFigure, solidFold } from './ui/wireframe'
 import { checkMarks } from './game/marks'
-import { towerStriking } from './game/tarot'
+import { modifiers as arcanaModifiers, offerSize, towerStriking } from './game/tarot'
 import {
   CODICES,
   buyAllCodices,
@@ -723,6 +724,12 @@ const hook: Record<string, unknown> = {
   solidFold,
   // Whether XVI is mid-strike, which the top bar draws over the ink.
   towerStriking,
+  // The whole modifier set a save's cards add up to. Exposed for test:arcana,
+  // which asks every card whether it does the thing its own text says.
+  arcanaModifiers,
+  offerSize,
+  // How much of the chain a run has open, which is what XXI changes.
+  unlockedSolids,
   rollProgress,
   // Whether a roll you asked for is in the air, which since the roll clock
   // became shared is no longer the same question as rollStartedAt.

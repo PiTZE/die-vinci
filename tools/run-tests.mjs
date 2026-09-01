@@ -15,7 +15,7 @@ import { spawn } from 'node:child_process'
 const SUITES = [
   // Longest first, so the slow ones are not left starting last.
   'roll', 'freeze', 'ui', 'layout', 'away', 'confirm', 'challenge',
-  'spoilers', 'wager', 'break', 'codices', 'backup', 'tarot', 'install', 'channels',
+  'spoilers', 'wager', 'break', 'codices', 'backup', 'tarot', 'arcana', 'install', 'channels',
   'durability', 'save',
 ]
 
