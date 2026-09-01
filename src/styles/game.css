@@ -1945,3 +1945,25 @@
     padding-left: 26px;
   }
 }
+
+/* The ring on a button that is holding itself down.
+   Two rings rather than a thicker one: a single heavy outline reads as a
+   focus state, and this is a state the button is in rather than a state the
+   browser has put it in. It sits outside the border so it never moves the
+   button by a pixel when it appears. */
+.sticky {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sticky {
+    animation: sticky-on 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  }
+}
+@keyframes sticky-on {
+  from {
+    outline-offset: 9px;
+    outline-color: transparent;
+  }
+}

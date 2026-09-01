@@ -144,6 +144,7 @@ const SECTIONS: Section[] = [
     body: [
       'Space rolls the dice. Hold it.',
       'M buys the most expensive thing you can afford, repeatedly. Hold it.',
+      'Keep holding any of them and it takes a ring: it goes on pressing itself with your hands off. One at a time, so choose which. Tap it again to stop it.',
       '1 to 9 buy a solid, shift for a single one. R buys roll rate.',
       { text: 'S takes a study. It asks twice unless you turn that off.', needs: afterStudy },
       { text: 'F binds a folio, and asks twice as well.', needs: (s) => s.folios > 0 || s.wagers > 0 },

@@ -153,11 +153,15 @@ export const FACE_AVERAGE_S = 0.05
  * Seconds for the printed number to travel from the last face it landed on to
  * the average, once it crosses that line.
  *
- * A d12 that landed on 9 reads 9, then walks down to 6.5 rather than cutting
- * to it. The snap was the tell that the number had stopped being a reading and
+ * A d12 that landed on 9 reads 9, then walks down to 6 rather than cutting to
+ * it. The snap was the tell that the number had stopped being a reading and
  * become a statistic, and it happened at the exact moment the table got fast.
+ *
+ * Long, and deliberately. At nine tenths of a second it was over before the
+ * eye had found it, which reads as the number having jumped after all: the
+ * whole point is that you watch it go.
  */
-export const FACE_SETTLE_S = 0.9
+export const FACE_SETTLE_S = 2.6
 
 /** Ink cost of the first roll-rate upgrade, then x10 each. */
 export const ROLL_COST_BASE = new Decimal(1000)

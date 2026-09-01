@@ -363,24 +363,50 @@ check('a roll too fast to read still shows a real face',
 check('and it is a real roll, not one number held', new Set(faces).size > 1, JSON.stringify(blur))
 
 // 0.889^60 is under a millisecond: nothing to see, so the honest number is the
-// average, and it is walked to rather than jumped to.
-await ev(`(() => { const s = window.LD.state; s.rollUpgrades = 60 })()`)
-// Sampled past the length of the walk rather than across it. At 14 samples
-// 70ms apart the window was 980ms against a walk of 900, so under load it
-// only just landed and the second-to-last reading was still moving.
-const walk = (await sample(20, 100)).map(Number)
+// die's average, and it is walked to rather than jumped to.
+//
+// Read off the d12 with the dice standing still, and from a face pinned to 12.
+// The d4 was the wrong die to ask: its faces sit either side of its own
+// average, so a walk from a landed 2 to an average of 2 never changes a digit
+// and the check passed or failed on which face the last roll happened to give.
+// Nothing rolling, because the walk is a property of the display and the
+// engine overwrites the faces forty times a second at this rate.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = false; s.autoDice = 0; s.handRollAt = 0; s.rollStartedAt = 0
+  s.studies = 5; s.rollUpgrades = 20
+  s.solids.forEach((d, i) => { d.bought = i < 4 ? 10 : 0
+    d.amount = new D(i < 4 ? 100 : 0) })
+  s.faces = s.faces.map((_, i) => (i === 3 ? 12 : 0)) })()`)
+await sleep(300)
+const pinned = await ev(`[...document.querySelectorAll('.pane:not([hidden]) .solid-face')][3].textContent.trim()`)
+check('a d12 showing the face it landed on', pinned === '12', pinned)
+
+await ev(`(() => { window.LD.state.rollUpgrades = 60 })()`)
+const walk = (await ev(`(() => {
+  const seen = []
+  return new Promise(done => {
+    const cell = [...document.querySelectorAll('.pane:not([hidden]) .solid-face')][3]
+    const t = setInterval(() => {
+      seen.push(cell.textContent.trim())
+      if (seen.length >= 34) { clearInterval(t); done(seen) }
+    }, 100)
+  })
+})()`)).map(Number)
 check('past seeing it walks to the average rather than cutting to it',
-  walk.length > 4 && walk.slice(0, 3).some((v) => Math.abs(v - 2.5) > 0.15),
-  JSON.stringify(walk))
-// A d4 averages 2.5, and the walk is nine tenths of a second.
+  walk[0] > 7, JSON.stringify(walk))
+// A d12 averages 6.5 and the column prints whole numbers, so it settles on 6.
+// Decimals in a column of die faces read as a fault rather than a statistic.
 check('and it lands on the average and stays there',
-  Math.abs(walk[walk.length - 1] - 2.5) < 0.06 &&
-    Math.abs(walk[walk.length - 2] - 2.5) < 0.06, JSON.stringify(walk))
-check('and it moves in one direction, not in steps',
-  (() => { const d = []
+  walk[walk.length - 1] === 6 && walk[walk.length - 2] === 6, JSON.stringify(walk))
+check('and every number it shows on the way is a whole one',
+  walk.every((v) => Number.isInteger(v)), JSON.stringify(walk))
+check('and it walks there rather than jumping, in one direction',
+  (() => {
+    const d = []
     for (let i = 1; i < walk.length; i++) d.push(walk[i] - walk[i - 1])
-    const moving = d.filter((v) => Math.abs(v) > 1e-9)
-    return moving.length > 2 && (moving.every((v) => v >= 0) || moving.every((v) => v <= 0))
+    const moving = d.filter((v) => v !== 0)
+    // Twelve down to six through every step between, over the settle window.
+    return new Set(walk).size >= 4 && moving.every((v) => v < 0)
   })(), JSON.stringify(walk))
 
 // A row you own none of sits the throw out: no face, and its wireframe does

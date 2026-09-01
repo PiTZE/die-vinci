@@ -254,9 +254,14 @@ try {
   // the tolerance a measure of how loaded the box was: this failed at +3 and at
   // +4 on a busy run and passed alone. Starting the window after the release
   // asks the real question instead, and the answer is exact.
+  // The ring is a separate feature with its own checks below. A hold long
+  // enough to measure a repeat is also long enough to earn one, so it is taken
+  // off here rather than left to answer a question nobody asked.
+  await evaluate(`window.LD.releaseSticky()`)
   const atRelease = await counts()
   await sleep(500)
   const lifted = await counts()
+  await evaluate(`window.LD.releaseSticky()`)
   check('lifting one finger stops only that button',
     lifted.roll === atRelease.roll && lifted.max - atRelease.max > 1,
     `roll +${lifted.roll - atRelease.roll}, max +${lifted.max - atRelease.max}`)
@@ -387,6 +392,7 @@ try {
     await new Promise(r => setTimeout(r, 1000))
     const held = s.studies
     press('pointerup', window)
+    window.LD.releaseSticky()
     await new Promise(r => setTimeout(r, 300))
     clearInterval(keep)
     return { held, after: s.studies - held } })()`)
@@ -462,6 +468,105 @@ try {
   await appReady(evaluate)
   const freshMs = await evaluate(`window.LD.state.options.uiMs`)
   check('a new save refreshes ten times a second', freshMs === 100, String(freshMs))
+
+  // -- the ring: a button that holds itself down ---------------------------
+  //
+  // Hold one long enough and it keeps going with your finger off. One at a
+  // time, which is the design rather than a limit: a phone has one thumb free
+  // and the table has three buttons worth holding, so being given one is a
+  // decision and being given all of them would not be.
+
+  const pdown = (sel, id) => evaluate(`(() => { const b = document.querySelector('${sel}')
+    const r = b.getBoundingClientRect()
+    b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: ${id},
+      button: 0, clientX: r.x + 5, clientY: r.y + 5 })) })()`)
+  const pup = (id) => evaluate(`window.dispatchEvent(new PointerEvent('pointerup',
+    { bubbles: true, pointerId: ${id} }))`)
+  const rings = () => evaluate(`[...document.querySelectorAll('.sticky')]
+    .map(n => n.className.split(/\\s+/).filter(Boolean).join(' '))`)
+
+  await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal
+    s.studies = 3; s.ink = new D('1e30'); s.autoRoll = false; s.autoDice = 0
+    s.inkThisWager = new D(0); s.broke = false; s.haltMs = 0
+    s.solids.forEach((d, i) => { d.bought = i < 4 ? 10 : 0
+      d.amount = new D(i < 4 ? 50 : 0) }) })()`)
+  await sleep(300)
+
+  // Ink first, and a beat for the button to notice: `disabled` is recomputed
+  // on the UI tick and holdable refuses a press on a disabled button, so
+  // dispatching straight after setting the ink presses nothing at all.
+  // inkThisWager too, and not only for tidiness: a ringed ROLL left rolling at
+  // this much ink crosses 1.8e308 inside a second, the action bar hands itself
+  // over to the Wager, and a ring on a button that has left the screen is
+  // correctly dropped. The fixture has to stay out of the endgame to ask
+  // anything about the ring at all.
+  // The table too, not only the wallet. Each hold in here buys hundreds of
+  // dice, and after a few of them the next price is past any fixed pile of
+  // ink: MAX goes disabled, holdable refuses the press, and the check that
+  // follows is measuring a button nobody managed to touch.
+  const ready = async () => {
+    await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal
+      s.ink = new D('1e30'); s.inkThisWager = new D(0)
+      s.solids.forEach((d, i) => { d.bought = i < 4 ? 10 : 0
+        d.amount = new D(i < 4 ? 50 : 0) }) })()`)
+    await sleep(250)
+  }
+
+  await ready()
+  await pdown('.bar-btn.max', 11); await sleep(500); await pup(11)
+  check('a short hold is only a hold', (await rings()).length === 0)
+
+  await ready()
+  await pdown('.bar-btn.max', 12); await sleep(1200)
+  const ringed = await rings()
+  await pup(12)
+  check('holding it long enough puts a ring on it',
+    ringed.length === 1 && ringed[0].includes('max'), JSON.stringify(ringed))
+
+  // Your finger is free for the others, which is the point of the ring.
+  await pdown('.bar-roll', 13); await sleep(300); await pup(13)
+  check('and using another button does not take it off',
+    (await rings()).length === 1, JSON.stringify(await rings()))
+
+  // A ringed ROLL keeps rolling with nothing touching it and no automation.
+  await pdown('.bar-roll', 14); await sleep(1200); await pup(14)
+  const only = await rings()
+  check('sticking another moves the ring rather than adding one',
+    only.length === 1 && only[0].includes('bar-roll'), JSON.stringify(only))
+
+  const inkBefore = await evaluate(`window.LD.state.ink.toString()`)
+  await sleep(900)
+  await evaluate(`(() => { window.LD.state.inkThisWager = new window.LD.Decimal(0) })()`)
+  check('and the ringed button goes on working with your hands off',
+    (await evaluate(`window.LD.state.ink.toString()`)) !== inkBefore)
+
+  // The only way off it that does not mean sticking something you did not want.
+  await pdown('.bar-roll', 15); await sleep(80); await pup(15)
+  await sleep(150)
+  check('a tap on the ringed button takes the ring off',
+    (await rings()).length === 0, JSON.stringify(await rings()))
+
+  // Unaffordable is not gone. MAX is disabled between one roll paying and the
+  // next, and dropping the ring for that would take it off a second after you
+  // put it on.
+  //
+  // Asserted on the rule rather than by staging an economy that produces it:
+  // forty checks have run before this one and the table is in whatever state
+  // they left it, so "make MAX unaffordable" is a fixture that fights the
+  // whole file. Disabling the button says the same thing in one line.
+  await ready()
+  await pdown('.bar-roll', 16); await sleep(1200); await pup(16)
+  const held = await evaluate(`document.querySelector('.bar-roll').classList.contains('sticky')`)
+  const waited = await evaluate(`(async () => {
+    const b = document.querySelector('.bar-roll')
+    b.disabled = true
+    await new Promise(r => setTimeout(r, 400))
+    const still = b.classList.contains('sticky')
+    b.disabled = false
+    return { still } })()`)
+  check('a ring waits through a button it cannot afford',
+    held === true && waited.still === true, JSON.stringify({ held, ...waited }))
+  await evaluate(`window.LD.releaseSticky()`)
 
   // -- the menu, in two levels ---------------------------------------------
   //

@@ -34,7 +34,7 @@ import { modifiers } from '../game/tarot'
 import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
-import { bindKey, holdable } from './hold'
+import { bindKey, holdable, isPressing } from './hold'
 import { Confirmer } from './confirm'
 import { vesica, type Vesica } from './geometry'
 import { setBlur, setDieRolling, setThrow, wireframe } from './wireframe'
@@ -122,6 +122,18 @@ function land(n: HTMLElement): void {
  * by pressing it.
  */
 const STEADY_MS = 350
+
+/**
+ * The ready-to-press highlight, which a button being pressed must not show.
+ *
+ * Holding MAX buys until the ink runs out, so `canMaxAll` goes false and then
+ * true again the moment a roll pays, and the button flashed its highlight back
+ * on under a finger that had never left it. The same for ROLL between throws.
+ * A control that is plainly being used does not need to advertise itself.
+ */
+function ready(btn: HTMLElement, on: boolean): void {
+  btn.classList.toggle('buyable', on && !isPressing(btn))
+}
 
 class Steady {
   private at = new Map<string, number>()
@@ -402,17 +414,19 @@ export function tablePane(): Pane {
 
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.
-      bindKey('m', () => actions.maxAll())
-      bindKey('space', () => actions.roll())
-      bindKey('r', () => actions.buyRollRate())
+      // Named so a held key marks its button the way a held finger does.
+      bindKey('m', () => actions.maxAll(), maxBtn)
+      bindKey('space', () => actions.roll(), rollNow)
+      bindKey('r', () => actions.buyRollRate(), rollBtn)
       bindKey('s', () => {
         if (canStudyNow && confirm.request('study')) actions.buyStudy()
-      })
+      }, barStudy)
       bindKey('f', () => {
         if (canFolioNow && confirm.request('folio')) actions.buyFolio()
-      })
+      }, barFolio)
       for (const def of SOLIDS) {
-        bindKey(String(def.idx), (mods) => actions.buySolid(def.idx, mods.shift))
+        bindKey(String(def.idx), (mods) => actions.buySolid(def.idx, mods.shift),
+          rows[def.idx - 1]?.buy)
       }
     },
 
@@ -517,8 +531,8 @@ export function tablePane(): Pane {
       // back to MAX.
       rollNow.hidden = rollingItself(s) || full
       if (!s.autoRoll) {
-        rollNow.classList.toggle(
-          'buyable',
+        ready(
+          rollNow,
           // Ready when no roll of yours is in the air. Asking rollStartedAt
           // stopped meaning that once the automated dice began setting it.
           steady.on('roll', !handRolling(s) && s.haltMs <= 0, now),
@@ -530,11 +544,11 @@ export function tablePane(): Pane {
       // dropped and restarted several times a second.
       const canMax = steady.on('max', canMaxAll(s), now)
       maxBtn.disabled = !canMax
-      maxBtn.classList.toggle('buyable', canMax)
+      ready(maxBtn, canMax)
 
       canStudyNow = canBuyStudy(s)
       barStudy.disabled = !canStudyNow
-      barStudy.classList.toggle('buyable', canStudyNow)
+      ready(barStudy, canStudyNow)
 
       for (const def of SOLIDS) {
         const r = rows[def.idx - 1]
@@ -662,10 +676,17 @@ export function tablePane(): Pane {
               r.settledFor = settleAt
             }
             r.shownFace = r.fromFace + (mean - r.fromFace) * settleEase
-            // One place, because the average of a die is rarely a whole
-            // number and rounding it would land back on a face it could
-            // actually roll, which reads as a reading again.
-            setText(r.face, r.shownFace.toFixed(1))
+            // A whole number, all the way down.
+            //
+            // This printed one decimal place, on the reasoning that a die's
+            // average is rarely whole and rounding it would land back on a
+            // face the die could actually roll. That is true and it was the
+            // wrong call: the column is nine rows of die faces, every one of
+            // them an integer, and 2.5 sitting among them reads as a fault
+            // rather than as a statistic. Floored rather than rounded so a
+            // d12 settles on 6, which is the number a player expects half of
+            // twelve to be.
+            setText(r.face, String(Math.floor(r.shownFace)))
           }
           r.drawnFace = r.lastFace
         }
@@ -700,7 +721,7 @@ export function tablePane(): Pane {
         // whole table strobing.
         const can = steady.on(`buy${def.idx}`, canBuySolid(s, def.idx), now)
         r.buy.disabled = !can
-        r.buy.classList.toggle('buyable', can)
+        ready(r.buy, can)
       }
 
       // Gated exactly as the WAGER tab is, so the bar and the tab that explains
@@ -726,7 +747,7 @@ export function tablePane(): Pane {
       duo(rollBtn, 'FASTER', `${format(rc, n)} INK`)
       const canRoll = steady.on('faster', canBuyRollRate(s), now)
       rollBtn.disabled = !canRoll
-      rollBtn.classList.toggle('buyable', canRoll)
+      ready(rollBtn, canRoll)
 
       // XIII Death is the gate, so nothing about melting exists until it does.
       meltRow.hidden = !meltUnlocked(s)
@@ -735,7 +756,7 @@ export function tablePane(): Pane {
         if (confirm.isArmed('melt')) duo(meltBtn, 'SURE? THIS DESTROYS THE CHAIN')
         else duo(meltBtn, 'MELT', `x${format(meltGain(s), n)} ON ${SOLIDS[openSolids(s) - 1].short}`)
         meltBtn.disabled = !can
-        meltBtn.classList.toggle('buyable', can)
+        ready(meltBtn, can)
       }
 
       confirmSettings = s.options.confirms
@@ -749,7 +770,7 @@ export function tablePane(): Pane {
       setText(barStudy, studyArmed ? '?' : 'S')
       const canStudy = canBuyStudy(s)
       studyBtn.disabled = !canStudy
-      studyBtn.classList.toggle('buyable', canStudy)
+      ready(studyBtn, canStudy)
 
       const showFolio = folioUnlocked(s)
       folioLabel.hidden = !showFolio
@@ -761,7 +782,7 @@ export function tablePane(): Pane {
       canFolioNow = showFolio && canBuyFolio(s)
       if (showFolio) {
         barFolio.disabled = !canFolioNow
-        barFolio.classList.toggle('buyable', canFolioNow)
+        ready(barFolio, canFolioNow)
       }
       if (showFolio) {
         const { idx, need } = folioReq(s)
