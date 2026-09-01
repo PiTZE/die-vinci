@@ -64,6 +64,15 @@ const OCTAVES = 10
 const LACUNARITY = 1.6
 const GAIN = 0.7
 const FREQUENCY = 10
+/**
+ * What ten octaves at this gain add up to, so the amplitude means something.
+ *
+ * Without it the sum reaches about 3.3 times the amplitude asked for, and
+ * `chaos` is a number whose effect you find by trying it. Divided through, it
+ * is the furthest the filament can stray, as a fraction of the shorter side,
+ * which is a thing you can reason about before you look.
+ */
+const OCTAVE_SUM = (1 - Math.pow(GAIN, OCTAVES)) / (1 - GAIN)
 
 function octaved(x: number, time: number, amplitude: number, seed: number): number {
   let sum = 0
@@ -74,7 +83,7 @@ function octaved(x: number, time: number, amplitude: number, seed: number): numb
     f *= LACUNARITY
     a *= GAIN
   }
-  return sum
+  return sum / OCTAVE_SUM
 }
 
 interface Point {
@@ -131,7 +140,7 @@ function samplesFor(w: number, h: number, r: number): number {
  */
 export function electricBorder(host: HTMLElement, opts: ElectricOptions = {}): () => void {
   const speed = opts.speed ?? 1
-  const chaos = opts.chaos ?? 0.035
+  const chaos = opts.chaos ?? 0.055
   const radius = opts.radius ?? 0
   const thickness = opts.thickness ?? 1
   /** How far the filament can stray, and the room the canvas leaves for it. */
@@ -141,7 +150,6 @@ export function electricBorder(host: HTMLElement, opts: ElectricOptions = {}): (
   const canvas = document.createElement('canvas')
   canvas.className = 'electric'
   canvas.setAttribute('aria-hidden', 'true')
-  canvas.style.inset = `${-bleed}px`
   const ctx = canvas.getContext('2d')
   host.appendChild(canvas)
 
@@ -155,7 +163,14 @@ export function electricBorder(host: HTMLElement, opts: ElectricOptions = {}): (
     w = r.width
     h = r.height
     reach = Math.min(w, h) * chaos
-    bleed = Math.ceil(reach * 2.2 + thickness * 5)
+    bleed = Math.ceil(reach + thickness * 5)
+    // Here, not at construction. The canvas is bigger than the element by
+    // `bleed` on every side and the drawing is translated by the same, so an
+    // inset that does not match puts the whole border out by that much: it
+    // was set once before the element had been measured, when bleed was
+    // still zero, and every border in the game sat twenty pixels down and to
+    // the right of the thing it belonged to.
+    canvas.style.inset = `${-bleed}px`
     canvas.width = Math.ceil((w + bleed * 2) * dpr)
     canvas.height = Math.ceil((h + bleed * 2) * dpr)
     canvas.style.width = `${w + bleed * 2}px`

@@ -7,8 +7,6 @@ import { checkAchievements, byId as achievementById } from '../game/achievements
 import { codicesUnlocked, esperienzaMultiplier } from '../game/codices'
 import { NAV_GROUPS, groupOf, type NavGroup } from '../game/nav'
 import { anyMarked, clearMark, isMarked } from '../game/marks'
-import { towerStriking } from '../game/tarot'
-import { electricBorder } from './electric'
 import type { GameState, TabId } from '../state'
 
 /** What a pane is allowed to do to the game. Implemented in main.ts. */
@@ -160,16 +158,6 @@ export class Shell {
   private announcedFull = false
   private toastTimer = 0
   private inkOut = new Readout('INK')
-  /**
-   * The Tower's strike, on the number it strikes.
-   *
-   * XVI multiplies everything a hundredfold for a few seconds at a time and
-   * then stops, and until now it did that with no sign at all: `towerStriking`
-   * was written and exported for the UI to read and nothing ever read it, so
-   * the strongest thing in the deck was a number that occasionally jumped and
-   * then went back. Ink is what it multiplies, so ink is what it plays over.
-   */
-  private bolt: (() => void) | null = null
   private chipsOut = new Readout('CHIPS')
   // The codices' currency. Hidden until the first codex opens, like the tab.
   private espOut = new Readout('ESPERIENZA')
@@ -412,14 +400,6 @@ export class Shell {
       this.toast(
         `AWAY ${formatTime(away.seconds)}${tail}   +${format(away.ink, s.options.notation)} INK`,
       )
-    }
-
-    const striking = towerStriking(s)
-    if (striking && !this.bolt) {
-      this.bolt = electricBorder(this.inkOut.root, { thickness: 1, speed: 1.6 })
-    } else if (!striking && this.bolt) {
-      this.bolt()
-      this.bolt = null
     }
 
     const n = s.options.notation

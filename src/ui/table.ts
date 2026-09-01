@@ -30,11 +30,12 @@ import {
 } from '../game/production'
 import { FACE_AVERAGE_S, FACE_SETTLE_S, WAGER_AT } from '../game/balance'
 import { wagerProgress } from '../game/wager'
-import { modifiers } from '../game/tarot'
+import { modifiers, towerStriking } from '../game/tarot'
 import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { bindKey, holdable, isPressing, setActable } from './hold'
+import { electricBorder } from './electric'
 import { Confirmer } from './confirm'
 import { vesica, type Vesica } from './geometry'
 import { setBlur, setDieRolling, setThrow, wireframe } from './wireframe'
@@ -160,6 +161,20 @@ export function tablePane(): Pane {
    */
   let settleAt = 0
   const rows: Row[] = []
+  /**
+   * The Tower's strike, on the deepest solid on the table.
+   *
+   * XVI multiplies everything a hundredfold for a few seconds at a time and
+   * then stops, and until now it did that with no sign at all: `towerStriking`
+   * was written and exported for the UI to read and nothing ever read it.
+   *
+   * On the deepest row rather than on the ink at the top, because that is the
+   * die the strike is worth the most on: every tier below it multiplies what
+   * this one produces, so a hundredfold here arrives at the ink through the
+   * whole chain. It is also the row you are watching.
+   */
+  let bolt: (() => void) | null = null
+  let boltOn = 0
   let maxBtn: HTMLButtonElement
   let barFolio: HTMLButtonElement
   let barStudy: HTMLButtonElement
@@ -566,6 +581,18 @@ export function tablePane(): Pane {
       canStudyNow = canBuyStudy(s)
       setActable(barStudy, canStudyNow)
       ready(barStudy, canStudyNow)
+
+      // The strike, and which row it is on. It follows the deepest open
+      // solid, so opening one moves it down the table with you.
+      const striking = towerStriking(s)
+      const deepest = striking ? openSolids(s) : 0
+      if (deepest !== boltOn) {
+        bolt?.()
+        bolt = null
+        boltOn = deepest
+        const host = deepest > 0 ? rows[deepest - 1]?.root : undefined
+        if (host) bolt = electricBorder(host, { thickness: 1, speed: 1.6 })
+      }
 
       for (const def of SOLIDS) {
         const r = rows[def.idx - 1]
