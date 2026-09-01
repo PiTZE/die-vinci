@@ -197,10 +197,15 @@ await ev(`(() => { const s = window.LD.state
 await ev(openTab('TAROT'))
 await sleep(250)
 const art = await ev(`(() => {
-  const cells = [...document.querySelectorAll('.pane:not([hidden]) .tile')]
+  const cells = [...document.querySelectorAll('.pane:not([hidden]) .card')]
+  // Visibility rather than display: the picture's space is kept so a sealed
+  // card is the same shape as a held one, and what is checked is whether it
+  // is painted.
   const shown = cells.filter(c => {
-    const svg = c.querySelector('.tile-art')
-    return svg && !svg.hasAttribute('hidden') && getComputedStyle(svg).display !== 'none'
+    const svg = c.querySelector('.card-art')
+    if (!svg) return false
+    const cs = getComputedStyle(svg)
+    return cs.display !== 'none' && cs.visibility !== 'hidden'
   })
   return { cells: cells.length, held: cells.filter(c => c.classList.contains('held')).length,
     drawn: shown.length } })()`)

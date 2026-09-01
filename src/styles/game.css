@@ -1188,88 +1188,273 @@
 /* -- the arcana ---------------------------------------------------------- */
 
 
-.arcana-grid {
+/* The draft. Three cards and nothing else on screen, because a choice sharing
+   a pane with a grid of what you already own is one people click past. */
+/*
+ * A card, in the proportions a card has.
+ *
+ * The draft used to be three buttons of text with no picture on them, in a
+ * game whose upgrade layer is a tarot deck: the art was drawn in the grid
+ * underneath and not on the thing you were choosing between. One card now,
+ * built the same way in both places, at two sizes.
+ */
+.card {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
-  gap: 1px;
-  background: var(--border-faint);
-  border-top: 1px solid var(--border-faint);
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 4px;
+  aspect-ratio: 5 / 8;
+  padding: 9px 8px;
+  border: 1px solid var(--border);
+  /* A face for the light to land on. Flat --bg is pure black in the dark
+     theme, and every blend mode worth using resolves to black against it, so
+     the foil was drawn and then multiplied away to nothing. */
+  background-image: linear-gradient(150deg, var(--fill) 0%, transparent 55%);
+  background-color: var(--bg);
+  text-align: center;
+  /* Dim until it is held, the same as every other thing you have not reached
+     yet. The redaction says the rest. */
+  opacity: 0.55;
+  /* The pointer's position on this card, published by ui/tilt.ts. Square and
+     centred until something says otherwise, which is also what they stay on a
+     touch screen, where there is no pointer to follow. */
+  --px: 50%;
+  --py: 50%;
+  --from-centre: 0;
+  --rx: 0deg;
+  --ry: 0deg;
+  transform: rotateX(var(--ry)) rotateY(var(--rx));
+  transform-style: preserve-3d;
+  /* Back to square over a second when the pointer leaves, and instantly
+     responsive while it is on the card: the easing there is done in script,
+     and a transition on top of it would fight it. */
+  transition: transform 0.9s ease;
 }
 
-.arcana-cell {
-  background: var(--bg);
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 1px 8px;
-  padding: 8px 10px;
-  align-items: baseline;
+.card.lit {
+  transition: none;
 }
 
-.arcana-numeral {
-  font-size: var(--t-3);
+.card.held {
+  opacity: 1;
+}
+
+/* The inner rule. One line inside another is what makes a rectangle read as a
+   card rather than as a box, and it costs no element. */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--border-faint);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/*
+ * The foil.
+ *
+ * Two layers over the face, both driven by the same pointer position the
+ * rotation is. The first is a band of hues repeating up the card, which is
+ * what a foil actually is: a diffraction grating, so the colour you see
+ * depends on the angle you are holding it at. The second is a soft highlight
+ * under the pointer, which is the light source.
+ *
+ * Both are blended rather than drawn, so on this game's black card they are a
+ * sheen rather than a picture, and neither one appears until the card is
+ * pointed at. A card sitting in a grid shimmering on its own would be the
+ * loudest thing on a screen that is otherwise all 1px rules.
+ */
+.card-foil,
+.card-glare {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.card.lit .card-foil {
+  opacity: calc(0.14 + var(--from-centre) * 0.2);
+}
+
+.card.lit .card-glare {
+  opacity: 0.35;
+}
+
+/* On a white card, adding light does nothing: screen against white is white.
+   The same two layers darken instead, which is what a foil does when the page
+   around it is paper. */
+[data-theme='modus-operandi'] .card-foil {
+  mix-blend-mode: multiply;
+  filter: saturate(0.5) contrast(0.9);
+}
+
+[data-theme='modus-operandi'] .card-glare {
+  background-image: radial-gradient(
+    farthest-corner circle at var(--px) var(--py),
+    hsla(0, 0%, 100%, 0.65) 4%,
+    hsla(0, 0%, 0%, 0.06) 40%,
+    hsla(0, 0%, 0%, 0.12) 80%
+  );
+  mix-blend-mode: multiply;
+}
+
+.card-foil {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      hsl(2, 100%, 73%) 5%,
+      hsl(53, 100%, 69%) 10%,
+      hsl(93, 100%, 69%) 15%,
+      hsl(176, 100%, 76%) 20%,
+      hsl(228, 100%, 74%) 25%,
+      hsl(283, 100%, 73%) 30%,
+      hsl(2, 100%, 73%) 35%
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      #0e152e 0%,
+      hsl(180, 10%, 60%) 3.8%,
+      hsl(180, 29%, 66%) 4.5%,
+      hsl(180, 10%, 60%) 5.2%,
+      #0e152e 10%,
+      #0e152e 12%
+    );
+  background-size: 100% 300%, 200% 200%;
+  background-position: 0 calc(var(--py) * 2), var(--px) var(--py);
+  background-blend-mode: color-dodge;
+  /* Screen, not the dodge the original uses. Dodge divides by the inverse of
+     the source, so against a black card it returns black however bright the
+     foil is: the effect was being drawn and then thrown away. Screen adds
+     light instead, which is what a foil does, and the opacity above is what
+     keeps it a sheen. */
+  mix-blend-mode: screen;
+  filter: saturate(0.75) contrast(1.1);
+  /* Ruled, not washed. A foil is a diffraction grating, and drawing it as a
+     smooth field of colour is the one thing that makes it read as a gradient
+     laid over a card rather than as a surface the card has. The lines are
+     fine enough to be a texture at a card's size and they move with the
+     pointer, so the grating catches the light across itself. */
+  mask-image: repeating-linear-gradient(
+    -50deg,
+    #000 0 1px,
+    transparent 1px 4px
+  );
+  -webkit-mask-image: repeating-linear-gradient(-50deg, #000 0 1px, transparent 1px 4px);
+  mask-position: var(--px) var(--py);
+  -webkit-mask-position: var(--px) var(--py);
+}
+
+.card-glare {
+  background-image: radial-gradient(
+    farthest-corner circle at var(--px) var(--py),
+    hsla(0, 0%, 100%, 0.5) 4%,
+    hsla(0, 0%, 100%, 0.08) 38%,
+    hsla(0, 0%, 100%, 0) 75%
+  );
+  mix-blend-mode: screen;
+}
+
+.card-numeral,
+.card-art,
+.card-name,
+.card-note,
+.card-foot {
+  position: relative;
+  z-index: 3;
+}
+
+.card-numeral {
+  font-size: var(--t-1);
+  letter-spacing: 0.12em;
+  color: var(--fg-dim);
+}
+
+.card-art {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   color: var(--fg-muted);
-  min-width: 2.2rem;
 }
 
-.arcana-name {
-  font-size: var(--t-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.arcana-level {
-  font-size: var(--t-2);
-  font-variant-numeric: tabular-nums;
+.card.held .card-art {
   color: var(--accent);
 }
 
-.arcana-note {
-  grid-column: 2 / -1;
-  font-size: var(--t-1);
-  color: var(--fg-muted);
-  line-height: 1.35;
+/* Taken away, and its space kept. */
+.card.sealed .card-art {
+  visibility: hidden;
 }
 
-/* The draft. Three tall targets and nothing else on screen, because a choice
-   sharing a pane with a grid of what you already own is one people click past. */
+.card-name {
+  font-size: var(--t-2);
+  line-height: 1.3;
+  color: var(--fg);
+}
+
+.card-note {
+  font-size: var(--t-1);
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+
+.card-foot {
+  font-size: var(--t-1);
+  letter-spacing: 0.08em;
+  color: var(--fg-dim);
+}
+
+/* The deck, as a spread of small cards. No room for the note at this size,
+   and the name and the numeral are what you read a spread for. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+  gap: 8px;
+  padding: 10px;
+  /* Depth for the cards to lean into. Without it the rotation is an affine
+     squash and reads as a card being crushed rather than tilted. */
+  perspective: 900px;
+}
+
+.card-sm {
+  padding: 7px 5px;
+  gap: 2px;
+}
+
+.card-sm .card-note {
+  display: none;
+}
+
+/* The three on offer. Stacked on a phone and in a row on a desktop, which is
+   how three cards are dealt in either place. */
 .arcana-offer {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  /* Three cards on two rows at 390px, and a choice between three is not one
-     to make from cards of two different heights. */
-  grid-auto-rows: 1fr;
-  gap: 1px;
-  background: var(--border-faint);
-  border-top: 1px solid var(--border-faint);
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 12px;
+  padding: 12px;
+  perspective: 900px;
 }
 
+/* Not dimmed, and not accented either. The accent means held, and three
+   full-bleed accent cards is the whole screen shouting one thing. */
 .arcana-pick {
-  background: var(--bg);
-  border: 0;
-  display: grid;
-  gap: 4px;
-  padding: 16px 12px;
-  min-height: 8rem;
-  text-align: left;
-  align-content: start;
-  color: inherit;
-  font: inherit;
+  width: 100%;
+  max-width: 13rem;
+  opacity: 1;
   cursor: pointer;
 }
 
+.arcana-pick .card-art {
+  color: var(--fg);
+}
+
 .arcana-pick:hover {
-  background: var(--fill);
+  border-color: var(--accent);
 }
 
-.arcana-pick .arcana-name {
-  font-size: var(--t-5);
-  white-space: normal;
-}
-
-.arcana-pick .arcana-note {
-  grid-column: 1;
-}
 
 /* -- help ---------------------------------------------------------------- */
 
@@ -1412,6 +1597,12 @@
 }
 
 /* -- desktop ------------------------------------------------------------- */
+
+@media (min-width: 820px) {
+  .arcana-offer {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 
 @media (min-width: 820px) {
   :root {

@@ -8,6 +8,7 @@ import { ARCANA_ART } from './arcana-art'
 import type { GameState } from '../state'
 import { el, type Pane } from './shell'
 import { seal, unseal } from './redact'
+import { tiltable } from './tilt'
 
 interface Cell {
   root: HTMLElement
@@ -28,7 +29,7 @@ interface Cell {
 function artFor(id: string): SVGElement {
   const art = ARCANA_ART[id]
   const box = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-  box.setAttribute('class', 'tile-art')
+  box.setAttribute('class', 'card-art')
   box.setAttribute('viewBox', art ? art.box : '0 0 48 48')
   box.setAttribute('fill', 'currentColor')
   box.setAttribute('aria-hidden', 'true')
@@ -38,6 +39,41 @@ function artFor(id: string): SVGElement {
     box.appendChild(path)
   }
   return box
+}
+
+/**
+ * A card, and the same one in both places it appears.
+ *
+ * The draft used to be three buttons carrying four lines of text and no
+ * picture at all, which is a strange thing to offer someone in a game whose
+ * whole upgrade layer is a tarot deck: the art was drawn in the grid below and
+ * not on the thing you were actually choosing between. It is a card now, in
+ * the proportions a card has, with the numeral above the picture and the name
+ * under it, and the grid holds the same card at a smaller size.
+ */
+interface CardParts {
+  root: HTMLElement
+  art: SVGElement
+  numeral: HTMLElement
+  name: HTMLElement
+  note: HTMLElement
+  level: HTMLElement
+}
+
+function card(id: string, numeral: string, tag: 'div' | 'button' = 'div'): CardParts {
+  const root = el(tag, 'card')
+  if (tag === 'button') (root as HTMLButtonElement).type = 'button'
+  const n = el('span', 'card-numeral', numeral)
+  const art = artFor(id)
+  const name = el('span', 'card-name', '')
+  const note = el('span', 'card-note', '')
+  const level = el('span', 'card-foot', '')
+  // The foil and the glare go under the content and over the face, and both
+  // are inert to the pointer, so a card that is a button still answers a
+  // click through them.
+  root.append(el('span', 'card-foil'), el('span', 'card-glare'), n, art, name, note, level)
+  tiltable(root)
+  return { root, art, numeral: n, name, note, level }
 }
 
 function setText(n: HTMLElement, v: string): void {
@@ -74,22 +110,15 @@ export function tarotPane(): Pane {
       hh.appendChild(head)
       heldSection.appendChild(hh)
 
-      const grid = el('div', 'tile-grid')
+      // The whole deck, as cards, small. The picture is hidden until the card
+      // is held: an unowned arcanum has its name and its note redacted, and a
+      // sun drawn over the redaction would say which one it is.
+      const grid = el('div', 'card-grid')
       for (const a of ARCANA) {
-        const cell = el('div', 'tile')
-        // The card's own picture, next to its numeral. Hidden until the card is
-        // held: an unowned arcanum has its name and its note redacted, and a
-        // sun drawn beside the redaction would give away which one it is.
-        const head = el('span', 'tile-head')
-        const art = artFor(a.id)
-        const numeral = el('span', 'tile-index', a.numeral)
-        const name = el('span', 'tile-name', '')
-        const note = el('span', 'tile-note', '')
-        const level = el('span', 'tile-mark', '')
-        head.append(art, numeral)
-        cell.append(head, name, note, level)
-        grid.appendChild(cell)
-        cells.set(a.id, { root: cell, art, numeral, name, note, level })
+        const c = card(a.id, a.numeral)
+        c.root.classList.add('card-sm')
+        grid.appendChild(c.root)
+        cells.set(a.id, c)
       }
       heldSection.appendChild(grid)
       root.appendChild(heldSection)
@@ -114,17 +143,14 @@ export function tarotPane(): Pane {
           offerRow.replaceChildren(
             ...s.pendingDraft.map((id) => {
               const def = ARCANA_BY_ID[id]
-              const card = el('button', 'arcana-pick')
-              card.type = 'button'
-              card.dataset.arcana = id
+              const c = card(id, def?.numeral ?? '?', 'button')
+              c.root.classList.add('arcana-pick')
+              c.root.dataset.arcana = id
               const at = levelOf(s, id as never)
-              card.append(
-                el('span', 'arcana-numeral', def?.numeral ?? '?'),
-                el('span', 'arcana-name', def?.name ?? id),
-                el('span', 'arcana-note', def?.note ?? ''),
-                el('span', 'arcana-level', at ? `held, level ${at} to ${at + 1}` : 'new'),
-              )
-              return card
+              setText(c.name, def?.name ?? id)
+              setText(c.note, def?.note ?? '')
+              setText(c.level, at ? `HELD, LEVEL ${at} TO ${at + 1}` : 'NEW')
+              return c.root
             }),
           )
         }
@@ -148,11 +174,15 @@ export function tarotPane(): Pane {
           seal(cell.name, a.name)
           seal(cell.note, a.note)
         }
-        // The attribute, not the property. `hidden` is defined on HTMLElement and
-        // an <svg> is not one, so assigning to it set a property nothing reads
-        // and every unheld card showed its picture beside its redacted name.
-        if (at > 0) cell.art.removeAttribute('hidden')
-        else cell.art.setAttribute('hidden', '')
+        // Hidden by the sealed class on the card, which takes the picture away
+        // without taking its space: a card whose art collapses has its name
+        // floating in the middle of it while the one beside it has the name
+        // under a picture, and a spread of cards has to be one shape.
+        //
+        // Not the hidden attribute, which it used to be. That is display:none
+        // globally, and an <svg> is not an HTMLElement, so the property does
+        // nothing and every unheld card used to show its picture beside its
+        // redacted name.
         // A full card says so. Nothing more can be drafted into it, and the
         // draft will not offer it again.
         setText(cell.level, at > 0 ? (isFull(s, a.id) ? `LEVEL ${at}  FULL` : `LEVEL ${at}`) : '')
