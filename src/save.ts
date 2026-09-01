@@ -176,6 +176,8 @@ function decode(raw: Raw, now: number): GameState {
     challengesDone: Array.isArray(m.challengesDone) ? [...m.challengesDone] : [],
     autobuyers: { ...base.autobuyers, ...(m.autobuyers ?? {}) },
     achievements: Array.isArray(m.achievements) ? [...m.achievements] : [],
+    marks: Array.isArray(m.marks) ? [...m.marks] : [],
+    marksArmed: Array.isArray(m.marksArmed) ? [...m.marksArmed] : [],
   }
   // Falls back to the fresh game's value, not to zero. Three of these four
   // start at zero and one starts at one, and the blanket `?? 0` handed a save

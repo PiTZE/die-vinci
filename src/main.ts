@@ -67,6 +67,7 @@ import { optionsPane } from './ui/options'
 import { tarotPane } from './ui/tarot'
 import { breakPane } from './ui/break'
 import { codicesPane } from './ui/codices'
+import { checkMarks } from './game/marks'
 import {
   CODICES,
   buyAllCodices,
@@ -550,6 +551,10 @@ function startRender(): void {
       uiDirty = false
       lastUiAt = lastRenderAt
       state.options.tab = shell.activeTab
+      // Before the shell draws, so a mark set this frame is on screen this
+      // frame. Called from here rather than from the tick so that nothing in
+      // game/ has to import the marks and the module graph stays one way.
+      checkMarks(state, (tab) => shell.canSee(state, tab))
       shell.update(state, inkPerSecond(state))
     }
     requestAnimationFrame(step)

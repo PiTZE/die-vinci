@@ -102,6 +102,15 @@ export interface GameState {
   autobuyers: Record<string, AutobuyerState>
   /** Ids of met entries in the Conquestion Archive. */
   achievements: string[]
+  /**
+   * Panes with a mark on them, and the rules whose condition already held.
+   *
+   * Both on the save, as AD's are: a mark you have not looked at should still
+   * be there tomorrow, and a rule that has already fired should not fire again
+   * on the next reload. See game/marks.ts.
+   */
+  marks: string[]
+  marksArmed: string[]
   /** Milliseconds of production still halted by a challenge restriction. */
   haltMs: number
   /** Arcanum id to level. Zero and absent are the same thing. */
@@ -211,6 +220,8 @@ export function newGame(now: number): GameState {
     challengesDone: [],
     autobuyers: newAutobuyers(),
     achievements: [],
+    marks: [],
+    marksArmed: [],
     haltMs: 0,
     tarot: {},
     draftProgress: 0,

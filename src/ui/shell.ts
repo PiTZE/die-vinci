@@ -5,6 +5,8 @@ import { pickThought } from './thoughts'
 import { dieRollsItself, inkPerRoll, mustWager } from '../game/production'
 import { checkAchievements, byId as achievementById } from '../game/achievements'
 import { codicesUnlocked, esperienzaMultiplier } from '../game/codices'
+import { NAV_GROUPS, groupOf, type NavGroup } from '../game/nav'
+import { anyMarked, clearMark, isMarked } from '../game/marks'
 import type { GameState, TabId } from '../state'
 
 /** What a pane is allowed to do to the game. Implemented in main.ts. */
@@ -121,7 +123,18 @@ class Readout {
 /** Owns the chrome: resource bar, tabs, panes, and the action bar. */
 export class Shell {
   private panes: Pane[] = []
+  /** One per group, in the strip that is the bottom bar on a phone and the
+   *  left nav on a desktop. */
+  private groupButtons = new Map<string, HTMLButtonElement>()
+  private groupMarks = new Map<string, HTMLElement>()
+  /** One per pane, in the second strip. Only the open group's are shown. */
   private tabButtons = new Map<TabId, HTMLButtonElement>()
+  private tabMarks = new Map<TabId, HTMLElement>()
+  private subtabStrip = el('div', 'subtabs')
+  private activeGroup = NAV_GROUPS[0].id
+  /** The last state seen by update, so a click can read it. Selecting a tab
+   *  clears its mark, and a click arrives between ticks. */
+  private lastState: GameState | null = null
   private paneEls = new Map<TabId, HTMLElement>()
   private actionEls = new Map<TabId, HTMLElement>()
   private actionBar = el('div', 'action-bar')
@@ -183,13 +196,32 @@ export class Shell {
     const tabs = el('nav', 'tabs')
     tabs.setAttribute('role', 'tablist')
 
-    for (const p of panes) {
-      const btn = el('button', 'tab', p.label)
+    // The top level: one button a group, and this is the only strip that has
+    // to fit a phone without scrolling.
+    for (const g of NAV_GROUPS) {
+      const btn = el('button', 'tab', g.label)
       btn.type = 'button'
       btn.setAttribute('role', 'tab')
-      btn.addEventListener('click', () => this.select(p.id))
+      const mark = el('span', 'tab-mark', '')
+      mark.setAttribute('aria-hidden', 'true')
+      btn.appendChild(mark)
+      btn.addEventListener('click', () => this.openGroup(g))
       tabs.appendChild(btn)
+      this.groupButtons.set(g.id, btn)
+      this.groupMarks.set(g.id, mark)
+    }
+
+    for (const p of panes) {
+      const btn = el('button', 'subtab', p.label)
+      btn.type = 'button'
+      btn.setAttribute('role', 'tab')
+      const mark = el('span', 'tab-mark', '')
+      mark.setAttribute('aria-hidden', 'true')
+      btn.appendChild(mark)
+      btn.addEventListener('click', () => this.select(p.id))
+      this.subtabStrip.appendChild(btn)
       this.tabButtons.set(p.id, btn)
+      this.tabMarks.set(p.id, mark)
 
       const pane = el('div', 'pane')
       pane.setAttribute('role', 'tabpanel')
@@ -217,13 +249,54 @@ export class Shell {
     this.thoughtEl.appendChild(this.thoughtLine)
     this.root.appendChild(this.thoughtEl)
     for (const pane of this.paneEls.values()) this.root.appendChild(pane)
-    this.root.append(this.actionBar, tabs)
+    // Subtabs before the groups in the DOM, because on a phone they are two
+    // grid rows and the second strip belongs above the bottom bar. On a
+    // desktop the wrapper becomes a flex column and `order` puts the groups
+    // back on top; `display: contents` is what lets one markup do both.
+    const nav = el('div', 'nav')
+    nav.append(this.subtabStrip, tabs)
+    this.root.append(this.actionBar, nav)
 
     this.select(initial)
   }
 
+  /**
+   * Opening a group opens the first pane in it that the player can see.
+   *
+   * Not the last one they were on. A group is a place rather than a memory,
+   * and re-entering WAGER to find CHALLENGES because that is where you were
+   * four Wagers ago is the kind of state nobody asked to keep.
+   */
+  private openGroup(g: NavGroup): void {
+    const first = g.panes.find((id) => this.paneVisible(id))
+    if (first) this.select(first)
+  }
+
+  /** Whether a pane is one the player is allowed to know about. The marks
+   *  ask before setting one, because a mark on a sealed tab would be the
+   *  loudest spoiler in the game. */
+  canSee(s: GameState, id: TabId): boolean {
+    const p = this.panes.find((x) => x.id === id)
+    if (!p) return false
+    return p.visible ? p.visible(s) : true
+  }
+
+  private paneVisible(id: TabId): boolean {
+    const p = this.panes.find((x) => x.id === id)
+    if (!p) return false
+    return p.visible ? p.visible(this.lastState ?? ({} as GameState)) : true
+  }
+
   select(id: TabId): void {
     this.active = id
+    const g = groupOf(id)
+    if (g) this.activeGroup = g.id
+    // Looking at it is what clears it, which is AD's rule.
+    if (this.lastState) clearMark(this.lastState, id)
+    for (const [gid, btn] of this.groupButtons) {
+      btn.setAttribute('aria-selected', String(gid === this.activeGroup))
+      btn.classList.toggle('on', gid === this.activeGroup)
+    }
     for (const [tab, btn] of this.tabButtons) {
       const on = tab === id
       btn.setAttribute('aria-selected', String(on))
@@ -316,6 +389,7 @@ export class Shell {
       if (a) this.toast(`ARCHIVE  ${a.name}`)
     }
 
+    this.lastState = s
     const away = consumeAway()
     if (away) {
       const tail = away.capped ? ' (capped)' : ''
@@ -368,10 +442,22 @@ export class Shell {
       this.espOut.set(format(s.esperienza, n), `x${format(esperienzaMultiplier(s), n)}`)
     }
 
+    const open = new Set<TabId>()
     for (const p of this.panes) {
       const btn = this.tabButtons.get(p.id)
       const on = p.visible ? p.visible(s) : true
-      if (btn) btn.hidden = !on
+      if (on) open.add(p.id)
+      // Shown only when it is in the group you are looking at. A pane that is
+      // unlocked but in another group is not hidden, it is one tap away.
+      // `hidden` is about this frame's menu; `data-open` is about the save.
+      // A pane in another group is not hidden because it is sealed, it is
+      // hidden because you are looking somewhere else, and the two questions
+      // have different answers now that the menu has two levels.
+      if (btn) btn.dataset.open = on ? '1' : ''
+      if (btn) btn.hidden = !on || groupOf(p.id)?.id !== this.activeGroup
+      if (btn) btn.classList.toggle('on', this.active === p.id)
+      const mark = this.tabMarks.get(p.id)
+      if (mark) mark.hidden = !isMarked(s, p.id)
       // Announce a tab the first time it appears, but not on the first frame,
       // when everything already open would announce itself at once.
       if (on && this.announced && !this.seenTabs.has(p.id)) this.toast(`UNLOCKED  ${p.label}`)
@@ -380,6 +466,25 @@ export class Shell {
       if (!on && this.active === p.id) this.select('table')
       if (on && this.active === p.id) p.update(s)
     }
+
+    // A group exists when anything inside it does, so the top level unseals
+    // itself one system at a time exactly as the flat bar used to.
+    for (const g of NAV_GROUPS) {
+      const btn = this.groupButtons.get(g.id)
+      const shown = g.panes.filter((id) => open.has(id))
+      if (btn) btn.dataset.open = shown.length ? '1' : ''
+      if (btn) btn.hidden = shown.length === 0
+      // AD's rule: a parent carries the mark of any child.
+      const mark = this.groupMarks.get(g.id)
+      if (mark) mark.hidden = g.id === this.activeGroup || !anyMarked(s, shown)
+    }
+
+    // The second strip earns its space only when there is a choice in it. A
+    // group holding one visible pane is a tab, and a bar under it saying the
+    // same word twice is furniture.
+    const siblings = (NAV_GROUPS.find((g) => g.id === this.activeGroup)?.panes ?? [])
+      .filter((id) => open.has(id))
+    this.subtabStrip.hidden = siblings.length < 2
     this.announced = true
   }
 }

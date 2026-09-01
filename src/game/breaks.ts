@@ -48,11 +48,23 @@ const OFFSET = 0.75
  */
 const SCALE_BASE = 10
 
-export function chipsFrom(s: GameState): Decimal {
+/**
+ * What a Wager pays for a run that earned `ink`.
+ *
+ * Split out from chipsFrom so a caller can ask what a run would pay if it went
+ * somewhere it has not been yet. The menu marks use it to work out whether the
+ * payout threshold will end a run before it reaches the depth the next codex
+ * wants, which is a question about a run that has not happened.
+ */
+export function chipsFromInk(s: GameState, ink: Decimal): Decimal {
   const base = s.broke
-    ? Decimal.pow10(Math.max(0, s.inkThisWager.log10()) / DIVISOR - OFFSET).floor().max(1)
+    ? Decimal.pow10(Math.max(0, ink.log10()) / DIVISOR - OFFSET).floor().max(1)
     : new Decimal(1)
   return base.times(chipMultiplier(s)).times(wagerChipMultiplier(s)).floor().max(1)
+}
+
+export function chipsFrom(s: GameState): Decimal {
+  return chipsFromInk(s, s.inkThisWager)
 }
 
 /**

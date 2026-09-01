@@ -2,7 +2,7 @@
 //
 //   npm run test:layout
 import { spawn } from 'node:child_process'
-import { appReady, guard, sweepStale } from './harness.mjs'
+import { appReady, guard, openTab, sweepStale, tabOffered } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -167,14 +167,24 @@ const bar = await ev(`(() => {
     labels: tabs.map(t => t.textContent.trim()) }
 })()`)
 check('tab labels never run into each other', bar.collide === false, JSON.stringify(bar.labels))
-check('and the bar scrolls when they do not fit', bar.scrolls === true, JSON.stringify(bar))
+// It used to assert the opposite: twelve flat tabs made an 822px strip on a
+// 390px phone and the check was that it scrolled rather than colliding. Five
+// groups fit, so the honest assertion is that nothing is off the edge at all.
+check('the top strip fits the phone with nothing off the edge',
+  bar.scrolls === false, JSON.stringify(bar))
+const strip = await ev(`(() => { const s = document.querySelector('.subtabs')
+  return { hidden: s.hidden, over: Math.round(s.scrollWidth - s.clientWidth),
+    n: [...s.querySelectorAll('.subtab')].filter(b => !b.hidden).length } })()`)
+check('and neither does the strip under it', strip.over <= 1, JSON.stringify(strip))
 
 // A tab reached from anywhere but a tap on it has to be brought into view.
 await ev(`window.LD.actions.setTab && window.LD.actions.setTab('help')`)
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'HELP').click()`)
+await ev(openTab('HELP'))
 await sleep(150)
 const seen = await ev(`(() => {
-  const t = [...document.querySelectorAll('.tab')].find(x => x.getAttribute('aria-selected') === 'true')
+  // The pane, not the group that holds it: selecting a pane marks both.
+  const t = [...document.querySelectorAll('.subtab')].find(x => x.getAttribute('aria-selected') === 'true')
+    ?? [...document.querySelectorAll('.tab')].find(x => x.getAttribute('aria-selected') === 'true')
   const b = t.getBoundingClientRect()
   return { label: t.textContent.trim(), left: Math.round(b.left), right: Math.round(b.right), w: innerWidth }
 })()`)
@@ -185,7 +195,7 @@ check('the selected tab is scrolled into view',
 // left corner while the label centred in a 49px button, they read as two
 // unrelated things stacked on top of each other, and no measurement of the
 // label alone showed it: the label was perfectly centred, in a two-line box.
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
+await ev(openTab('TABLE'))
 await sleep(150)
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.studies = 8; s.autoRoll = true; s.ink = new D('1e40')
@@ -408,7 +418,7 @@ check('and the divider is gone before folios exist',
   (await ev(`document.querySelector('.reset-head').classList.contains('alone')`)) === true)
 
 // Back to the table, or every check below reads a hidden pane.
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
+await ev(openTab('TABLE'))
 await sleep(150)
 await ev(`document.documentElement.style.removeProperty('--safe-b')`)
 await ev(`document.documentElement.style.removeProperty('--safe-t')`)

@@ -477,7 +477,6 @@ export function tablePane(): Pane {
       // Under a fast roll rate the digit would change every frame, which is
       // noise rather than a reading. The dice just spin then.
       const duration = rollDuration(s)
-      const readable = duration >= FACE_READABLE_S
       // The walk to the average: a fixed window off one clock, so it takes
       // the same nine tenths of a second at any refresh rate and every row
       // lands on its own average at the same instant.
@@ -612,11 +611,14 @@ export function tablePane(): Pane {
             } else {
               setText(r.face, '')
             }
-            // Dimmed only while it is genuinely stale, which is a throw still
-            // in the air at a speed where you can watch it land.
-            r.face.classList.toggle('stale', readable && rollProgress(s, now) < 1)
+            // Never dimmed. It used to grey to 30% while a throw was in the
+            // air, which was right when a throw in the air meant the column
+            // was showing you the previous number because this one had not
+            // landed. The engine keeps the last face now, so that is simply
+            // what the column shows, and a die is in the air for the whole
+            // interval and at rest for a single frame: the number spent
+            // almost all of its life at 30% with a 120ms fade either side.
           } else {
-            r.face.classList.remove('stale')
             // Fixed from the face this die was showing when the rolls went out
             // of sight, so the whole table walks in step.
             if (r.settledFor !== settleAt) {

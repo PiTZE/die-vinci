@@ -1,7 +1,7 @@
 // Tarot: the weighting, the draft, and that a card changes the engine rather
 // than only being marked as held.
 import { spawn } from 'node:child_process'
-import { appReady, guard, sweepStale } from './harness.mjs'
+import { appReady, guard, openTab, sweepStale, tabOffered } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -29,7 +29,7 @@ await appReady(ev)
 await ev(`window.LD.state.options.offline = false`)
 
 check('no tarot tab before the first Wager',
-  (await ev(`(() => { const t = [...document.querySelectorAll('.tab')].find(x => x.textContent.trim() === 'TAROT')
+  (await ev(`(() => { const t = [...document.querySelectorAll('.tab, .subtab')].find(x => x.textContent.trim() === 'TAROT')
     return !t || t.hidden })()`)) === true)
 
 // A Wager pays a draft, and the first one interrupts.
@@ -45,7 +45,7 @@ const afterWager = await ev(`({ offered: window.LD.state.pendingDraft.length,
 check('a Wager pays a draft', afterWager.offered >= 3 && afterWager.progress === 1,
   JSON.stringify(afterWager))
 
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TAROT').click()`)
+await ev(openTab('TAROT'))
 await sleep(400)
 const offer = await ev(`document.querySelectorAll('.arcana-pick').length`)
 check('the draft shows the choice', offer >= 3, `${offer} on offer`)
@@ -160,7 +160,9 @@ const interrupt = await ev(`(() => {
   s.tarot = {}; s.pendingDraft = []; s.options.tab = 'table'
   s.ink = new D('1e309'); s.inkThisWager = new D('1e309')
   window.LD.actions.wager()
-  const on = [...document.querySelectorAll('.tab')].find(b => b.getAttribute('aria-selected') === 'true')
+  // The pane rather than the group: opening TAROT selects both it and the
+  // WAGER group that holds it, and the draft is about the pane.
+  const on = [...document.querySelectorAll('.subtab')].find(b => b.getAttribute('aria-selected') === 'true')
   return { pending: s.pendingDraft.length, tab: on?.textContent?.trim() }
 })()`)
 check('the first draft interrupts and opens the tab',

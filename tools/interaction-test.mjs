@@ -9,7 +9,7 @@
 //
 // The dev server must already be running.
 import { spawn } from 'node:child_process'
-import { appReady, guard, sweepStale } from './harness.mjs'
+import { appReady, guard, openTab, sweepStale, tabOffered } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -463,6 +463,105 @@ try {
   const freshMs = await evaluate(`window.LD.state.options.uiMs`)
   check('a new save refreshes ten times a second', freshMs === 100, String(freshMs))
 
+  // -- the menu, in two levels ---------------------------------------------
+  //
+  // Twelve flat tabs made an 822px strip on a 390px phone, so 432px of the menu
+  // was off the right edge. Five groups hold the same twelve panes.
+
+  const navFresh = await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal
+    s.wagers = 0; s.chips = new D(0); s.studies = 0; s.autoDice = 0; s.autoRoll = false
+    s.broke = false; s.codexOpen = 0; s.pendingDraft = []; s.marks = []; s.marksArmed = []
+    s.challengesDone = []
+    for (const k of Object.keys(s.autobuyers)) s.autobuyers[k].unlocked = false })()`)
+  await sleep(300)
+  const navGroups = await evaluate(`(() => {
+    const g = [...document.querySelectorAll('.tab')]
+    return { all: g.map(b => b.textContent.trim()),
+      open: g.filter(b => !b.hidden).map(b => b.textContent.trim()),
+      panes: [...document.querySelectorAll('.subtab')].length } })()`)
+  check('five groups hold the twelve panes',
+    navGroups.all.length === 5 && navGroups.panes === 12, JSON.stringify(navGroups))
+  // A group exists when anything inside it does, exactly as the flat tabs did.
+  check('and a group stays sealed until something inside it is real',
+    !navGroups.open.includes('WAGER') && !navGroups.open.includes('BREAK')
+      && navGroups.open.includes('TABLE'), JSON.stringify(navGroups.open))
+
+  // The second strip earns its space only when there is a choice in it.
+  const oneChild = await evaluate(`(() => document.querySelector('.subtabs').hidden)()`)
+  check('the strip under a one-pane group is not drawn', oneChild === true)
+
+  await evaluate(`(() => { const s = window.LD.state; s.wagers = 1; s.studies = 3 })()`)
+  await sleep(300)
+  await evaluate(openTab('CHALLENGES'))
+  await sleep(300)
+  const navTwo = await evaluate(`(() => { const strip = document.querySelector('.subtabs')
+    return { hidden: strip.hidden,
+      shown: [...strip.querySelectorAll('.subtab')].filter(b => !b.hidden).map(b => b.textContent.trim()),
+      group: [...document.querySelectorAll('.tab')].find(b => b.classList.contains('on'))?.textContent.trim() } })()`)
+  check('opening a pane opens the group that holds it',
+    navTwo.group === 'WAGER' && navTwo.hidden === false, JSON.stringify(navTwo))
+  check('and the strip shows that group and no other',
+    navTwo.shown.join(',') === 'WAGER,CHALLENGES,TAROT', JSON.stringify(navTwo.shown))
+
+  // -- marks ---------------------------------------------------------------
+  //
+  // AD's tab notifications: a dot meaning "something in here is new and you have
+  // not looked", cleared by looking, and carried by a parent for any child.
+
+  await evaluate(`(() => { const s = window.LD.state
+    s.marks = []; s.marksArmed = []; s.pendingDraft = ['sun','fool','wheel'] })()`)
+  await sleep(400)
+  const navMarked = await evaluate(`(() => {
+    const dot = sel => [...document.querySelectorAll(sel)]
+      .filter(b => !b.hidden && !b.querySelector('.tab-mark').hidden)
+      .map(b => b.textContent.trim())
+    return { groups: dot('.tab'), panes: dot('.subtab'),
+      open: window.LD.state.options.tab } })()`)
+  check('a pending draft marks the pane it is waiting in',
+    navMarked.panes.includes('TAROT'), JSON.stringify(navMarked))
+  // Suppressed on the group you are standing in, because the pane's own dot is
+  // already on screen beside it.
+  check('but not on the group you are already inside',
+    !navMarked.groups.includes('WAGER'), JSON.stringify(navMarked))
+
+  // AD's rule, and the whole reason grouping and marks had to arrive together:
+  // this.subtabs.some(tab => tab.hasNotification). From outside the group, the
+  // parent is the only thing that can tell you.
+  await evaluate(openTab('TABLE'))
+  await sleep(400)
+  const navFromOutside = await evaluate(`(() => {
+    const dot = sel => [...document.querySelectorAll(sel)]
+      .filter(b => !b.hidden && !b.querySelector('.tab-mark').hidden)
+      .map(b => b.textContent.trim())
+    return { groups: dot('.tab'), panes: dot('.subtab'),
+      marks: window.LD.state.marks.slice() } })()`)
+  check('a group carries the mark of a pane inside it',
+    navFromOutside.marks.includes('tarot') && navFromOutside.groups.includes('WAGER'),
+    JSON.stringify(navFromOutside))
+  check('and the marked pane is not on screen to say so itself',
+    !navFromOutside.panes.includes('TAROT'), JSON.stringify(navFromOutside))
+
+  await evaluate(openTab('TAROT'))
+  await sleep(400)
+  const navCleared = await evaluate(`(() => ({ marks: window.LD.state.marks.slice(),
+    dot: !document.querySelector('.subtab[aria-selected="true"] .tab-mark')?.hidden }))()`)
+  check('looking at it is what clears it',
+    !navCleared.marks.includes('tarot'), JSON.stringify(navCleared))
+
+  // Never on a tab the player has not met. A mark on a navSealed pane would be the
+  // loudest spoiler in the game.
+  const navSealed = await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal
+    s.wagers = 0; s.chips = new D(0); s.marks = []; s.marksArmed = []
+    s.pendingDraft = []; s.broke = false; s.codexOpen = 0
+    for (const k of Object.keys(s.autobuyers)) s.autobuyers[k].unlocked = false
+    return true })()`)
+  await sleep(400)
+  const noSpoiler = await evaluate(`(() => ({ marks: window.LD.state.marks.slice(),
+    offered: ${tabOffered('CODICES')} }))()`)
+  check('and never on one the player has not met',
+    noSpoiler.offered === false && !noSpoiler.marks.includes('codices'),
+    JSON.stringify(noSpoiler))
+
   const shot = await send('Page.captureScreenshot', { format: 'png' })
   const { writeFileSync } = await import('node:fs')
   writeFileSync(MOBILE ? 'interaction-mobile.png' : 'interaction-desktop.png', Buffer.from(shot.data, 'base64'))
@@ -472,6 +571,7 @@ try {
   await sleep(150)
   try { rmSync(profile, { recursive: true, force: true }) } catch {}
 }
+
 const failed = results.filter((r) => !r.ok).length
 console.log(`\n${results.length - failed}/${results.length} passed`)
 process.exit(failed ? 1 : 0)

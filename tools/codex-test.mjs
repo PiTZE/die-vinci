@@ -8,7 +8,7 @@
 //
 //   npm run test:codices
 import { spawn } from 'node:child_process'
-import { appReady, guard, sweepStale } from './harness.mjs'
+import { appReady, guard, openTab, sweepStale, tabOffered } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -42,7 +42,7 @@ await appReady(ev)
 await ev(`(() => { const c = window.LD.state.options.confirms
   for (const k of Object.keys(c)) c[k] = false })()`)
 
-const tabShown = `[...document.querySelectorAll('.tab')].some(t => t.textContent === 'CODICES' && !t.hidden)`
+const tabShown = `${tabOffered('CODICES')}`
 
 // Nothing about the second chain exists before the wall comes down, and a
 // broken save with a shallow run does not get it either. The gate is depth,
@@ -73,7 +73,7 @@ check('reaching that depth opens the tab', (await ev(tabShown)) === true)
 check('and opens exactly one codex',
   (await ev(`window.LD.openCodices(window.LD.state)`)) === 1)
 
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'CODICES').click()`)
+await ev(openTab('CODICES'))
 await sleep(250)
 const rows = await ev(`(() => { const pane = [...document.querySelectorAll('.pane')].find(p => !p.hidden)
   return { shown: [...pane.querySelectorAll('.codex')].filter(r => !r.hidden).length,

@@ -3,7 +3,7 @@
 // ten minutes in you could read "call the Wager", "bind a folio" and "clear a
 // challenge" and know the shape of everything ahead.
 import { spawn } from 'node:child_process'
-import { appReady, guard, sweepStale } from './harness.mjs'
+import { appReady, guard, openTab, sweepStale, tabOffered } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -35,7 +35,7 @@ await ev(`localStorage.clear()`); await send('Page.reload')
 // inherit 'none' from a hidden ancestor, so a check on the heading alone
 // reports every topic as visible while its section is hidden.
 async function shown(tab, sel) {
-  await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === '${tab}').click()`)
+  await ev(openTab(tab))
   await sleep(150)
   return ev(`[...document.querySelectorAll('${sel}')]
     .filter(n => n.getBoundingClientRect().height > 0)
@@ -46,7 +46,7 @@ async function shown(tab, sel) {
  *  so the test has to prove the words are absent from the document rather than
  *  merely out of view. */
 async function everything(tab) {
-  await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === '${tab}').click()`)
+  await ev(openTab(tab))
   await sleep(150)
   return ev(`document.querySelector('.pane:not([hidden])').textContent`)
 }
@@ -135,7 +135,7 @@ check('nothing about breaking the Wager on a fresh save',
 // The tab this suite was already on, put back afterwards: the archive checks
 // below read a pane that only redraws while it is the active one.
 const wasOn = await ev(`document.querySelector('.tab[aria-selected=\"true\"]').textContent`)
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'OPTIONS').click()`)
+await ev(openTab('OPTIONS'))
 await sleep(300)
 const OPT_AHEAD = ['FOLIO', 'MELT', 'THE WAGER', 'ENTER A CHALLENGE', 'LEAVE A CHALLENGE',
   'A CHIP UPGRADE OVER 1', 'BREAKING THE WAGER']
@@ -147,7 +147,7 @@ check('no confirmation switch for anything not yet met',
 // And the one for the thing you can do from the first second is there.
 check('the study switch is, because a study is on the table from the start',
   settings.includes('STUDY'), settings.join(', '))
-await ev(`(() => { const t = [...document.querySelectorAll('.tab')].find(x => x.textContent === ${JSON.stringify(wasOn)}); if (t) t.click() })()`)
+await ev(`(() => { const t = [...document.querySelectorAll('.tab, .subtab')].find(x => x.textContent === ${JSON.stringify(wasOn)}); if (t) t.click() })()`)
 await sleep(300)
 
 check('and no archive entry about anything ahead',
@@ -194,7 +194,7 @@ check('and the archive fills in behind it',
 // something nothing reads and every card showed its picture.
 await ev(`(() => { const s = window.LD.state
   s.wagers = 2; s.tarot = { sun: 1 }; s.pendingDraft = [] })()`)
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TAROT').click()`)
+await ev(openTab('TAROT'))
 await sleep(250)
 const art = await ev(`(() => {
   const cells = [...document.querySelectorAll('.pane:not([hidden]) .tile')]

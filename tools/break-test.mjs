@@ -7,7 +7,7 @@
 //
 //   npm run test:break
 import { spawn } from 'node:child_process'
-import { appReady, guard, sweepStale } from './harness.mjs'
+import { appReady, guard, openTab, sweepStale, tabOffered } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -41,7 +41,7 @@ await ev(`(() => { const c = window.LD.state.options.confirms
   for (const k of Object.keys(c)) c[k] = false })()`)
 
 // A save that has never called a Wager should not be able to see any of this.
-const hidden = await ev(`[...document.querySelectorAll('.tab')].some(t => t.textContent === 'BREAK' && !t.hidden)`)
+const hidden = await ev(`${tabOffered('BREAK')}`)
 check('the break tab is not there before the Wager can be automated', hidden === false)
 
 // The thirteenth challenge is what awards the autobuyer, so nothing before it
@@ -53,16 +53,16 @@ const armed = `(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autobuyers.wager.unlocked = false; s.autobuyers.wager.level = 0 })()`
 await ev(armed); await sleep(250)
 check('nor with twelve challenges cleared and no Wager autobuyer',
-  (await ev(`[...document.querySelectorAll('.tab')].some(t => t.textContent === 'BREAK' && !t.hidden)`)) === false)
+  (await ev(`${tabOffered('BREAK')}`)) === false)
 
 // Awarded, but at its base interval, the gate says how far off it is.
 await ev(`(() => { const s = window.LD.state
   s.autobuyers.wager.unlocked = true; s.autobuyers.wager.level = 0 })()`)
 await sleep(250)
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'BREAK').click()`)
+await ev(openTab('BREAK'))
 await sleep(250)
 const gate = await ev(`({
-  shown: [...document.querySelectorAll('.tab')].some(t => t.textContent === 'BREAK' && !t.hidden),
+  shown: ${tabOffered('BREAK')},
   line: document.querySelector('.break-gate').textContent,
   disabled: [...document.querySelectorAll('.action')].find(b => b.textContent.includes('BREAK IT'))?.disabled,
   grid: document.querySelector('.break-figure') ? true : false })`)

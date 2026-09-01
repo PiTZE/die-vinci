@@ -146,3 +146,42 @@ export function guard(chrome, profile, getSocket) {
 
   return cleanup
 }
+
+/**
+ * The menu has two levels now: five groups holding twelve panes. A suite that
+ * used to click one button has to open a group first, and "is this tab there"
+ * stopped being the same question as "is this button on screen", because a
+ * pane in a group you are not looking at is hidden without being sealed.
+ *
+ * Both helpers take the label a player would read, and neither cares which
+ * level it is on.
+ */
+export function openTab(label) {
+  const want = JSON.stringify(label)
+  return `(async () => {
+    const txt = n => n.textContent.trim()
+    const find = () => [...document.querySelectorAll('.subtab')].find(b => txt(b) === ${want})
+    const group = [...document.querySelectorAll('.tab')].find(b => txt(b) === ${want})
+    let sub = find()
+    if (sub && !sub.hidden) { sub.click(); return true }
+    for (const g of [...document.querySelectorAll('.tab')].filter(b => !b.hidden)) {
+      g.click()
+      // Longer than the UI refresh, which is 100ms by default. At 60ms the
+      // subtab was still carrying last frame's hidden flag, so this walked
+      // straight past the group it had just opened and ended up somewhere
+      // else entirely.
+      await new Promise(r => setTimeout(r, 220))
+      sub = find()
+      if (sub && !sub.hidden) { sub.click(); return true }
+    }
+    if (group && !group.hidden) { group.click(); return true }
+    return false
+  })()`
+}
+
+/** Whether the player can reach this pane at all, at either level. */
+export function tabOffered(label) {
+  const want = JSON.stringify(label)
+  return `[...document.querySelectorAll('.tab, .subtab')]
+    .some(b => b.textContent.trim() === ${want} && b.dataset.open === '1')`
+}

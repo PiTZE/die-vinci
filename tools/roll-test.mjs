@@ -1,7 +1,7 @@
 // The roll loop. Nothing produces until a roll lands, a hand cannot out-roll
 // the roll rate, and the automator takes over from the finger.
 import { spawn } from 'node:child_process'
-import { appReady, guard, sweepStale } from './harness.mjs'
+import { appReady, guard, openTab, sweepStale, tabOffered } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -142,20 +142,20 @@ check('space rolls', Number(afterKey) > Number(beforeKey), `${beforeKey} -> ${af
 // The automator is a post-Wager purchase now, bought with a point in the
 // AUTOMATION tab, so the whole first run is your finger on the button.
 const beforeWager = await ev(`(() => {
-  const t = [...document.querySelectorAll('.tab')].find(x => x.textContent.trim() === 'AUTOMATION')
+  const t = [...document.querySelectorAll('.tab, .subtab')].find(x => x.textContent.trim() === 'AUTOMATION')
   return !t || t.hidden })()`)
 check('no automation tab before the first Wager', beforeWager === true)
 
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.wagers = 1; s.chips = new D(3) })()`)
 await sleep(400)
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'AUTOMATION').click()`)
+await ev(openTab('AUTOMATION'))
 await sleep(300)
 await ev(`[...document.querySelectorAll('.auto-up')].find(b => b.textContent.includes('UNLOCK')).click()`)
 await sleep(300)
 check('it costs a point', (await ev(`Number(window.LD.state.chips)`)) === 2,
   `points now ${await ev(`Number(window.LD.state.chips)`)}`)
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === 'TABLE').click()`)
+await ev(openTab('TABLE'))
 await sleep(300)
 const auto = await ev(`({ auto: window.LD.state.autoRoll,
   btn: getComputedStyle(${ROLL}).display })`)
@@ -276,9 +276,15 @@ const hop = await ev(`(() => {
 })()`)
 check('the hop is big enough to see', hop.lowest < -1.2, JSON.stringify(hop))
 
-// A die in the air holds the face it last landed on, dimmed, rather than
-// emptying the column for the whole roll. In a game whose feedback is numbers,
-// a blank column for a second reads as the panel going out.
+// A die in the air holds the face it last landed on, at full strength, rather
+// than emptying the column for the whole roll. In a game whose feedback is
+// numbers, a blank column for a second reads as the panel going out.
+//
+// It used to hold it dimmed to 30%, on the reasoning that a throw in the air
+// means the number on screen belongs to the previous throw. True, and useless:
+// a die is in the air for the whole interval and at rest for a single frame,
+// so the number spent almost all of its life greyed out with a 120ms fade
+// either side, which is what the dimming was supposed to be an exception to.
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0 })()`)
 await sleep(150)
@@ -288,9 +294,11 @@ const heldFace = await ev(`document.querySelector('.solid-face').textContent`)
 await ev(`${ROLL}.click()`); await sleep(120)
 const air = await ev(`(() => { const f = document.querySelector('.solid-face')
   return { face: f.textContent, stale: f.classList.contains('stale'),
+    opacity: getComputedStyle(f).opacity,
     progress: window.LD.rollProgress(window.LD.state, Date.now()) } })()`)
-check('a die in the air holds its last face, dimmed',
-  air.face === heldFace && heldFace !== "" && air.progress < 1 && air.stale === true,
+check('a die in the air holds its last face, undimmed',
+  air.face === heldFace && heldFace !== "" && air.progress < 1
+    && air.stale === false && air.opacity === '1',
   JSON.stringify({ heldFace, ...air }))
 
 // And a die that has never landed shows nothing, because there is nothing to
@@ -699,7 +707,7 @@ const sealed = await ev(`(async () => { const s = window.LD.state
   s.wagers = 0; s.autoRoll = false; s.chips = new window.LD.Decimal(0)
   for (const k of Object.keys(s.autobuyers)) s.autobuyers[k].unlocked = false
   await new Promise(r => setTimeout(r, 250))
-  const tab = [...document.querySelectorAll('.tab')].find(t => t.textContent === 'AUTOMATION')
+  const tab = [...document.querySelectorAll('.tab, .subtab')].find(t => t.textContent === 'AUTOMATION')
   tab.click()
   await new Promise(r => setTimeout(r, 250))
   const pane = [...document.querySelectorAll('.pane')].find(p => !p.hidden)

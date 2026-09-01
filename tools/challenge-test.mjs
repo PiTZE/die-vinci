@@ -2,7 +2,7 @@
 //
 //   npm run test:challenge
 import { spawn } from 'node:child_process'
-import { appReady, guard, sweepStale } from './harness.mjs'
+import { appReady, guard, sweepStale, tabOffered } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -33,7 +33,7 @@ const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByV
 await send('Emulation.setFocusEmulationEnabled',{enabled:true})
 await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
-const tab = (name) => `[...document.querySelectorAll('.tab')].find(t => t.textContent === '${name}')`
+const tab = (name) => `[...document.querySelectorAll('.tab, .subtab')].find(t => t.textContent === '${name}')`
 
 // Start from nothing. A run interrupted part way leaves its browser alive and
 // holding this port, and the next run then attaches to it and inherits a save
@@ -65,8 +65,8 @@ const first = await ev(`({ done: window.LD.state.challengesDone.slice(),
   auto: window.LD.state.autobuyers.solid1.unlocked })`)
 check('the first wager clears challenge 1', first.done.includes(1), JSON.stringify(first.done))
 check('and unlocks the first solid autobuyer', first.auto === true)
-check('challenges tab now shows', await ev(`${tab('CHALLENGES')} && !${tab('CHALLENGES')}.hidden`))
-check('automation tab now shows', await ev(`${tab('AUTOMATION')} && !${tab('AUTOMATION')}.hidden`))
+check('challenges tab now shows', await ev(tabOffered('CHALLENGES')))
+check('automation tab now shows', await ev(tabOffered('AUTOMATION')))
 
 // Enter challenge 7, which cuts the chain to six solids.
 await ev(`${tab('CHALLENGES')}.click()`); await sleep(150)

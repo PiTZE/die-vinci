@@ -5,7 +5,7 @@
 //
 //   npm run test:wager
 import { spawn } from 'node:child_process'
-import { appReady, guard, sweepStale } from './harness.mjs'
+import { appReady, guard, openTab, sweepStale, tabOffered } from './harness.mjs'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -54,13 +54,13 @@ const atThreshold = `(() => { const s = window.LD.state, D = window.LD.Decimal
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal; s.ink = new D(1000) })()`)
 await sleep(150)
 check('wager tab hidden early',
-  await ev(`![...document.querySelectorAll('.tab')].some(t => t.textContent === 'WAGER' && !t.hidden)`))
+  await ev(`!${tabOffered('WAGER')}`))
 
 await ev(atThreshold); await sleep(150)
 check('wager tab appears near the threshold',
-  await ev(`[...document.querySelectorAll('.tab')].some(t => t.textContent === 'WAGER' && !t.hidden)`))
+  await ev(`${tabOffered('WAGER')}`))
 
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'WAGER').click()`)
+await ev(openTab('WAGER'))
 await sleep(150)
 // The first Wager clears the first challenge, which awards the solid 1
 // autobuyer, which then spends the ten starting ink on a d4 within half a
@@ -99,7 +99,7 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.chips = new D(20); s.chipUpgrades = []; s.studies = 5 })()`)
 await sleep(150)
 // Only the active pane updates, so the table has to be on screen to be read.
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'TABLE').click()`)
+await ev(openTab('TABLE'))
 await sleep(150)
 // The verb and the requirement are separate spans now, so the button reads
 // "STUDY" then "20 d8" rather than one slash-joined string.
@@ -119,7 +119,7 @@ check('resetBoost lowers the study requirement by 9',
 // held, so that player hit the cap with the gate still short of it, and got a
 // full bar, a dead CALL button and a table that had stopped producing. It
 // read as a hang. Production has to keep going until the run itself qualifies.
-await ev(`[...document.querySelectorAll('.tab')].find(t => t.textContent === 'WAGER').click()`)
+await ev(openTab('WAGER'))
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = true; s.studies = 3; s.rollUpgrades = 25
   s.solids.forEach((d, i) => { if (i < 4) { d.bought = 20; d.amount = new D('1e8') } })

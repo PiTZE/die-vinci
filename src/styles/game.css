@@ -5,7 +5,8 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  /* bar, thought, pane, action bar, subtabs, groups. */
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
   /* svh is the floor: it is the smallest the viewport gets, so it can never be
      taller than what is on screen. --app-h is the measured height, set by
      ui/viewport.ts, and is exact when it is available. */
@@ -1407,15 +1408,13 @@
   }
 
   .tabs {
-    grid-column: 1;
-    grid-row: 2 / 6;
     flex-direction: column;
     align-items: stretch;
     border-top: 0;
-    border-right: 1px solid var(--border);
+    border-right: 0;
     padding: 0;
     overflow-x: visible;
-    overflow-y: auto;
+    overflow-y: visible;
   }
 
   .tab {
@@ -1679,12 +1678,11 @@
    the screen. It arrives now, and then gets out of the way. */
 @keyframes face-land {
   0% {
-    transform: scale(0.6);
+    transform: scale(0.86);
     color: var(--accent);
   }
-  55% {
-    transform: scale(1.18);
-    color: var(--accent);
+  50% {
+    transform: scale(1.08);
   }
   100% {
     transform: scale(1);
@@ -1692,16 +1690,18 @@
   }
 }
 
+/* Shorter than the roll it fires on, which 260ms was not: the readable floor
+   is a 180ms roll, so the pop outlasted the interval that triggered it and the
+   digit spent most of its life mid-animation at 0.6 scale in the accent
+   colour. That, plus the 30% dimming that used to sit under it, is what made
+   a landing read as slow. */
 .solid-face.landed {
   font-weight: 600;
-  animation: face-land 260ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  animation: face-land 120ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
 /* Mid-throw, the previous face waits rather than the column going blank. It is
    the number you last rolled, so it is dimmed to say so. */
-.solid-face.stale {
-  opacity: 0.3;
-}
 
 @media (prefers-reduced-motion: reduce) {
   .solid-face.landed {
@@ -1848,4 +1848,100 @@
   font-size: 0.7rem;
   line-height: 1.5;
   color: var(--fg-muted);
+}
+
+/* -- the second level of the menu ---------------------------------------- */
+/*
+   Twelve flat tabs made an 822px strip on a 390px phone, so 432px of it lived
+   off the right edge. Five groups fit without scrolling and the panes inside
+   the open one get a strip of their own, which is Antimatter Dimensions'
+   classic mode: a bar of tabs and a bar of subtabs under it.
+*/
+.nav {
+  display: contents;
+}
+.subtabs {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  background: var(--chrome);
+  border-top: 1px solid var(--border-faint);
+  padding-left: var(--safe-l);
+  padding-right: var(--safe-r);
+}
+.subtabs::-webkit-scrollbar {
+  display: none;
+}
+.subtab {
+  position: relative;
+  flex: 1 0 auto;
+  border: 0;
+  border-right: 1px solid var(--border-faint);
+  background: none;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--fg-muted);
+  padding: 7px 12px;
+  min-height: 34px;
+}
+.subtab.on {
+  color: var(--fg);
+  background: var(--chrome-lit, rgba(255, 255, 255, 0.04));
+}
+.tab.on {
+  color: var(--fg);
+}
+
+/* The mark. A dot rather than AD's exclamation icon, because there is no icon
+   font here and one glyph of punctuation says the same thing at 6px. */
+.tab-mark {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.tab {
+  position: relative;
+}
+
+@media (min-width: 820px) {
+  /* Under the group list in the left column, indented, which is the space the
+     twelve flat tabs used to run into. AD's modern sidebar nests subtabs
+     inside the tab button and reveals them on hover; a hover reveal is no use
+     on the phone this layout shares its markup with, so they are always out. */
+  .nav {
+    display: flex;
+    flex-direction: column;
+    grid-column: 1;
+    grid-row: 2 / 7;
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+  }
+  .tabs {
+    order: 1;
+  }
+  .subtabs {
+    order: 2;
+    flex-direction: column;
+    overflow: visible;
+    border-top: 0;
+    border-right: 0;
+  }
+  .subtab {
+    flex: 0 0 auto;
+    border-right: 0;
+    text-align: left;
+    padding-left: 28px;
+    min-height: 38px;
+  }
+  .subtab.on {
+    border-left: 2px solid var(--accent);
+    padding-left: 26px;
+  }
 }
