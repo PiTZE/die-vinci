@@ -44,6 +44,7 @@ export function releaseSticky(): void {
   sticky.rep.stop()
   sticky.el.classList.remove('sticky')
   sticky = null
+  stuckKeys.clear()
 }
 
 export function isSticky(el: HTMLElement | null | undefined): boolean {
@@ -231,6 +232,9 @@ export function bindKey(key: string, action: (mods: Mods) => void, el?: HTMLElem
 }
 
 const keyButtons = new Map<string, HTMLElement>()
+/** Keys waiting to earn a ring, and the one key that has. */
+const stickTimers = new Map<string, number>()
+const stuckKeys = new Set<string>()
 
 /**
  * Whether this button is being operated right now, by finger, by key, or by
@@ -242,8 +246,11 @@ export function isPressing(el: HTMLElement | null | undefined): boolean {
 }
 
 function releaseAll(): void {
-  for (const r of heldKeys.values()) r.stop()
+  for (const [k, r] of heldKeys) if (!stuckKeys.has(k)) r.stop()
   for (const k of heldKeys.keys()) keyButtons.get(k)?.classList.remove('pressing')
+  for (const id of stickTimers.values()) window.clearTimeout(id)
+  stickTimers.clear()
+  stuckKeys.clear()
   heldKeys.clear()
   for (const r of releasers) r()
 }
@@ -257,13 +264,45 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault()
   // The OS repeat would run alongside ours and double the rate.
   if (e.repeat || heldKeys.has(key)) return
-  keyButtons.get(key)?.classList.add('pressing')
-  heldKeys.set(key, repeat(() => fn({ shift: e.shiftKey })))
+  const el = keyButtons.get(key)
+  // A key press on the ringed button takes the ring off, the same as a tap on
+  // it does. Held keys earn a ring on the same timer a held finger does: the
+  // ring is about not having to keep pressing, and a key is as tiring to hold
+  // down as a thumb.
+  if (el && isSticky(el)) {
+    releaseSticky()
+    return
+  }
+  el?.classList.add('pressing')
+  const rep = repeat(() => {
+    if (el && (el.hidden || !el.isConnected)) {
+      if (isSticky(el)) releaseSticky()
+      return
+    }
+    fn({ shift: e.shiftKey })
+  })
+  heldKeys.set(key, rep)
+  if (el) {
+    stickTimers.set(
+      key,
+      window.setTimeout(() => {
+        stickTimers.delete(key)
+        releaseSticky()
+        sticky = { el, rep }
+        stuckKeys.add(key)
+        el.classList.add('sticky')
+      }, STICK_MS),
+    )
+  }
 })
 
 window.addEventListener('keyup', (e) => {
   const key = keyOf(e)
-  heldKeys.get(key)?.stop()
+  window.clearTimeout(stickTimers.get(key))
+  stickTimers.delete(key)
+  // A key that earned a ring hands its repeat over rather than ending it.
+  if (!stuckKeys.has(key)) heldKeys.get(key)?.stop()
+  stuckKeys.delete(key)
   heldKeys.delete(key)
   keyButtons.get(key)?.classList.remove('pressing')
 })

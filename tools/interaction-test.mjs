@@ -546,6 +546,46 @@ try {
   check('a tap on the ringed button takes the ring off',
     (await rings()).length === 0, JSON.stringify(await rings()))
 
+  // A held key earns a ring the same way a held finger does. It is the same
+  // tiredness either way, and the desktop player is the one holding a key for
+  // the length of a run.
+  //
+  // On space rather than M, because the check is that it goes on working and
+  // MAX stops the moment the wallet is dry, which after a second of holding it
+  // is a race against how loaded the box is. A ringed ROLL runs forever.
+  await ready()
+  await evaluate(`window.LD.releaseSticky()`)
+  const spaceKey = (type) => send('Input.dispatchKeyEvent', { type, key: ' ',
+    code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 })
+
+  await spaceKey('keyDown'); await sleep(400); await spaceKey('keyUp')
+  check('a short key press is only a press', (await rings()).length === 0,
+    JSON.stringify(await rings()))
+
+  await spaceKey('keyDown'); await sleep(1200)
+  const keyRing = await rings()
+  await spaceKey('keyUp')
+  check('holding the key long enough rings its button',
+    keyRing.length === 1 && keyRing[0].includes('bar-roll'), JSON.stringify(keyRing))
+
+  await evaluate(`(() => { window.LD.state.inkThisWager = new window.LD.Decimal(0) })()`)
+  await sleep(700)
+  check('and it goes on rolling with the key up',
+    (await evaluate(`window.LD.state.inkThisWager.gt(0)`)) === true)
+
+  // The same key again takes it off, as a tap on the button does.
+  await spaceKey('keyDown'); await sleep(80); await spaceKey('keyUp')
+  await sleep(150)
+  check('and pressing the key again takes the ring off',
+    (await rings()).length === 0, JSON.stringify(await rings()))
+
+  // After the roll already in the air has landed. Taking the ring off stops
+  // the next throw, not the one under way, and a throw is up to a second long.
+  await sleep(1200)
+  await evaluate(`(() => { window.LD.state.inkThisWager = new window.LD.Decimal(0) })()`)
+  await sleep(600)
+  check('and then it stops', (await evaluate(`window.LD.state.inkThisWager.eq(0)`)) === true)
+
   // Unaffordable is not gone. MAX is disabled between one roll paying and the
   // next, and dropping the ring for that would take it off a second after you
   // put it on.
