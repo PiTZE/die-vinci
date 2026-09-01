@@ -72,7 +72,7 @@ import { tarotPane } from './ui/tarot'
 import { breakPane } from './ui/break'
 import { codicesPane } from './ui/codices'
 import { releaseSticky } from './ui/hold'
-import { solidFigure } from './ui/wireframe'
+import { solidFigure, solidFold } from './ui/wireframe'
 import { checkMarks } from './game/marks'
 import {
   CODICES,
@@ -717,6 +717,9 @@ const hook: Record<string, unknown> = {
   // Vertices and edges as generated, so the suite can check the tables rather
   // than count points in a drawing of them.
   solidFigure,
+  // How often a solid maps onto itself in one turn about the vertical, which
+  // is what a throw is quantised to.
+  solidFold,
   rollProgress,
   // Whether a roll you asked for is in the air, which since the roll clock
   // became shared is no longer the same question as rollStartedAt.

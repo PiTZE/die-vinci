@@ -675,9 +675,14 @@ const symmetry = await ev(`(() => {
   return out })()`)
 const crooked = Object.entries(symmetry).filter(([, ok]) => !ok).map(([k]) => k)
 // And put the table back, because everything after this is about the dice
-// rolling themselves and the settle above turned all of that off.
+// rolling themselves and the settle above turned all of that off. The scroll
+// too: a row off the top of the pane has its wire paused, so leaving the
+// table at the bottom left every check below this one watching four dice that
+// had stopped being drawn.
 await ev(`(() => { const s = window.LD.state
-  s.autoRollOn = true; s.studies = 8 })()`)
+  s.autoRollOn = true; s.studies = 8
+  const pane = [...document.querySelectorAll('.pane')].find((p) => !p.hidden)
+  if (pane) pane.scrollTop = 0 })()`)
 check('and every one of them rests mirror-symmetric',
   crooked.length === 0 && Object.keys(symmetry).length === 9,
   crooked.length ? crooked.join(', ') : `${Object.keys(symmetry).length} on the table`)

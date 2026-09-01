@@ -152,8 +152,7 @@ function sphere(meridians: number, bands: number): Geo {
   for (let m = 0; m < meridians; m++) {
     es.push([north, ring[0][m]], [south, ring[ring.length - 1][m]])
   }
-  // Its own pole, and a turn of one meridian puts it back where it was.
-  return { vs, es, spin: [0, 1, 0], fold: meridians }
+  return { vs, es, spin: [0, 1, 0], fold: 1 }
 }
 
 /**
@@ -236,59 +235,43 @@ function orient(vs: V3[], axis: V3, roll: number): V3[] {
 }
 
 /**
- * The axis a throw turns each solid about, and its order about that axis.
+ * How many times a solid maps onto itself in one turn about the vertical.
  *
- * A throw used to pick two axes at random and turn about both at once, on the
- * reasoning that nine dice tumbling in lockstep would look mechanical. What it
- * actually produced was nine dice each wobbling its own arbitrary way, and a
- * die passing through poses that belong to no view of it: the same "random"
- * the resting pose had, except moving, where it is on screen for a second at a
- * time rather than a glance.
+ * Every die turns about the upright axis through its top, which is the axis a
+ * die spun on a table turns about, and the only one that reads the same way
+ * for nine different solids sitting in a column. What differs between them is
+ * how often that turn passes through the pose they rest in: four times for
+ * the cube standing on a face, twelve for the sphere about its pole, once for
+ * the tetrahedron, whose three-fold axis points at you rather than up.
  *
- * Each one turns about one of its own symmetry axes now, so a third or a fifth
- * of the way through a throw it is in a pose identical to the one it rests in,
- * and it goes on passing through that pose all the way round. Nothing is
- * chosen here that the solid does not already have: these are its vertex,
- * face and pole axes.
- *
- * Written in the vertex table's own coordinates and turned along with it, so
- * the pair stays consistent when a resting pose changes.
+ * Measured off the vertex table rather than written down, so a resting pose
+ * can be changed without a second table quietly going stale. It runs once per
+ * solid, behind the same cache the geometry is behind.
  */
-const SPIN_AXIS: Record<string, { axis: V3; fold: number }> = {
-  // A vertex not the one facing you, so the tetrahedron turns corner over
-  // corner rather than spinning about the point it is resting on.
-  tetra: { axis: [1, -1, -1], fold: 3 },
-  // A body diagonal: the corner-over-corner turn a thrown cube makes.
-  hexa: { axis: [1, 1, 1], fold: 3 },
-  octa: { axis: [1, 1, 1], fold: 3 },
-  dodeca: { axis: [1, 1, 1], fold: 3 },
-  trunccube: { axis: [1, 1, 1], fold: 3 },
-  // A vertex of the icosahedron, which is a five-fold axis.
-  icosa: { axis: [0, 1, PHI], fold: 5 },
-  rhombi: { axis: [1, 1, 1], fold: 3 },
-  icosidodeca: { axis: [1, 1, 1], fold: 3 },
+function foldAboutVertical(vs: V3[]): number {
+  const near = (a: V3, b: V3) =>
+    Math.abs(a[0] - b[0]) < 1e-6 && Math.abs(a[1] - b[1]) < 1e-6 && Math.abs(a[2] - b[2]) < 1e-6
+  for (const k of [12, 10, 8, 6, 5, 4, 3, 2]) {
+    const a = (Math.PI * 2) / k
+    const c = Math.cos(a)
+    const s = Math.sin(a)
+    const maps = vs.every((v) => {
+      const r: V3 = [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]
+      return vs.some((w) => near(w, r))
+    })
+    if (maps) return k
+  }
+  return 1
 }
 
 function geometryFor(def: { id: SolidId; shape: SolidShape }): Geo {
   if (def.shape.kind === 'sphere') return sphere(def.shape.meridians, def.shape.bands)
   let vs = uniformVertices(def.id)
   const pose = REST_POSE[def.id]
-  const turn = SPIN_AXIS[def.id] ?? { axis: [0, 1, 0] as V3, fold: 1 }
-  let spin = turn.axis
   // Edges before the turn or after it makes no difference: it is a rotation,
-  // so it moves no vertex closer to any other. The spin axis goes through the
-  // same turn as the vertices, because it is written in their coordinates.
-  if (pose) {
-    vs = orient(vs, pose.axis, pose.roll)
-    spin = orient([spin], pose.axis, pose.roll)[0]
-  }
-  const len = Math.hypot(...spin)
-  return {
-    vs,
-    es: edgesByDistance(vs),
-    spin: [spin[0] / len, spin[1] / len, spin[2] / len],
-    fold: turn.fold,
-  }
+  // so it moves no vertex closer to any other.
+  if (pose) vs = orient(vs, pose.axis, pose.roll)
+  return { vs, es: edgesByDistance(vs), spin: [0, 1, 0], fold: foldAboutVertical(vs) }
 }
 
 function normalize(g: Geo): Geo {
@@ -306,6 +289,10 @@ function normalize(g: Geo): Geo {
  * every solid is down a symmetry axis. It failed on four different solids in
  * one afternoon and each time the drawing was correct.
  */
+export function solidFold(id: SolidId): number {
+  return geometry(id).fold
+}
+
 export function solidFigure(id: SolidId): [number, number] {
   const g = geometry(id)
   return [g.vs.length, g.es.length]
@@ -319,6 +306,7 @@ function geometry(id: SolidId): Geo {
     const def = SOLIDS.find((d) => d.id === id)
     if (!def) throw new Error(`no solid named ${id}`)
     g = normalize(geometryFor(def))
+    g.fold = foldAboutVertical(g.vs)
     CACHE.set(id, g)
   }
   return g
@@ -390,7 +378,6 @@ class Wire {
   /** Keeps the nine tumbles out of phase with each other. */
   private phase = Math.random() * Math.PI * 2
   /** And the nine bounces, so they do not all hit the table together. */
-  private hopPhase = Math.random() * 0.4
   visible = true
   /** A row with no dice on it. It stays where it is. */
   rolls = true
@@ -419,7 +406,6 @@ class Wire {
     // from is one it could be resting in and so is the one it lands on. The
     // variance is still there; it is quantised rather than removed.
     this.phase = (Math.floor(Math.random() * fold) * Math.PI * 2) / fold
-    this.hopPhase = Math.random() * 0.4
     // The variance rides inside the budget rather than on top of it, or a die
     // drawn at 1.25 speed would sit a quarter over its own ceiling.
     const wanted = turnsFor(this.id, duration) * this.speed
@@ -501,12 +487,16 @@ class Wire {
    */
   private bounce(p: number): void {
     if (p < LAND_AT) {
-      // Still in the air. A little drift and tilt so the spin does not look
-      // like it is happening on a pin, and nothing else.
+      // Still in the air. Straight up and straight down, and nothing else.
+      //
+      // It used to drift sideways and tilt six degrees on a phase picked at
+      // random, so that the spin would not look like it was happening on a
+      // pin. It is happening on a pin: the die turns about the upright axis
+      // through its top, and a tilt laid over that is the one thing on screen
+      // that answers to nothing, which is what reads as the die wobbling
+      // rather than turning.
       const k = p / LAND_AT
-      const side = Math.sin((k + this.hopPhase) * Math.PI) * 1.2
-      const tilt = Math.sin((k * 2 + this.hopPhase) * Math.PI) * 6
-      this.place(side, -1.5 * Math.sin(k * Math.PI), tilt, 1, 1)
+      this.place(0, -1.5 * Math.sin(k * Math.PI), 0, 1, 1)
       return
     }
 
@@ -514,14 +504,18 @@ class Wire {
     // the part that reads as weight.
     const q = (p - LAND_AT) / (1 - LAND_AT)
     const fade = Math.pow(1 - q, 1.6)
-    const cycle = q * BOUNCES + this.hopPhase * 0.15
+    // On the beat, not on a phase of its own: a die that lands a little
+    // before or after where it hops is a die whose landing has nothing to do
+    // with its throw.
+    const cycle = q * BOUNCES
     const hop = -Math.abs(Math.sin(cycle * Math.PI)) * HOP_PX * fade
     // Flattest at the instant of contact, which is where the sine is zero.
     const contact = Math.pow(1 - Math.abs(Math.sin(cycle * Math.PI)), 3) * fade
     const sx = 1 + SQUASH * contact
     const sy = 1 - SQUASH * contact
-    const tilt = Math.sin(cycle * 2 * Math.PI) * 5 * fade
-    this.place(0, hop, tilt, sx, sy)
+    // Squashed on contact, upright throughout. The tilt that used to rock it
+    // through the bounce went the same way as the one in the air.
+    this.place(0, hop, 0, sx, sy)
   }
 
   private place(x: number, y: number, deg: number, sx = 1, sy = 1): void {
