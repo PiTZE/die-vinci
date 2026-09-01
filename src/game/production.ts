@@ -412,6 +412,21 @@ function resetTable(s: GameState): void {
   }
   seedForAutomator(s)
   s.ink = Decimal.max(new Decimal(START_INK), m.keepInk)
+  // And the run with it. A study or a folio starts the climb to the Wager
+  // again, which is Antimatter Dimensions' own shape: a Dimension Boost
+  // resets antimatter, and the progress to Infinity is the antimatter you are
+  // holding. It works there for the reason it works here, that each reset
+  // multiplies what the table produces, so the next cycle passes the last
+  // one's peak rather than merely repeating it.
+  //
+  // It used to accrue across resets, on the reasoning that at 77% with
+  // nothing left to buy the only move was a study that threw the bar away.
+  // The cost of that was a bar that said 77% while the table it was measuring
+  // had just been swept, which is a percentage of nothing.
+  //
+  // deepestInk keeps its own running maximum from the tick, so what the
+  // codices open on is still the deepest a run has ever reached.
+  s.inkThisWager = new Decimal(0)
   s.stats.sinceResetMs = 0
   // A spin in the air would otherwise land onto the fresh table and pay out
   // from the solids that were just cleared.

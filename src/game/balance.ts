@@ -335,3 +335,19 @@ export function magicianBias(level: number): number {
  * the chain. See codices.ts for the rest of it.
  */
 export const CODEX_CONVERSION = 7
+
+/**
+ * How far into a run the study and folio autobuyers stop resetting it.
+ *
+ * A reset clears what the run has earned as well as the table, so one taken
+ * in the last stretch throws away the climb rather than shortening it. The
+ * simulation's own player stops at 1e285, which on the log scale the run bar
+ * uses is 0.925, and AD players stop taking galaxies and push for Infinity
+ * for the same reason. This is that rule, given to the two autobuyers that
+ * would otherwise keep pressing.
+ *
+ * Only applies while the ceiling holds. Past the wall a run overshoots on
+ * purpose and lives most of its life above this line, and these two are how
+ * the ladder gets rebuilt at all.
+ */
+export const RESET_HOLD_AT = 0.925

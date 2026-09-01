@@ -9,6 +9,7 @@
 // Each is unlocked by clearing the challenge that awards it, which is what
 // turns "start slowly" into "automate everything".
 import Decimal from '../vendor/break-infinity'
+import { RESET_HOLD_AT, WAGER_AT } from './balance'
 import { SOLIDS, SOLID_COUNT } from './solids'
 import type { GameState } from '../state'
 
@@ -208,6 +209,22 @@ export function setUntil(s: GameState, id: AutobuyerId, on: boolean, at?: number
  */
 export function allowed(s: GameState, id: AutobuyerId): boolean {
   if (!hasLimit(id)) return true
+  // Neither reset throws away a run that is nearly home.
+  //
+  // A study clears what the run has earned as well as the table, so an
+  // autobuyer taking one every four seconds during the last stretch is an
+  // autobuyer that can stop the Wager ever being reached. It is also just bad
+  // play: it is why the simulation's own player stops resetting at 1e285 and
+  // pushes, and why AD players stop taking galaxies and push for Infinity.
+  //
+  // Only while the ceiling holds. Past the wall a run overshoots the
+  // threshold on purpose, so it spends nearly all of its life above this line
+  // and the reset autobuyers are how the ladder gets rebuilt at all.
+  // Written out rather than called: breaks.ts and wager.ts both import this
+  // file, so importing either one back would be a cycle. `!s.broke` is
+  // ceilingHolds and the ratio of logs is wagerProgress.
+  if (!s.broke && !s.inkThisWager.lte(1) &&
+    s.inkThisWager.log10() / WAGER_AT.log10() >= RESET_HOLD_AT) return false
   const held = id === 'study' ? s.studies : s.folios
   const under = !limitOn(s, id) || held < limitAt(s, id)
   const lifted = id === 'study' && untilOn(s, id) && s.folios >= untilFolios(s, id)

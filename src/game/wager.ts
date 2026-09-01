@@ -22,16 +22,17 @@ import { grantAutoRoll, registerWager, seedForAutomator } from './production'
 import type { GameState } from '../state'
 
 /**
- * Measured on what this run has earned, not on what it is holding.
+ * Measured on what this stretch has earned, not on what it is holding.
  *
- * A study clears the ink, so progress toward the Wager used to be thrown away
- * with it. At 77% of the way there, with nothing left to buy, the only move was
- * a study that reset the bar to nothing: a stretch with no good play in it.
- * inkThisWager only accrues and only clears at a Wager, so a reset costs you
- * the table and the time, which is the point of a reset, but not the run.
+ * The two differ because a card can hand you ink outright: V The Hierophant
+ * pays at a reset without the run having earned it. Production halts on ink
+ * held, over in mustWager, and the Wager opens on what was earned, so ink
+ * from nowhere fills the table without also finishing the run.
  *
- * The halt is deliberately still measured on ink held, over in mustWager. The
- * table is full when the table is full; that is a different statement.
+ * A study or a folio clears both. That is Antimatter Dimensions' shape, where
+ * Infinity is reached on the antimatter you are holding and a Dimension Boost
+ * resets it: the climb has to be finished in one stretch, and each reset
+ * makes the next stretch reach further than the last.
  */
 export function canWager(s: GameState): boolean {
   return s.inkThisWager.gte(WAGER_AT)
