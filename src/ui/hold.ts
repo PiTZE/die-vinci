@@ -57,6 +57,27 @@ export function isSticky(el: HTMLElement | null | undefined): boolean {
   return !!el && sticky?.el === el
 }
 
+/**
+ * Dims a holdable button instead of disabling it.
+ *
+ * A disabled button receives no pointer events at all, which is the browser's
+ * rule and not ours: pointerdown never fires on one, so a press cannot reach
+ * it and it can never be given the ring. That is exactly backwards for the
+ * three buttons worth ringing, because the moment you most want the game to
+ * keep pressing MAX for you is while you cannot afford anything and are
+ * waiting for the ink.
+ *
+ * So it takes aria-disabled, which says the same thing to a screen reader and
+ * styles the same way, and stays live to the pointer. Nothing unsafe gets
+ * through: every action behind these guards itself, maxAll buys what the ink
+ * covers and nothing when it covers nothing, and a study checks its own
+ * requirement.
+ */
+export function setActable(el: HTMLElement, can: boolean): void {
+  if (el.getAttribute('aria-disabled') === String(!can)) return
+  el.setAttribute('aria-disabled', String(!can))
+}
+
 export interface Mods {
   shift: boolean
 }
@@ -156,6 +177,7 @@ export function holdable(el: HTMLElement, action: (mods: Mods) => void): void {
       return
     }
     if ((el as HTMLButtonElement).disabled) return
+    // aria-disabled is deliberately not checked. See setActable.
     fromPointer = true
     // Whichever finger pressed last owns the hold. Refusing a press while
     // `holding` was set looked tidier and was worse: any pointerdown whose

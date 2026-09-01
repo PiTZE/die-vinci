@@ -937,8 +937,11 @@ const sealed = await ev(`(async () => { const s = window.LD.state
   tab.click()
   await new Promise(r => setTimeout(r, 250))
   const pane = [...document.querySelectorAll('.pane')].find(p => !p.hidden)
+  // The heading's own words, not the switch beside them: a section head
+  // carries its master switch at the right now, so its textContent is the
+  // title with ON stuck to the end of it.
   const shown = [...pane.querySelectorAll('.section')].filter(x => !x.hidden)
-    .map(x => x.querySelector('.section-head').textContent.trim())
+    .map(x => (x.querySelector('.section-head .grow') ?? x.querySelector('.section-head')).textContent.trim())
   return { visible: !tab.hidden, shown } })()`)
 check('the tab is open before the Wager', sealed.visible === true, JSON.stringify(sealed))
 check('and holds nothing but the roll while it is',

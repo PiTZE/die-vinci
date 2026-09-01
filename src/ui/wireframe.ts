@@ -39,7 +39,14 @@ function dedupe(vs: V3[]): V3[] {
   return out
 }
 
-type Geo = { vs: V3[]; es: [number, number][] }
+type Geo = {
+  vs: V3[]
+  es: [number, number][]
+  /** The axis a throw turns this solid about, and how many times it maps onto
+   *  itself in one turn about it. See SPIN_AXIS. */
+  spin: V3
+  fold: number
+}
 
 const PHI = (1 + Math.sqrt(5)) / 2
 const SILVER = 1 + Math.sqrt(2)
@@ -145,7 +152,8 @@ function sphere(meridians: number, bands: number): Geo {
   for (let m = 0; m < meridians; m++) {
     es.push([north, ring[0][m]], [south, ring[ring.length - 1][m]])
   }
-  return { vs, es }
+  // Its own pole, and a turn of one meridian puts it back where it was.
+  return { vs, es, spin: [0, 1, 0], fold: meridians }
 }
 
 /**
@@ -227,19 +235,65 @@ function orient(vs: V3[], axis: V3, roll: number): V3[] {
   })
 }
 
+/**
+ * The axis a throw turns each solid about, and its order about that axis.
+ *
+ * A throw used to pick two axes at random and turn about both at once, on the
+ * reasoning that nine dice tumbling in lockstep would look mechanical. What it
+ * actually produced was nine dice each wobbling its own arbitrary way, and a
+ * die passing through poses that belong to no view of it: the same "random"
+ * the resting pose had, except moving, where it is on screen for a second at a
+ * time rather than a glance.
+ *
+ * Each one turns about one of its own symmetry axes now, so a third or a fifth
+ * of the way through a throw it is in a pose identical to the one it rests in,
+ * and it goes on passing through that pose all the way round. Nothing is
+ * chosen here that the solid does not already have: these are its vertex,
+ * face and pole axes.
+ *
+ * Written in the vertex table's own coordinates and turned along with it, so
+ * the pair stays consistent when a resting pose changes.
+ */
+const SPIN_AXIS: Record<string, { axis: V3; fold: number }> = {
+  // A vertex not the one facing you, so the tetrahedron turns corner over
+  // corner rather than spinning about the point it is resting on.
+  tetra: { axis: [1, -1, -1], fold: 3 },
+  // A body diagonal: the corner-over-corner turn a thrown cube makes.
+  hexa: { axis: [1, 1, 1], fold: 3 },
+  octa: { axis: [1, 1, 1], fold: 3 },
+  dodeca: { axis: [1, 1, 1], fold: 3 },
+  trunccube: { axis: [1, 1, 1], fold: 3 },
+  // A vertex of the icosahedron, which is a five-fold axis.
+  icosa: { axis: [0, 1, PHI], fold: 5 },
+  rhombi: { axis: [1, 1, 1], fold: 3 },
+  icosidodeca: { axis: [1, 1, 1], fold: 3 },
+}
+
 function geometryFor(def: { id: SolidId; shape: SolidShape }): Geo {
   if (def.shape.kind === 'sphere') return sphere(def.shape.meridians, def.shape.bands)
   let vs = uniformVertices(def.id)
   const pose = REST_POSE[def.id]
+  const turn = SPIN_AXIS[def.id] ?? { axis: [0, 1, 0] as V3, fold: 1 }
+  let spin = turn.axis
   // Edges before the turn or after it makes no difference: it is a rotation,
-  // so it moves no vertex closer to any other.
-  if (pose) vs = orient(vs, pose.axis, pose.roll)
-  return { vs, es: edgesByDistance(vs) }
+  // so it moves no vertex closer to any other. The spin axis goes through the
+  // same turn as the vertices, because it is written in their coordinates.
+  if (pose) {
+    vs = orient(vs, pose.axis, pose.roll)
+    spin = orient([spin], pose.axis, pose.roll)[0]
+  }
+  const len = Math.hypot(...spin)
+  return {
+    vs,
+    es: edgesByDistance(vs),
+    spin: [spin[0] / len, spin[1] / len, spin[2] / len],
+    fold: turn.fold,
+  }
 }
 
 function normalize(g: Geo): Geo {
   const r = Math.max(...g.vs.map((v) => Math.hypot(v[0], v[1], v[2])))
-  return { vs: g.vs.map((v) => [v[0] / r, v[1] / r, v[2] / r] as V3), es: g.es }
+  return { ...g, vs: g.vs.map((v) => [v[0] / r, v[1] / r, v[2] / r] as V3) }
 }
 
 /**
@@ -319,16 +373,6 @@ function depthOpacity(f: number): number {
  */
 const REST_T = 0
 
-/**
- * And the axes it is turned about, which the pose depends on just as much.
- *
- * `throw()` re-picks these on every throw so nine dice do not turn in
- * lockstep, so winding the angle back without them left a die at the right
- * angle about the wrong pair of axes: still a different picture every time it
- * stopped. Zero through zero is no rotation, which is the whole point.
- */
-const REST_WY = 1
-const REST_WX = 0
 
 class Wire {
   readonly el: SVGSVGElement
@@ -339,8 +383,6 @@ class Wire {
   /** Tumble axis weights, re-picked on every throw. A fixed pair made nine
    *  dice turn in lockstep like a row of gears, which is the one thing a
    *  handful of thrown dice never looks like. */
-  private wy = REST_WY
-  private wx = REST_WX
   /** Each die leaves the hand a little differently. */
   private speed = 1
   /** Revolutions this throw, picked against this solid's own ceiling. */
@@ -364,27 +406,26 @@ class Wire {
    */
   rest(): void {
     if (this.el.style.transform) this.el.style.transform = ''
-    if (this.t === REST_T && this.wy === REST_WY && this.wx === REST_WX) return
+    if (this.t === REST_T) return
     this.t = REST_T
-    this.wy = REST_WY
-    this.wx = REST_WX
     this.draw()
   }
 
-  /** A new throw. Fresh axis, fresh rate. */
+  /** A new throw. Fresh rate, and it starts and lands square. */
   throw(duration: number): void {
-    // Kept away from zero on both axes, or the solid spins flat about one axis
-    // and reads as a wheel rather than a tumble.
-    const a = Math.random() * Math.PI * 2
-    this.wy = 0.55 + Math.abs(Math.cos(a)) * 0.75
-    this.wx = 0.55 + Math.abs(Math.sin(a)) * 0.75
-    if (Math.random() < 0.5) this.wx = -this.wx
+    const { fold } = geometry(this.id)
     this.speed = 0.8 + Math.random() * 0.45
-    this.phase = Math.random() * Math.PI * 2
+    // A whole number of the solid's own symmetry steps, so the pose it starts
+    // from is one it could be resting in and so is the one it lands on. The
+    // variance is still there; it is quantised rather than removed.
+    this.phase = (Math.floor(Math.random() * fold) * Math.PI * 2) / fold
     this.hopPhase = Math.random() * 0.4
     // The variance rides inside the budget rather than on top of it, or a die
     // drawn at 1.25 speed would sit a quarter over its own ceiling.
-    this.turns = turnsFor(this.id, duration) * this.speed
+    const wanted = turnsFor(this.id, duration) * this.speed
+    // Rounded to a symmetry step as well, so the last frame of a throw is the
+    // resting pose rather than a few degrees off it that then snaps.
+    this.turns = Math.max(1, Math.round(wanted * fold)) / fold
   }
 
   constructor(id: SolidId) {
@@ -496,25 +537,23 @@ class Wire {
   }
 
   private draw(): void {
-    const { vs, es } = geometry(this.id)
-    const ay = this.t * this.wy
-    const ax = this.t * this.wx
-    const cy = Math.cos(ay)
-    const sy = Math.sin(ay)
-    const cx = Math.cos(ax)
-    const sx = Math.sin(ax)
+    const { vs, es, spin } = geometry(this.id)
+    // One turn about one axis, by Rodrigues. It used to be two turns about two
+    // axes at a ratio picked at random, which is what made every throw a
+    // different tumble and none of them a pose the solid has.
+    const c = Math.cos(this.t)
+    const s = Math.sin(this.t)
+    const k = 1 - c
+    const [kx, ky, kz] = spin
 
     const px: number[] = []
     const py: number[] = []
     const pz: number[] = []
     for (const v of vs) {
-      const x1 = v[0] * cy + v[2] * sy
-      const z1 = -v[0] * sy + v[2] * cy
-      const y2 = v[1] * cx - z1 * sx
-      const z2 = v[1] * sx + z1 * cx
-      px.push(x1)
-      py.push(y2)
-      pz.push(z2)
+      const dot = kx * v[0] + ky * v[1] + kz * v[2]
+      px.push(v[0] * c + (ky * v[2] - kz * v[1]) * s + kx * dot * k)
+      py.push(v[1] * c + (kz * v[0] - kx * v[2]) * s + ky * dot * k)
+      pz.push(v[2] * c + (kx * v[1] - ky * v[0]) * s + kz * dot * k)
     }
 
     if (this.lines.length) {

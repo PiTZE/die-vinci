@@ -134,6 +134,14 @@ export function automationPane(): Pane {
       autoSection = el('div', 'section')
       const ah = el('div', 'section-head')
       ah.appendChild(el('span', 'grow', 'THE ROLL'))
+      // The master, in the head, where the autobuyers' one is. It was the last
+      // row under the nine it governs, next to a purchase, which made it read
+      // as a tenth die rather than as the switch over all of them.
+      autoToggle = el('button', 'auto-toggle', 'ON')
+      autoToggle.type = 'button'
+      autoToggle.title = 'Hand the whole table back to your finger'
+      autoToggle.addEventListener('click', () => actions.toggleAutomator())
+      ah.appendChild(autoToggle)
       autoSection.appendChild(ah)
 
       // One row a die, shallowest first, which is the order they are sold in.
@@ -165,10 +173,7 @@ export function automationPane(): Pane {
       autoBuy = el('button', 'auto-up', '')
       autoBuy.type = 'button'
       autoBuy.addEventListener('click', () => actions.buyAutomator())
-      autoToggle = el('button', 'auto-toggle', 'ON')
-      autoToggle.type = 'button'
-      autoToggle.addEventListener('click', () => actions.toggleAutomator())
-      autoRow.append(el('span', 'auto-label', 'EVERY DIE'), autoToggle, autoBuy)
+      autoRow.append(el('span', 'auto-label', 'EVERY DIE'), autoBuy)
       autoManualRow = autoRow
       autoSection.appendChild(autoRow)
       root.append(autoSection)
@@ -332,11 +337,13 @@ export function automationPane(): Pane {
       // a first run, where the ladder is the only automation there is, the one
       // switch labelled EVERY DIE was the one switch that did nothing.
       const anyAuto = s.autoRoll || s.autoDice > 0
-      autoManualRow.hidden = !anyAuto
       autoToggle.hidden = !anyAuto
       setText(autoToggle, s.autoRollOn ? 'ON' : 'OFF')
       autoToggle.classList.toggle('buyable', s.autoRollOn)
-      autoBuy.hidden = s.autoRoll
+      // The automator, while it is still something to buy. Once the Wager has
+      // granted it there is nothing left in this row: the switch it used to
+      // carry is in the heading.
+      autoManualRow.hidden = s.autoRoll
       if (!s.autoRoll) {
         setText(autoBuy, `UNLOCK / ${automatorCost()} POINT`)
         const can = canBuyAutomator(s)

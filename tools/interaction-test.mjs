@@ -189,8 +189,9 @@ try {
 
     // Dragging off the button must not end the hold. Only lifting should.
     await evaluate(flowing)
-    // MAX disables itself at zero ink, and a disabled button does not start a
-    // hold. Let production put something in the pile first.
+    // MAX goes dark at zero ink. It still takes the press, which is the whole
+    // point of dimming it rather than disabling it, but let production put
+    // something in the pile so the hold has something to buy.
     await sleep(150)
     await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(box.x, box.y) })
     await sleep(150)
@@ -434,7 +435,7 @@ try {
     const m = [], r_ = [], f = []
     for (let i = 0; i < 120; i++) {
       window.LD.actions.roll(); window.LD.actions.maxAll()
-      m.push(max.className + (max.disabled ? ' off' : ''))
+      m.push(max.className + (max.getAttribute('aria-disabled') === 'true' ? ' off' : ''))
       r_.push(roll.className)
       f.push(fill.style.width)
       await new Promise(r => requestAnimationFrame(r))
@@ -453,7 +454,7 @@ try {
     s.ink = new D(0)
     await new Promise(r => setTimeout(r, 700))
     const max = document.querySelector('.bar-btn.max')
-    return { cls: max.className, off: max.disabled } })()`)
+    return { cls: max.className, off: max.getAttribute('aria-disabled') === 'true' } })()`)
   check('a button that truly cannot be pressed still goes dark',
     goesDark.off === true && !goesDark.cls.includes('buyable'), JSON.stringify(goesDark))
 
@@ -502,8 +503,8 @@ try {
   // anything about the ring at all.
   // The table too, not only the wallet. Each hold in here buys hundreds of
   // dice, and after a few of them the next price is past any fixed pile of
-  // ink: MAX goes disabled, holdable refuses the press, and the check that
-  // follows is measuring a button nobody managed to touch.
+  // ink: MAX goes dark and buys nothing, and the check that follows is
+  // measuring a hold that had nothing to do.
   const ready = async () => {
     await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal
       s.ink = new D('1e30'); s.inkThisWager = new D(0)
@@ -621,7 +622,26 @@ try {
   }
   await evaluate(`window.LD.releaseSticky()`)
 
-  // Unaffordable is not gone. MAX is disabled between one roll paying and the
+  // A button you cannot press yet still takes the ring, which is the reason
+  // these are dimmed rather than disabled. The moment you most want the game
+  // to keep pressing MAX for you is while you cannot afford anything and are
+  // waiting on the ink, and a disabled button receives no pointer events at
+  // all, so the press could never arrive.
+  await evaluate(`(() => { const s = window.LD.state, D = window.LD.Decimal
+    s.autoRoll = false; s.rollUpgrades = 0; s.ink = new D(0)
+    s.solids.forEach((d) => { d.bought = 0; d.amount = new D(0) }) })()`)
+  await sleep(500)
+  const dark = await evaluate(`(() => { const b = document.querySelector('.bar-btn.max')
+    return b.getAttribute('aria-disabled') === 'true' && !b.disabled })()`)
+  await pdown('.bar-btn.max', 21); await sleep(1200)
+  const ringedDark = await rings()
+  await pup(21)
+  check('a button too poor to press can still be given the ring',
+    dark === true && ringedDark.length === 1 && ringedDark[0].includes('max'),
+    JSON.stringify({ dark, ringedDark }))
+  await evaluate(`window.LD.releaseSticky()`)
+
+  // Unaffordable is not gone. MAX goes dark between one roll paying and the
   // next, and dropping the ring for that would take it off a second after you
   // put it on.
   //

@@ -34,7 +34,7 @@ import { modifiers } from '../game/tarot'
 import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
-import { bindKey, holdable, isPressing } from './hold'
+import { bindKey, holdable, isPressing, setActable } from './hold'
 import { Confirmer } from './confirm'
 import { vesica, type Vesica } from './geometry'
 import { setBlur, setDieRolling, setThrow, wireframe } from './wireframe'
@@ -560,11 +560,11 @@ export function tablePane(): Pane {
       // the button live means a held finger keeps its repeat instead of being
       // dropped and restarted several times a second.
       const canMax = steady.on('max', canMaxAll(s), now)
-      maxBtn.disabled = !canMax
+      setActable(maxBtn, canMax)
       ready(maxBtn, canMax)
 
       canStudyNow = canBuyStudy(s)
-      barStudy.disabled = !canStudyNow
+      setActable(barStudy, canStudyNow)
       ready(barStudy, canStudyNow)
 
       for (const def of SOLIDS) {
@@ -792,7 +792,7 @@ export function tablePane(): Pane {
       else duo(studyBtn, 'STUDY', `${formatWhole(sq.need, n)} ${SOLIDS[sq.idx - 1].short}`)
       setText(barStudy, studyArmed ? '?' : 'S')
       const canStudy = canBuyStudy(s)
-      studyBtn.disabled = !canStudy
+      setActable(studyBtn, canStudy)
       ready(studyBtn, canStudy)
 
       const showFolio = folioUnlocked(s)
@@ -804,7 +804,7 @@ export function tablePane(): Pane {
       barFolio.hidden = !showFolio
       canFolioNow = showFolio && canBuyFolio(s)
       if (showFolio) {
-        barFolio.disabled = !canFolioNow
+        setActable(barFolio, canFolioNow)
         ready(barFolio, canFolioNow)
       }
       if (showFolio) {
@@ -814,7 +814,7 @@ export function tablePane(): Pane {
         else duo(folioBtn, 'FOLIO', `${formatWhole(need, n)} ${SOLIDS[idx - 1].short}`)
         setText(barFolio, folioArmed ? '?' : 'F')
         const canFolio = canBuyFolio(s)
-        folioBtn.disabled = !canFolio
+        setActable(folioBtn, canFolio)
         folioBtn.classList.toggle('buyable', canFolio)
       }
     },

@@ -94,7 +94,8 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+button:disabled,
+button[aria-disabled='true'] {
   cursor: default;
   color: var(--fg-muted);
   border-color: var(--border-faint);

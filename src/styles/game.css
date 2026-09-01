@@ -169,6 +169,19 @@
   flex: 1;
 }
 
+/*
+ * A switch a section carries over everything under it, at the right of its
+ * heading. It is the same control as the ones in the rows below, so it has to
+ * be the same size: a row is a grid and the column gives it its width, and a
+ * heading is a flex line with nothing to do that, which left it 17px wide
+ * against their 45.
+ */
+.section-head .auto-toggle {
+  align-self: center;
+  min-width: 45px;
+  margin: -3px 0;
+}
+
 /* -- a solid in the production chain ------------------------------------- */
 
 
@@ -498,7 +511,7 @@
   letter-spacing: 0.1em;
 }
 
-.bar-roll:hover:not(:disabled) {
+.bar-roll:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--fill);
   text-shadow: 0 0 6px var(--glow);
 }
@@ -519,7 +532,7 @@
   -webkit-user-select: none;
 }
 
-.bar-btn:hover:not(:disabled) {
+.bar-btn:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--fill);
   text-shadow: 0 0 6px var(--glow);
 }
