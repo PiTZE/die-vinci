@@ -59,7 +59,7 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.ink = new D('1.8e308'); s.inkThisWager = new D('1.8e308') })()`)
 await sleep(150)
 await ev(`${tab('WAGER')}.click()`); await sleep(150)
-await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)
+await ev(`document.querySelector('.wager-now').click()`)
 await sleep(150)
 const first = await ev(`({ done: window.LD.state.challengesDone.slice(),
   auto: window.LD.state.autobuyers.solid1.unlocked })`)
@@ -101,7 +101,7 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.ink = new D('1.8e308'); s.inkThisWager = new D('1.8e308') })()`)
 await sleep(150)
 await ev(`${tab('WAGER')}.click()`); await sleep(150)
-await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)
+await ev(`document.querySelector('.wager-now').click()`)
 await sleep(150)
 const cleared = await ev(`({ done: window.LD.state.challengesDone.slice(),
   running: window.LD.state.challengeRunning, auto: window.LD.state.autobuyers.solid7.unlocked })`)

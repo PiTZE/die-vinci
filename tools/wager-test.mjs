@@ -57,11 +57,11 @@ check('wager tab hidden early',
   await ev(`!${tabOffered('WAGER')}`))
 
 await ev(atThreshold); await sleep(150)
-check('wager tab appears near the threshold',
-  await ev(`${tabOffered('WAGER')}`))
-
-await ev(openTab('WAGER'))
-await sleep(150)
+// The pane holds nothing but things bought with chips, so it waits for the
+// first Wager to pay some. Before that the run bar on the table says how far
+// away it is and the action bar carries the button.
+check('the wager tab stays shut until the first one is called',
+  (await ev(`${tabOffered('WAGER')}`)) === false)
 // The first Wager clears the first challenge, which awards the solid 1
 // autobuyer, which then spends the ten starting ink on a d4 within half a
 // second. That is correct, and it is not what this check is about, so the
@@ -70,7 +70,7 @@ await ev(`(() => { const a = window.LD.state.autobuyers
   for (const k of Object.keys(a)) a[k].on = false })()`)
 await sleep(150)
 const before = await ev(`({ chips: Number(window.LD.state.chips), wagers: window.LD.state.wagers })`)
-await ev(`[...document.querySelectorAll('.action')].find(b => b.textContent.startsWith('CALL THE WAGER')).click()`)
+await ev(`document.querySelector('.wager-now').click()`)
 await sleep(150)
 const after = await ev(`({ chips: Number(window.LD.state.chips), wagers: window.LD.state.wagers,
   ink: window.LD.state.ink.toString(), studies: window.LD.state.studies, folios: window.LD.state.folios,
@@ -140,22 +140,22 @@ check('ink over the cap does not stop the run', stuck0 !== stuck1, `${stuck0} ->
 check('ink held is clamped to the threshold',
   await ev(`window.LD.state.ink.lte(new window.LD.Decimal('1.8e308'))`),
   await ev(`window.LD.state.ink.toString()`))
-check('the CALL button stays shut until the run has earned it',
-  await ev(`(() => { const b = [...document.querySelectorAll('.action')]
-    .find(x => x.title === 'Call the Wager  (w)')
-    return !!b && b.disabled })()`))
+// The bar keeps the roll and the resets while the run is still short, and
+// hands itself to the one remaining move only when it is not.
+check('the CALL button stays away until the run has earned it',
+  await ev(`(() => { const b = document.querySelector('.wager-now')
+    return !!b && b.hidden })()`))
 
 // The CALL button holds and sticks like the rest. It is one of the three that
 // used to answer a click and nothing else.
+await ev(openTab('TABLE'))
 await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   // canWager reads what this run has earned, not what is in hand.
   s.ink = new D('1e309'); s.inkThisWager = new D('1e309'); s.broke = false })()`)
-await sleep(300)
-await ev(openTab('WAGER'))
 await sleep(400)
 const called = await ev(`(() => {
-  const b = [...document.querySelectorAll('.action')].find(x => x.textContent.startsWith('CALL THE WAGER'))
-  if (!b) return 'no button'
+  const b = document.querySelector('.wager-now')
+  if (!b || b.hidden) return 'no button'
   const r = b.getBoundingClientRect()
   b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 41, button: 0,
     clientX: r.x + 4, clientY: r.y + 4 }))

@@ -174,6 +174,8 @@ export function tablePane(): Pane {
    * occurred, which reads as the game ignoring you.
    */
   let canStudyNow = false
+  /** Whether the run is over and the Wager is the only move left. */
+  let mustWagerNow = false
   let canFolioNow = false
   let rollLine: HTMLElement
   let rollBtn: HTMLButtonElement
@@ -253,8 +255,10 @@ export function tablePane(): Pane {
       wagerNow = el('button', 'bar-roll wager-now', 'CALL THE WAGER')
       wagerNow.type = 'button'
       wagerNow.hidden = true
-      wagerNow.addEventListener('click', () => {
-        if (confirm.request('wager')) actions.wager()
+      // Held and stickable like the rest of the bar. It is the button the pane
+      // used to carry, and it carries the ring the pane's one was given.
+      holdable(wagerNow, () => {
+        if (mustWagerNow && confirm.request('wager')) actions.wager()
       })
 
       actionGroup = el('div', 'action-group')
@@ -417,6 +421,12 @@ export function tablePane(): Pane {
       // Same actions from the keyboard, held or tapped. Digits are read from
       // the physical key so shift+1 still means the first solid.
       // Named so a held key marks its button the way a held finger does.
+      // The Wager is called from here now, by key as well as by thumb. Its own
+      // pane no longer carries a button, because until the first one is called
+      // the pane is not there to carry it.
+      bindKey('w', () => {
+        if (mustWagerNow && confirm.request('wager')) actions.wager()
+      }, wagerNow)
       bindKey('m', () => actions.maxAll(), maxBtn)
       bindKey('space', () => actions.roll(), rollNow)
       bindKey('r', () => actions.buyRollRate(), rollBtn)
@@ -491,6 +501,7 @@ export function tablePane(): Pane {
       // The dice only turn while a roll is in the air. Under the automator
       // that is always, which is exactly the difference the purchase buys.
       const full = mustWager(s)
+      mustWagerNow = full
       const spinning = rolling(s) && s.haltMs <= 0 && !full
 
       // The bar gives itself over to the one remaining move.
@@ -730,8 +741,10 @@ export function tablePane(): Pane {
         ready(r.buy, can)
       }
 
-      // Gated exactly as the WAGER tab is, so the bar and the tab that explains
-      // it arrive together and neither gives the other away early.
+      // On its own gate. It used to share the WAGER tab's, so the two arrived
+      // together; the tab waits for the first Wager to be called now, and this
+      // is what tells you one is coming. It says a bare percentage, so it
+      // gives nothing away by arriving early.
       const showRun = s.wagers > 0 || s.inkThisWager.gte(WAGER_AT.div(1e60))
       runBar.hidden = !showRun
       // Emptied rather than merely hidden. Before the first Wager this gate can
@@ -743,8 +756,12 @@ export function tablePane(): Pane {
         // wagerProgress, not a second copy of the maths. It measures what the
         // run has earned rather than what it is holding, so a study no longer
         // throws the bar away along with the table.
+        // The number and nothing else. The two circles are the label: this is
+        // the only thing on the table drawn rather than written, it sits above
+        // the chain on every screen, and three words in front of the figure
+        // said what the figure was already saying.
         const pct = wagerProgress(s) * 100
-        setText(runLabel, `TO THE WAGER  ${pct.toFixed(2)}%`)
+        setText(runLabel, `${pct.toFixed(2)}%`)
         runLens.set(wagerProgress(s))
       }
 

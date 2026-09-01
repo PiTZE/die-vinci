@@ -1,5 +1,4 @@
 import { format } from '../format'
-import { WAGER_AT } from '../game/balance'
 import {
   UPGRADES,
   UPGRADE_CHAINS,
@@ -8,10 +7,8 @@ import {
   isBought,
   type UpgradeId,
 } from '../game/upgrades'
-import { canWager, chipsFromWager } from '../game/wager'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
-import { bindKey, holdable } from './hold'
 import { Confirmer } from './confirm'
 import {
   canBuyChipMult,
@@ -44,8 +41,6 @@ function duo(btn: HTMLElement, verb: string, cost: string): void {
 export function wagerPane(): Pane {
   let confirm: Confirmer
   let confirmSettings: Record<string, boolean> = {}
-  let callBtn: HTMLButtonElement
-  let callLine: HTMLElement
   let chipsLine: HTMLElement
   let note: HTMLElement
   /** Which upgrade the note line is describing, or empty for the prompt. */
@@ -58,30 +53,16 @@ export function wagerPane(): Pane {
     id: 'wager',
     label: 'WAGER',
 
-    // Hidden until the threshold is in sight, so it does not sit there empty
-    // for the whole first run.
-    visible: (s) => s.wagers > 0 || s.inkThisWager.gte(WAGER_AT.div(1e60)),
+    // Nothing here until the first Wager has been called. Everything this
+    // pane holds is bought with chips, and there are no chips until then, so
+    // before that it is a tab with a locked grid in it and a button that says
+    // how far away you are. The table says how far away you are, on the run
+    // bar, and the button that calls it lives in the action bar where your
+    // thumb already is.
+    visible: (s) => s.wagers > 0,
 
     mount(root, actions: Actions) {
       confirm = new Confirmer((k) => confirmSettings[k.split(':')[0]] !== false)
-      const call = el('div', 'section')
-      const ch = el('div', 'section-head')
-      ch.appendChild(el('span', 'grow', 'THE WAGER'))
-      callLine = el('span', 'num dim', '')
-      ch.appendChild(callLine)
-      call.appendChild(ch)
-
-
-      callBtn = el('button', 'action', '')
-      callBtn.type = 'button'
-      callBtn.title = 'Call the Wager  (w)'
-      holdable(callBtn, () => {
-        if (confirm.request('wager')) actions.wager()
-      })
-      const cr = el('div', 'row')
-      cr.appendChild(callBtn)
-      call.appendChild(cr)
-
       const grid = el('div', 'section')
       const gh = el('div', 'section-head')
       gh.appendChild(el('span', 'grow', 'CHIPS'))
@@ -136,11 +117,7 @@ export function wagerPane(): Pane {
       multRow.appendChild(multBtn)
       grid.appendChild(multRow)
 
-      root.append(call, grid)
-
-      bindKey('w', () => {
-        if (confirm.request('wager')) actions.wager()
-      }, callBtn)
+      root.append(grid)
     },
 
     update(s: GameState) {
@@ -151,19 +128,7 @@ export function wagerPane(): Pane {
       // and shift everything under it on the first tap.
       if (!noteFor) setText(note, 'touch an upgrade to read what it does')
 
-      setText(callLine, `${s.wagers}`)
       confirmSettings = s.options.confirms
-      const ready = canWager(s)
-      setText(
-        callBtn,
-        confirm.isArmed('wager')
-          ? 'SURE? THIS RESETS EVERYTHING'
-          : ready
-          ? `CALL THE WAGER  +${format(chipsFromWager(s), n)}`
-          : `${format(s.inkThisWager, n)} / ${format(WAGER_AT, n)} INK`,
-      )
-      callBtn.disabled = !ready
-      callBtn.classList.toggle('buyable', ready)
 
       setText(chipsLine, format(s.chips, n))
 
