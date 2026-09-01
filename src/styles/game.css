@@ -114,19 +114,25 @@
 }
 
 .tab {
-  /* Grows to share whatever width there is, never shrinks below its own word.
-     Fixed at auto the four tabs of an early save left 60% of the bar empty;
-     at flex: 1 the eight tabs of a late one crushed CHALLENGES into
-     AUTOMATION. This fills the bar when they fit and scrolls when they do
-     not. */
-  flex: 1 0 auto;
+  /* Every tab the same width, whatever its word.
+     It used to be flex: 1 0 auto, which shares the spare room but sizes each
+     one from its own label, so OPTIONS sat half again as wide as AUTO and the
+     bar read as a ragged row rather than a set of equal keys. Zero basis makes
+     the width the bar's, divided evenly, and the padding is small enough that
+     the longest label still fits a sixth of 360px.
+     The two bars were also a font size apart, 0.64 against 0.6, which is the
+     other half of why they did not look like one control. */
+  flex: 1 1 0;
+  min-width: 0;
   border: 0;
   border-right: 1px solid var(--border-faint);
-  font-size: 0.64rem;
+  font-size: 0.62rem;
   letter-spacing: 0.06em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--fg-muted);
-  padding: 8px 14px calc(8px + var(--safe-b));
+  padding: 8px 4px calc(8px + var(--safe-b));
   min-height: calc(44px + var(--safe-b));
 }
 
@@ -1888,16 +1894,21 @@
   display: none;
 }
 .subtab {
+  /* The same rule as the row above it, so the two bars read as one control:
+     equal keys, same size, same type. */
   position: relative;
-  flex: 1 0 auto;
+  flex: 1 1 0;
+  min-width: 0;
   border: 0;
   border-right: 1px solid var(--border-faint);
   background: none;
-  font-size: 0.6rem;
+  font-size: 0.62rem;
   letter-spacing: 0.06em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--fg-muted);
-  padding: 7px 12px;
+  padding: 7px 4px;
   min-height: 34px;
 }
 .subtab.on {
