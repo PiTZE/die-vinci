@@ -481,7 +481,14 @@ class Wire {
     // change of speed. One global number meant the tetrahedron blurred at the
     // rate the sphere needs, which is four times slower than it can manage.
     const rate = ceilingFor(this.id) * Math.PI * 2
-    this.t += dt * rate * this.speed
+    // Clamped against the frame that actually arrived rather than the sixty a
+    // second the ceiling is written in terms of. A page delivering thirty
+    // would otherwise advance two thirds of a symmetry step a frame and read
+    // as a crawl, so the same die spun differently on two machines for no
+    // reason either of them chose. Held to a third of a step whatever the
+    // frame rate, it looks the same on both and simply covers less ground on
+    // the slower one.
+    this.t += Math.min(dt * rate * this.speed, stepRad(this.id) * STEP_SHARE)
     // Rolling too fast to watch, and standing still while it does. There was a
     // drift and a three-degree tilt riding on the spin here, on the same
     // reasoning as the one in the hop and wrong for the same reason: the die
@@ -508,7 +515,7 @@ class Wire {
       // that answers to nothing, which is what reads as the die wobbling
       // rather than turning.
       const k = p / LAND_AT
-      this.place(0, -1.5 * Math.sin(k * Math.PI), 0, 1, 1)
+      this.place(0, -RISE_SHARE * iconPx * Math.sin(k * Math.PI), 0, 1, 1)
       return
     }
 
@@ -520,7 +527,8 @@ class Wire {
     // before or after where it hops is a die whose landing has nothing to do
     // with its throw.
     const cycle = q * BOUNCES
-    const hop = -Math.abs(Math.sin(cycle * Math.PI)) * HOP_PX * fade
+    const hop =
+      -Math.abs(Math.sin(cycle * Math.PI)) * RISE_SHARE * BOUNCE_OF_RISE * iconPx * fade
     // Flattest at the instant of contact, which is where the sine is zero.
     const contact = Math.pow(1 - Math.abs(Math.sin(cycle * Math.PI)), 3) * fade
     const sx = 1 + SQUASH * contact
@@ -679,8 +687,30 @@ const FRAME_HZ = 60
  * and simply do not stop, which is what a roll rate too high to watch should
  * look like.
  */
+/**
+ * How much of a symmetry step a solid may turn in one frame.
+ *
+ * One whole step was the old rule and it is the one number that cannot be
+ * used, because a shape that turns exactly one symmetry step between frames is
+ * drawn in the same pose every frame: at sixty frames a second the fastest
+ * spin in the game was a still picture. A frame either side of that is worse
+ * than still. The tetrahedron at 58fps creeps four degrees a frame, and at
+ * 50fps it aliases into turning backwards, which is what a die spinning as
+ * fast as it can looked like on any screen not delivering exactly sixty.
+ *
+ * A third of a step gives three frames to cross it, which reads as a fast turn
+ * in the direction it is actually going. It is the same rule the comment above
+ * always claimed, set below its own limit rather than on it.
+ */
+const STEP_SHARE = 1 / 3
+
 function ceilingFor(id: SolidId): number {
-  return ((SYMMETRY_STEP[id] ?? 30) / 360) * FRAME_HZ
+  return ((SYMMETRY_STEP[id] ?? 30) / 360) * FRAME_HZ * STEP_SHARE
+}
+
+/** One symmetry step in radians, which is the pose repeating. */
+function stepRad(id: SolidId): number {
+  return ((SYMMETRY_STEP[id] ?? 30) * Math.PI) / 180
 }
 
 /**
@@ -708,8 +738,44 @@ const LAND_AT = 0.75
 /** Hops in that last quarter. Two is a die landing; one is a drop. */
 const BOUNCES = 2
 
-/** How high, as a share of the icon. A fifth of it reads at 32px. */
-const HOP_PX = 6.4
+/**
+ * How high it hops, and how far it rises in the air, as shares of the icon.
+ *
+ * Both were flat pixel counts, tuned against the 32px icon a phone draws. The
+ * desktop row draws the same die at 38px, so the same 6.4px was a fifth of the
+ * icon on one and a sixth on the other: the die landed differently on the two
+ * screens for no reason anybody chose. The shares are the phone's numbers, so
+ * the size it was tuned at is unchanged and the desktop now matches it.
+ */
+const RISE_SHARE = 0.1
+
+/**
+ * The first bounce, as a share of the arc the die fell from.
+ *
+ * These were two unrelated numbers, 6.4px of hop against 1.5px of arc, and
+ * nothing held them in any relation to each other. The bounce was four times
+ * the throw it was a bounce from, so the largest upward movement in the whole
+ * animation happened after the die had landed: the roll ended on the die
+ * leaping off the table, which is what it looked like. Reported from playing.
+ *
+ * Tied to the arc now, so it cannot invert again. The fade takes the first
+ * contact to about a third of the arc and the second to a twentieth, which is
+ * a die settling rather than a die taking off.
+ */
+const BOUNCE_OF_RISE = 0.5
+
+/**
+ * What the icon is currently drawn at. One number for the table, because every
+ * row draws the same size, kept by an observer rather than measured per frame:
+ * a getBoundingClientRect a die a throw is nine forced layouts a roll.
+ */
+let iconPx = 32
+const sizes = new ResizeObserver((entries) => {
+  for (const e of entries) {
+    const w = e.contentRect.width
+    if (w > 0) iconPx = w
+  }
+})
 
 /** The squash on contact, and how long it holds before springing back. */
 const SQUASH = 0.14
@@ -793,6 +859,10 @@ export function setBlur(on: boolean): void {
 
 function frame(now: number): void {
   raf = requestAnimationFrame(frame)
+  // Stamped whether or not this frame draws anything, because this is what
+  // says the loop is alive. Stamping it below the hidden guard would have a
+  // page that comes back from a minute away look exactly like a dead loop.
+  lastFrameAt = now
   const dt = Math.min((now - last) / 1000, 0.25)
   last = now
   if (document.hidden) return
@@ -811,9 +881,33 @@ function frame(now: number): void {
   // At rest. The loop keeps running because a throw can start on any frame.
 }
 
+/**
+ * When the loop was last given a frame, and how long a gap means it is gone.
+ *
+ * A stored handle is not proof that a loop is alive. A page that goes away can
+ * be handed a perfectly good frame handle and then never given the frame, and
+ * `raf` is left holding the number of something that will never arrive: every
+ * later ensureLoop saw a truthy handle, decided the loop was running, and
+ * returned. The dice stopped for the rest of the session, and the only way
+ * back was closing the game and opening it again, which is exactly how it was
+ * reported.
+ *
+ * main.ts already had this, as a generation counter and a watchdog in the
+ * tick, for the same reason and after the same failure. This loop had nothing.
+ * So it stamps a frame, and a handle older than the stamp allows is treated as
+ * dead rather than as running.
+ */
+let lastFrameAt = 0
+const STALE_MS = 1000
+
 function ensureLoop(): void {
-  if (raf || REDUCED.matches) return
+  if (REDUCED.matches) return
+  if (raf && performance.now() - lastFrameAt < STALE_MS) return
+  // Cancelling a live frame and asking for another is the same frame. Doing it
+  // to a discarded one is the only way back.
+  if (raf) cancelAnimationFrame(raf)
   last = performance.now()
+  lastFrameAt = last
   raf = requestAnimationFrame(frame)
 }
 
@@ -824,6 +918,13 @@ function stopLoop(): void {
 }
 
 REDUCED.addEventListener('change', () => (REDUCED.matches ? stopLoop() : ensureLoop()))
+
+// Back from another tab, and turning again. The table asks for the loop on
+// every frame it wants a blur, so this is not the only way back, but waiting
+// for that means waiting on the render loop's own two-second watchdog first.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) ensureLoop()
+})
 
 /**
  * Whether this die takes part in a throw. A row you own none of does not:
@@ -842,6 +943,7 @@ export function wireframe(id: SolidId, cls = 'solid-icon'): SVGSVGElement {
   live.add(w)
   byEl.set(w.el, w)
   observer?.observe(w.el)
+  sizes.observe(w.el)
   ensureLoop()
   return w.el
 }

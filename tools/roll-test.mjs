@@ -231,13 +231,19 @@ await sleep(150)
 // which is a vertex, and a die turns about the upright axis through its top:
 // that vertex is the one point in the drawing that never moves, so a die
 // turning perfectly well measured as a die standing still.
-await ev(`(() => { window.__s = []; window.__sOn = true
+// Timestamped, because the reading is a rate rather than a count. Distance
+// moved between two frames depends on how far apart those frames were, so on a
+// box running four browsers this measured the load as much as the easing, and
+// the same build read 5.56 on one run and 2.37 on the next. Divided by the gap
+// it is degrees a second, which is what "decelerates" is a claim about.
+await ev(`(() => { window.__s = []; window.__t = []; window.__sOn = true
   const icon = document.querySelector('.solid-icon')
   const read = () => [...icon.querySelectorAll('line')].flatMap(l =>
     [Number(l.getAttribute('x1')), Number(l.getAttribute('y1')),
      Number(l.getAttribute('x2')), Number(l.getAttribute('y2'))])
   const step = () => {
     if (!window.__sOn) return
+    window.__t.push(performance.now())
     window.__s.push(read())
     requestAnimationFrame(step)
   }
@@ -259,11 +265,13 @@ await ev(`window.__sOn = false`)
 const swing = await ev(`(() => {
   const s = window.__s
   const d = []
-  // How far the whole wireframe moved between one frame and the next.
+  // How fast the whole wireframe moved, per millisecond rather than per frame.
+  const t = window.__t
   for (let i = 1; i < s.length; i++) {
     let sum = 0
     for (let k = 0; k < s[i].length; k++) sum += Math.abs(s[i][k] - s[i-1][k])
-    d.push(sum)
+    const gap = t[i] - t[i-1]
+    d.push(gap > 0 ? sum / gap : 0)
   }
   const moving = d.filter(v => v > 0)
   const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0
@@ -461,9 +469,18 @@ check('an empty row lands on nothing',
   (await ev(`[...document.querySelectorAll('.solid')].filter(r => getComputedStyle(r).display !== 'none')
      .slice(1).every(r => r.querySelector('.solid-face').textContent === '')`)) === true)
 
-// Spin speed has to rise with the roll rate and then stop rising, or crossing
-// out of the readable range makes the dice visibly slow down, which is what it
-// used to do: a fixed blur rate slower than the fastest eased throw.
+// Crossing out of the readable range must not make the dice visibly slow down,
+// which is what a fixed blur rate slower than the fastest eased throw used to
+// do. Past the first upgrade every rate sits at the solid's own ceiling, so
+// the claim is that it holds there rather than that it keeps climbing.
+//
+// And it must not alias, which is the harder half and the half that was wrong.
+// Distance moved per frame is not a measure of apparent speed: it peaks
+// exactly when a shape turns one whole symmetry step between frames, which is
+// the pose repeating, which is a die standing perfectly still. The ceiling was
+// set on that number, so the fastest spin in the game scored full marks here
+// and was a still picture on screen. Frames identical to the one before them
+// is the reading that tells those two apart.
 async function spinRate(upgrades) {
   await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
     s.autoRoll = true; s.studies = 2; s.rollUpgrades = ${upgrades}
@@ -504,22 +521,29 @@ async function spinRate(upgrades) {
   }
   await ev(`window.__spOn = false`)
   return ev(`(() => { const s = window.__sp, d = []
+    let repeats = 0
     for (let i = 1; i < s.length; i++) {
       let sum = 0
       for (let k = 0; k < s[i].length; k++) sum += Math.abs(s[i][k] - s[i-1][k])
+      if (sum === 0) repeats++
       d.push(sum)
     }
     const m = d.filter(v => v > 0)
-    return m.length ? m.reduce((a,b)=>a+b,0) / m.length : 0 })()`)
+    return { move: m.length ? m.reduce((a,b)=>a+b,0) / m.length : 0,
+      repeats, frames: s.length } })()`)
 }
 const slow = await spinRate(0)
 const quicker = await spinRate(6)
 const fast = await spinRate(40)
-check('the dice spin faster as the roll rate climbs', fast > slow * 1.3,
-  `1 roll/s: ${slow.toFixed(4)}  ->  110 roll/s: ${fast.toFixed(4)}`)
-check('and stop speeding up at the ceiling instead of dropping',
-  fast >= quicker * 0.9 && quicker > slow,
-  `${slow.toFixed(4)} -> ${quicker.toFixed(4)} -> ${fast.toFixed(4)}`)
+check('the dice do not slow down as the roll rate crosses out of the readable range',
+  fast.move >= slow.move * 0.9 && fast.move >= quicker.move * 0.9,
+  `1 roll/s: ${slow.move.toFixed(4)} -> ${quicker.move.toFixed(4)} -> 110 roll/s: ${fast.move.toFixed(4)}`)
+// Asked of the continuous spin only. A readable throw is an eased curve with a
+// die sitting still between throws, so identical frames there are the die
+// resting rather than the die aliasing.
+check('and the fastest spin is still a turn rather than a repeating pose',
+  fast.repeats === 0,
+  `${fast.repeats}/${fast.frames} frames identical to the one before`)
 
 // The throws hand over to the shake loop rather than both playing at once.
 const bed = await ev(`(async () => {

@@ -120,6 +120,56 @@ const f2 = await ev(stateInk)
 check('a freeze and resume is credited, not lost', Number(f2) > Number(f1),
   `${Number(f1).toExponential(2)} -> ${Number(f2).toExponential(2)}`)
 
+// -- and the other loop, which is the dice ---------------------------------
+//
+// The nine solids keep their own frame loop, and it had none of the above. It
+// stored its handle and read a truthy value as proof a frame was coming, which
+// is the bug this whole file exists about, a second time and in a second
+// place. Reported as the dice stopping after a tab switch and coming back only
+// when the game was closed and opened again.
+//
+// The handle handed out here is truthy, unlike the `() => 0` above. That is
+// the whole of the failure: a zero reads as "no loop running" and every
+// ensureLoop would have started one, so a falsy stub tests nothing here.
+await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  // Rolling far too fast to read, which is the continuous spin rather than the
+  // eased throw, and past the wall so the table is never halted mid-measure.
+  s.broke = true
+  s.autoRoll = true; s.autoRollOn = true; s.autoDiceOff = []
+  s.rollUpgrades = 400
+  s.solids.forEach((d, i) => { if (i < 3) { d.bought = 10; d.amount = new D(100) } }) })()`)
+await sleep(600)
+
+// Sampled off a timer, never off a frame: a frame-driven sampler stops with
+// the thing it is measuring and reports every freeze as a clean zero.
+//
+// The whole figure, not one vertex. Reading a single x1 measured the
+// tetrahedron's apex, which sits on the axis it turns about and so holds still
+// through a perfectly good spin. That looked exactly like the bug.
+const spun = `(async () => {
+  const svg = document.querySelector('.solid-icon')
+  const read = () => [...svg.querySelectorAll('line,path')]
+    .map(n => n.getAttribute('x1') + ',' + n.getAttribute('x2') + (n.getAttribute('d') || '')).join('|')
+  let prev = read(), changes = 0
+  await new Promise(done => { let n = 0; const h = setInterval(() => {
+    const v = read(); n++; if (v !== prev) changes++; prev = v
+    if (n >= 40) { clearInterval(h); done() } }, 16) })
+  return changes })()`
+
+const spin1 = await ev(spun)
+check('the dice turn before the frame chain dies', spin1 > 10, `${spin1}/40 samples moved`)
+
+await ev(`window.requestAnimationFrame = () => 987654`)
+await sleep(700)
+const spin2 = await ev(spun)
+check('and stop when it dies', spin2 === 0, `${spin2}/40 samples moved`)
+
+await ev(`window.requestAnimationFrame = window.__origRaf`)
+let spin3 = 0
+for (let i = 0; i < 12 && spin3 <= 10; i++) spin3 = await ev(spun)
+check('and come back on their own, without the game being reopened',
+  spin3 > 10, `${spin3}/40 samples moved`)
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)
