@@ -283,11 +283,25 @@ const swing = await ev(`(() => {
     const gap = t[i] - t[i-1]
     d.push(gap > 0 ? sum / gap : 0)
   }
-  const moving = d.filter(v => v > 0)
+  // Cut at the last frame that moved, rather than dropping every still frame.
+  //
+  // Filtering the zeros out threw away the end of the throw along with the
+  // rest that follows it, and the end of the throw is the half this is about:
+  // the tail third then came from the middle of the curve, and how much of it
+  // got dropped moved with the frame rate. Same build, 2.77 one run and 1.83
+  // the next, either side of the threshold. Everything up to the last moving
+  // frame is the throw, still frames inside it included.
+  // Both ends. The sampler is installed before the click, so the window opens
+  // on a die still at rest, and those leading zeros sat in the head third and
+  // pulled the opening of the throw down toward the end of it.
+  let first = -1
+  let last = -1
+  for (let i = 0; i < d.length; i++) if (d[i] > 0) { if (first < 0) first = i; last = i }
+  const throw_ = first < 0 ? [] : d.slice(first, last + 1)
   const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0
-  const third = Math.max(1, Math.floor(moving.length / 3))
-  return { samples: d.length, moving: moving.length,
-    head: avg(moving.slice(0, third)), tail: avg(moving.slice(-third)) }
+  const third = Math.max(1, Math.floor(throw_.length / 3))
+  return { samples: d.length, moving: d.filter(v => v > 0).length, frames: throw_.length,
+    head: avg(throw_.slice(0, third)), tail: avg(throw_.slice(-third)) }
 })()`)
 check('the die actually tumbles', swing.moving > 8, JSON.stringify(swing))
 check('and decelerates the whole way rather than stopping dead',
@@ -994,6 +1008,51 @@ const backOn = await ev(`(() => { const s = window.LD.state, D = window.LD.Decim
   return { off: s.autoDiceOff.slice(), inkMoved: s.ink.toString() !== before } })()`)
 check('and switching it back on starts it again',
   backOn.off.length === 0 && backOn.inkMoved === true, JSON.stringify(backOn))
+
+// Switch every one of them off, and the table is genuinely idle.
+//
+// The tick asked whether the ladder had ever been bought rather than whether
+// anything actually rolls itself, so a table with every die switched off still
+// counted as automated. The roll clock went on running with nobody driving it,
+// which left the animation permanently mid-throw on a clock that kept jumping
+// and left a press with nothing to start. Reported from playing, as a single
+// tap on ROLL wrecking the die animation.
+const allOff = await ev(`(async () => { const s = window.LD.state, D = window.LD.Decimal
+  s.studies = 3; s.autoDice = 3; s.autoDiceOff = [1, 2, 3]; s.autoRoll = false
+  s.autoRollOn = true; s.handRollAt = 0; s.rollStartedAt = 0; s.rollAccum = 0
+  s.solids.forEach((d, i) => { if (i < 4) { d.bought = 10; d.amount = new D(50) } })
+  await new Promise(r => setTimeout(r, 800))
+  const seen = []
+  for (let i = 0; i < 10; i++) { seen.push(s.rollStartedAt)
+    await new Promise(r => setTimeout(r, 60)) }
+  return { rollsItself: [1, 2, 3].map(i => window.LD.dieRollsItself(s, i)),
+    running: seen.filter(v => v > 0).length, of: seen.length } })()`)
+check('with every die switched off the roll clock is idle',
+  allOff.rollsItself.every((v) => v === false) && allOff.running === 0,
+  JSON.stringify(allOff))
+
+// And a button you can see cannot refuse the press.
+//
+// startRoll asked whether the automator was on; the button is hidden when
+// every die is covered by it. Those disagree exactly when a die is switched
+// back to your finger, which is what those switches are for: the button came
+// back, and every press it took was dropped before it was even marked.
+const pressTaken = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = true; s.autoRollOn = true; s.studies = 3
+  s.autoDice = 3; s.autoDiceOff = [2]; s.handRollAt = 0
+  s.solids.forEach((d, i) => { if (i < 4) { d.bought = 10; d.amount = new D(50) } })
+  window.LD.actions.roll()
+  const out = { covered: window.LD.allRollThemselves ? window.LD.allRollThemselves(s) : null,
+    rollsItself: [1, 2, 3].map(i => window.LD.dieRollsItself(s, i)),
+    registered: s.handRollAt > 0 }
+  // Left as the checks below expect to find it. The automator being on is the
+  // whole point of this one, and leaving it on made the next check read a
+  // table where every die can roll itself.
+  s.autoRoll = false; s.autoDice = 2; s.autoDiceOff = []; s.handRollAt = 0
+  return out })()`)
+check('a die handed back to your finger can still be rolled by hand',
+  pressTaken.rollsItself.join() === 'true,false,true' && pressTaken.registered === true,
+  JSON.stringify(pressTaken))
 
 // A switch is only worth offering for a die something would roll without you.
 const noSwitch = await ev(`(() => { const s = window.LD.state

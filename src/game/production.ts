@@ -861,7 +861,7 @@ export function rollProgress(s: GameState, now: number): number {
 }
 
 export function rolling(s: GameState): boolean {
-  return rollingItself(s) || s.rollStartedAt > 0
+  return anyRollsItself(s) || s.rollStartedAt > 0
 }
 
 /** Begins a spin. Refused while one is already in flight, which is the whole
@@ -917,7 +917,13 @@ function spendHandRoll(s: GameState, now: number): void {
 
 export function startRoll(s: GameState, now: number): boolean {
   if (mustWager(s)) return false
-  if (rollingItself(s)) return false
+  // The same question the ROLL button is hidden by, because a button you can
+  // see and a press that is refused cannot disagree. This asked whether the
+  // automator was on, and the button asks whether every die is covered by it:
+  // switch one die back to your finger, which is the whole point of those
+  // switches, and the button came back while every press it received was
+  // dropped before it was even marked. Reported as the button doing nothing.
+  if (allRollThemselves(s)) return false
   // Marked even when a spin is already in the air, because that is what makes
   // holding cover every roll rather than every other one.
   s.handRollAt = now
@@ -1127,6 +1133,23 @@ export function dieRollsItself(s: GameState, idx: number): boolean {
 
 /** Whether the whole table rolls itself, which is when a ROLL button has
  *  nothing left to do. Switch one die back to your finger and it returns. */
+/**
+ * Whether anything on the table rolls without your finger right now.
+ *
+ * Not the same question as whether the ladder was ever bought, and the
+ * difference is what broke the table. Every rung the ladder sells can be
+ * switched back to your finger, and the automator's master switch turns the
+ * lot of them off at once, so `autoDice > 0` says only that a purchase was
+ * made once. Asked that way, a table with every die switched off still
+ * counted as automated: the roll clock went on running with nobody driving
+ * it, which left the animation permanently mid-throw on a clock that kept
+ * jumping, and left a press with nothing to start.
+ */
+export function anyRollsItself(s: GameState): boolean {
+  for (let i = 1; i <= openSolids(s); i++) if (dieRollsItself(s, i)) return true
+  return false
+}
+
 export function allRollThemselves(s: GameState): boolean {
   for (let i = 1; i <= openSolids(s); i++) if (!dieRollsItself(s, i)) return false
   return openSolids(s) > 0
@@ -1309,7 +1332,7 @@ export function tick(s: GameState, dt: number, now: number): void {
   // you ask for this one. Yes throws everything; no throws only the dice that
   // roll themselves.
   const hand = handRolling(s)
-  const anyAuto = rollingItself(s) || s.autoDice > 0
+  const anyAuto = anyRollsItself(s)
   if (!hand && !anyAuto) {
     // Nothing is rolling, so nothing is in the air either. A spin that was
     // asked for keeps `hand` true until it lands, so this cannot cut one off.
