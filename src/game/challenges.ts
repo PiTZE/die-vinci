@@ -1,3 +1,4 @@
+import { HALT_MS } from './balance'
 // The challenge ladder, ported from Antimatter Dimensions' normal challenges.
 //
 // Its shape: each challenge is a run under a restriction, completed by
@@ -24,7 +25,7 @@ export const CHALLENGES: ChallengeDef[] = [
   { id: 1, awards: 'solid1', label: `${SOLIDS[0].short} AUTO`, faithful: true,
     note: 'no restriction. Reach the Wager once.' },
   { id: 2, awards: 'solid2', label: `${SOLIDS[1].short} AUTO`, faithful: true,
-    note: 'every purchase halts all production, recovering over three minutes' },
+    note: 'a purchase takes all production to nothing, and it climbs back over three minutes' },
   { id: 3, awards: 'solid3', label: `${SOLIDS[2].short} AUTO`, faithful: true,
     note: 'buying a solid destroys every solid below it' },
   { id: 4, awards: 'solid4', label: `${SOLIDS[3].short} AUTO`, faithful: true,
@@ -82,6 +83,8 @@ export interface Restrictions {
   noRollRate: boolean
   eraseLower: boolean
   /** Milliseconds production stays halted after any purchase. */
+  /** Milliseconds of recovery a purchase costs, counted down to zero. It
+   *  scales production on the way rather than stopping it; see chargeBack. */
   haltMs: number
   /** Divides the first solid's multiplier. */
   weakenFirst: number
@@ -128,7 +131,7 @@ export function exitChallenge(s: GameState, reset: (s: GameState) => void): void
 export function restrictions(s: GameState): Restrictions {
   switch (s.challengeRunning) {
     case 2:
-      return { ...NONE, haltMs: 3 * 60_000 }
+      return { ...NONE, haltMs: HALT_MS }
     case 3:
       return { ...NONE, eraseLower: true }
     case 4:

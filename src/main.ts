@@ -6,6 +6,7 @@ import './styles/game.css'
 import Decimal from './vendor/break-infinity'
 import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, START_INK, TICK_MS, UI_MS_DEFAULT } from './game/balance'
 import {
+  chargeBack,
   buyFolio,
   autoRollCost,
   buyAutoRoll,
@@ -717,6 +718,8 @@ const hook: Record<string, unknown> = {
   // How often a solid maps onto itself in one turn about the vertical, which
   // is what a throw is quantised to.
   solidFold,
+  // What the second challenge is paying, 0 to 1, on its way back up.
+  chargeBack,
   // Whether XVI is mid-strike, which the top bar draws over the ink.
   towerStriking,
   // The whole modifier set a save's cards add up to. Exposed for test:arcana,

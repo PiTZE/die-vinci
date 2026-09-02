@@ -13,6 +13,7 @@ import {
   unspentMultiplier,
 } from './upgrades'
 import {
+  HALT_MS,
   AUTOMATOR_COST,
   AUTOMATOR_SEED,
   AUTO_ROLL_COSTS,
@@ -65,6 +66,27 @@ export function studyBonus(s: GameState, tier: number): Decimal {
  * wagers completed for the solids that upgrade covers, and one on the first
  * solid from chips left unspent.
  */
+/**
+ * How much of its production the table is making, 0 to 1.
+ *
+ * The second challenge, and this is AD's own arrangement rather than the one
+ * that was here. Its C2 keeps a number it calls chall2Pow, sets it to zero on
+ * any dimension or tickspeed purchase, adds `diff / 100 / 1800` to it every
+ * tick until it reaches one, and multiplies every dimension's production by
+ * it. That is a linear ramp back to full over three minutes, and the game goes
+ * on being played the whole way up: a second after a purchase you are making
+ * about nothing, ninety seconds later you are making half.
+ *
+ * What was here instead was a wall. A purchase stopped production dead for the
+ * full three minutes and refused to let you roll at all, so every purchase
+ * bought three minutes of a game that could not be played. Same sentence in
+ * the challenge list, an order of magnitude harsher in the hand.
+ */
+export function chargeBack(s: GameState): number {
+  if (s.haltMs <= 0) return 1
+  return Math.max(0, Math.min(1, 1 - s.haltMs / HALT_MS))
+}
+
 export function solidMultiplier(s: GameState, idx: number): Decimal {
   const st = s.solids[idx - 1]
   const r = restrictions(s)
@@ -880,7 +902,7 @@ function spendHandRoll(s: GameState, now: number): void {
 
 export function startRoll(s: GameState, now: number): boolean {
   if (mustWager(s)) return false
-  if (rollingItself(s) || s.haltMs > 0) return false
+  if (rollingItself(s)) return false
   // Marked even when a spin is already in the air, because that is what makes
   // holding cover every roll rather than every other one.
   s.handRollAt = now
@@ -914,11 +936,15 @@ function produce(s: GameState, rolls: Decimal, factors: number[]): void {
   const before = s.solids.map((d) => d.amount)
 
   const m = modifiers(s)
+  // Every tier, the way AD multiplies every dimension by chall2Pow. One is the
+  // ordinary case and costs a multiplication by a Decimal one.
+  const charge = chargeBack(s)
   const ink = before[0]
     .times(solidMultiplier(s, 1))
     .times(factors[0])
     .times(rolls)
     .times(m.globalMult)
+    .times(charge)
   s.ink = s.ink.plus(ink)
   s.inkThisWager = s.inkThisWager.plus(ink)
 
@@ -931,6 +957,7 @@ function produce(s: GameState, rolls: Decimal, factors: number[]): void {
       .times(factors[i - 1])
       .times(rolls)
       .times(m.globalMult)
+      .times(charge)
     s.solids[i - 2].amount = s.solids[i - 2].amount.plus(made)
   }
 }
@@ -1215,13 +1242,10 @@ export function tick(s: GameState, dt: number, now: number): void {
     return
   }
 
-  // A challenge that halts production after a purchase, recovering over three
-  // minutes, as AD's second challenge does.
-  if (s.haltMs > 0) {
-    s.haltMs = Math.max(0, s.haltMs - dt * 1000)
-    s.rollStartedAt = 0
-    return
-  }
+  // The second challenge's recovery, which is a ramp rather than a wall: the
+  // clock runs down and chargeBack turns it into the fraction of production
+  // the table is making. Nothing stops here.
+  if (s.haltMs > 0) s.haltMs = Math.max(0, s.haltMs - dt * 1000)
 
   // The high-water mark the codices open on, and the codices themselves.
   //

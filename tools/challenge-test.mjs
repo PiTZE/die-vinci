@@ -228,6 +228,46 @@ check('the roll master covers the ladder, not just the automator',
   masters.laddderRollsWithItOn === true && masters.ladderStopsWithItOff === true,
   JSON.stringify(masters))
 
+// The second challenge, which is AD's C2 and now has AD's shape.
+//
+// Its chall2Pow goes to zero on a purchase and climbs back to one over three
+// minutes, multiplying every dimension's production the whole way. What was
+// here instead stopped production dead for the full three minutes and refused
+// to let you roll at all, which is the same sentence and a different game.
+const halt = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
+  window.LD.actions.enterChallenge(2)
+  s.ink = new D('1e12'); s.solids[0].amount = new D(1000); s.solids[0].bought = 10
+  s.haltMs = 0
+  const full = window.LD.chargeBack(s)
+  // Any purchase drops it to nothing.
+  window.LD.actions.buySolid(1, true)
+  const after = { charge: window.LD.chargeBack(s), ms: s.haltMs }
+  // Half way back at ninety seconds, all the way at three minutes.
+  s.haltMs = 90000
+  const half = window.LD.chargeBack(s)
+  s.haltMs = 0
+  const back = window.LD.chargeBack(s)
+  return { full, after, half, back } })()`)
+check('a purchase in challenge 2 takes production to nothing',
+  halt.full === 1 && halt.after.charge === 0 && halt.after.ms === 180000,
+  JSON.stringify(halt))
+check('and it climbs back linearly over three minutes',
+  Math.abs(halt.half - 0.5) < 0.001 && halt.back === 1, JSON.stringify(halt))
+
+// It scales production rather than stopping it, and it never stops you playing.
+const during = await ev(`(async () => { const s = window.LD.state, D = window.LD.Decimal
+  s.haltMs = 90000
+  s.ink = new D(0); s.solids[0].amount = new D(1000); s.solids[0].bought = 10
+  const rolled = window.LD.actions.roll() !== false
+  await new Promise(r => setTimeout(r, 1200))
+  const paid = s.ink.gt(0)
+  return { rolled, paid, ink: s.ink.toString() } })()`)
+check('and the table still rolls while it recovers', during.rolled === true,
+  JSON.stringify(during))
+check('and still pays, at a fraction rather than nothing', during.paid === true,
+  JSON.stringify(during))
+await ev(`window.LD.actions.exitChallenge()`)
+
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)
 process.exit(res.every(Boolean)?0:1)

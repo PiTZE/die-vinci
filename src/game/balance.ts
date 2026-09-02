@@ -351,3 +351,12 @@ export const CODEX_CONVERSION = 7
  * the ladder gets rebuilt at all.
  */
 export const RESET_HOLD_AT = 0.925
+
+/**
+ * How long the second challenge takes to come back to full after a purchase.
+ *
+ * AD's own number, and its own shape: chall2Pow goes to zero on a purchase and
+ * climbs by diff / 100 / 1800 a tick until it reaches one, which is a linear
+ * three minutes, with production multiplied by it the whole way.
+ */
+export const HALT_MS = 3 * 60_000
