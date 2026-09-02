@@ -119,6 +119,11 @@ function make(): boolean {
  */
 function ready(): boolean {
   if (!ctx) return false
+  // Never woken while the page is away. This is the one place that resumes a
+  // suspended context, so a guard here is what makes the suspension below
+  // hold: without it anything reaching for a sound would quietly start the
+  // audio again in a tab nobody is looking at.
+  if (document.hidden) return false
   if (ctx.state === 'suspended') void ctx.resume()
   return true
 }
@@ -144,10 +149,27 @@ if (typeof window !== 'undefined') {
     for (const e of events) window.removeEventListener(e, arm)
   }
 
-  // Safari suspends the context when the tab goes away and does not always
-  // bring it back on its own.
+  // Quiet the moment the page goes away, and back when it returns.
+  //
+  // Going away was the half that was missing, and it was audible. The shake
+  // loop is a looping source, and the only thing that ever stops it is
+  // setSpinBed, which is driven from the frame loop: frames stop when a tab
+  // goes to the background, so nothing was left to call it and the rattle went
+  // on playing into whatever the player had switched to. Suspending is the
+  // whole answer rather than stopping the loop, because it also silences a
+  // throw already in flight, and it freezes the clock the bed's own fades are
+  // scheduled against instead of leaving them to run against nothing.
+  //
+  // Coming back is unchanged, and Safari needs it: it suspends the context on
+  // its own when the tab goes away and does not always bring it back. The next
+  // frame after that calls setSpinBed with the rate the game is actually at,
+  // which either settles the loop or fades it out.
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden || !ctx) return
+    if (!ctx) return
+    if (document.hidden) {
+      void ctx.suspend()
+      return
+    }
     playbackSession()
     if (ctx.state === 'suspended') void ctx.resume()
   })

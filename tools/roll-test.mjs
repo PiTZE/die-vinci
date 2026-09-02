@@ -32,6 +32,16 @@ const ev=async e=>{const r=await send('Runtime.evaluate',{expression:e,returnByV
 await send('Emulation.setFocusEmulationEnabled',{enabled:true})
 await send('Page.enable');await send('Runtime.enable')
 const res=[];const check=(n,ok,d='')=>{res.push(ok);console.log(`${ok?'PASS':'FAIL'}  ${n}${d?'  '+d:''}`)}
+// The game's own AudioContext, caught before the page has a chance to make
+// one. Nothing exposes it, and the checks at the end of this file are about
+// what it does when the page goes away.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  const AC = window.AudioContext
+  window.AudioContext = function (...a) { const c = new AC(...a)
+    if (!window.__gameCtx) window.__gameCtx = c
+    return c }
+  window.AudioContext.prototype = AC.prototype
+` })
 await send('Page.navigate',{url:'http://127.0.0.1:5173/'})
  await appReady(ev)
 await ev(`localStorage.clear()`); await send('Page.reload')
@@ -562,6 +572,45 @@ const bed = await ev(`(async () => {
   return b.duration.toFixed(2) + 's ' + b.numberOfChannels + 'ch'
 })()`)
 check('the shake loop is there and decodes', /^1\.[0-9]+s 1ch$/.test(bed), bed)
+
+// And it goes quiet when the page does.
+//
+// The loop is a looping source, and the only thing that stops it is
+// setSpinBed, which the frame loop drives. Frames stop when a tab goes to the
+// background, so nothing was left to call it and the rattle carried on playing
+// into whatever the player had switched to.
+//
+// Headless keeps every target visible: Page.setWebLifecycleState takes only
+// frozen and active, and activating a second tab leaves the first one visible
+// too, both measured. So the state is overridden and the event dispatched,
+// which drives the handler under test rather than the browser's own
+// bookkeeping. That the frame loop stops when a page is hidden is the
+// browser's guarantee, not this game's, and is not what this is checking.
+const quiet = await ev(`(async () => {
+  const ctx = window.__gameCtx
+  if (!ctx) return { made: false }
+  // Rolling fast enough that the bed, rather than single throws, is playing.
+  const s = window.LD.state, D = window.LD.Decimal
+  s.autoRoll = true; s.autoRollOn = true; s.rollUpgrades = 14
+  s.solids.forEach((d, i) => { if (i < 2) { d.bought = 10; d.amount = new D(50) } })
+  window.LD.armAudio && window.LD.armAudio()
+  document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  await new Promise(r => setTimeout(r, 900))
+  const before = ctx.state
+  const real = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden')
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+  document.dispatchEvent(new Event('visibilitychange'))
+  await new Promise(r => setTimeout(r, 400))
+  const away = ctx.state
+  delete document.hidden; delete document.visibilityState
+  if (real) Object.defineProperty(Document.prototype, 'hidden', real)
+  document.dispatchEvent(new Event('visibilitychange'))
+  await new Promise(r => setTimeout(r, 400))
+  return { made: true, before, away, back: ctx.state } })()`)
+check('the audio goes quiet when the page goes away, and comes back with it',
+  quiet.made && quiet.away === 'suspended' && quiet.back !== 'suspended',
+  JSON.stringify(quiet))
 
 // A fair die is the b = 0 case of a loaded one, so the maths for the upgrade
 // that is coming has to already hold at both ends and in between.
