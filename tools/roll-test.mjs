@@ -296,23 +296,22 @@ check('and lands square, with no tilt left on it',
   landedSquare.transform === '' || !/rotate\((?!0deg)/.test(landedSquare.transform),
   JSON.stringify(landedSquare.transform))
 
-// A die in the air should visibly hop rather than vibrate on the spot.
+// A die turns where it stands. It used to toss and land in two bounces, and
+// the bounce was four times the arc it fell from, so every roll ended on the
+// die leaping off the table. Tying the bounce to the arc made it smaller and
+// did not answer the complaint, which came back against the tuned version: the
+// jump was the problem rather than its size. Nothing writes a transform on a
+// wireframe now, so this asks that none appears.
 await ev(`(() => { window.__h = []
   const icon = document.querySelector('.solid-icon')
-  window.__ht = setInterval(() => {
-    const m = icon.style.transform
-    const i = m.indexOf(',')
-    const j = m.indexOf('px', i)
-    window.__h.push(i < 0 ? 0 : Number(m.slice(i + 1, j)))
-  }, 30) })()`)
+  window.__ht = setInterval(() => { window.__h.push(icon.style.transform) }, 30) })()`)
 await ev(`${ROLL}.click()`)
 await sleep(1400)
 await ev(`clearInterval(window.__ht)`)
-const hop = await ev(`(() => {
-  const h = window.__h.filter(v => Number.isFinite(v))
-  return { n: h.length, lowest: Math.min(...h), highest: Math.max(...h) }
-})()`)
-check('the hop is big enough to see', hop.lowest < -1.2, JSON.stringify(hop))
+const hop = await ev(`(() => ({ n: window.__h.length,
+  moved: [...new Set(window.__h)].filter(t => t !== '') }))()`)
+check('the die turns without travelling', hop.n > 10 && hop.moved.length === 0,
+  JSON.stringify(hop))
 
 // A die in the air holds the face it last landed on, at full strength, rather
 // than emptying the column for the whole roll. In a game whose feedback is
@@ -453,12 +452,22 @@ await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.autoRoll = false; s.rollStartedAt = 0; s.rollUpgrades = 0; s.studies = 2
   s.solids.forEach((d, i) => { d.bought = 0; d.amount = new D(i === 0 ? 5 : 0) }) })()`)
 await sleep(150)
-await ev(`${ROLL}.click()`); await sleep(150)
-const empties = await ev(`(() => {
+// Read off the drawing rather than off the CSS transform. The transform was
+// the hop, and a die does not travel any more, so there is nothing on it to
+// read: this watches whether each row's wireframe is actually being redrawn.
+await ev(`(() => {
   const rows = [...document.querySelectorAll('.solid')].filter(r => getComputedStyle(r).display !== 'none')
-  return rows.map(r => ({ face: r.querySelector('.solid-face').textContent,
-    moved: r.querySelector('.solid-icon').style.transform !== '' }))
-})()`)
+  const fig = r => [...r.querySelectorAll('.solid-icon line, .solid-icon path')]
+    .map(n => n.getAttribute('x1') + ',' + n.getAttribute('y1') + (n.getAttribute('d') || '')).join('|')
+  window.__rows = rows
+  const was = rows.map(fig)
+  window.__turned = rows.map(() => false)
+  window.__rt = setInterval(() => { rows.forEach((r, i) => {
+    if (fig(r) !== was[i]) window.__turned[i] = true }) }, 16) })()`)
+await ev(`${ROLL}.click()`); await sleep(400)
+await ev(`clearInterval(window.__rt)`)
+const empties = await ev(`window.__rows.map((r, i) => ({
+  face: r.querySelector('.solid-face').textContent, moved: window.__turned[i] }))`)
 check('the row with dice on it is thrown', empties[0] && empties[0].moved === true,
   JSON.stringify(empties))
 check('and the empty rows are not',

@@ -462,16 +462,17 @@ class Wire {
   }
 
   /**
-   * `turns` is the absolute rotation this die should be at, in revolutions,
-   * and `shake` is 0 to 1 for how much it is still bouncing.
+   * Where along its throw this die should be drawn, `eased` being 0 to 1.
    *
    * Absolute rather than accumulated: a throw is a curve from a start to a
    * finish, and integrating a rate towards it drifts, so a die that should
    * land square lands a few degrees off and the last frame snaps.
+   *
+   * It used to take the raw progress as well, to drive the hop. There is no
+   * hop, so the only thing left that a frame of a throw needs is the angle.
    */
-  render(eased: number, progress: number): void {
+  render(eased: number): void {
     this.t = eased * this.turns * Math.PI * 2 + this.phase
-    this.bounce(progress)
     this.draw()
   }
 
@@ -489,65 +490,7 @@ class Wire {
     // frame rate, it looks the same on both and simply covers less ground on
     // the slower one.
     this.t += Math.min(dt * rate * this.speed, stepRad(this.id) * STEP_SHARE)
-    // Rolling too fast to watch, and standing still while it does. There was a
-    // drift and a three-degree tilt riding on the spin here, on the same
-    // reasoning as the one in the hop and wrong for the same reason: the die
-    // turns about the upright axis through its top, and anything rocking that
-    // axis is the one thing on screen that answers to nothing.
-    this.place(0, 0, 0)
     this.draw()
-  }
-
-  /**
-   * A die does not vibrate on the spot, it hops and settles. Three diminishing
-   * hops across the throw, driven by progress rather than by the tumble angle,
-   * because tying them together gave a single slow heave over the whole roll
-   * that read as the icon drifting.
-   */
-  private bounce(p: number): void {
-    if (p < LAND_AT) {
-      // Still in the air. Straight up and straight down, and nothing else.
-      //
-      // It used to drift sideways and tilt six degrees on a phase picked at
-      // random, so that the spin would not look like it was happening on a
-      // pin. It is happening on a pin: the die turns about the upright axis
-      // through its top, and a tilt laid over that is the one thing on screen
-      // that answers to nothing, which is what reads as the die wobbling
-      // rather than turning.
-      const k = p / LAND_AT
-      this.place(0, -RISE_SHARE * iconPx * Math.sin(k * Math.PI), 0, 1, 1)
-      return
-    }
-
-    // The landing. Two decaying hops and a squash on each contact, which is
-    // the part that reads as weight.
-    const q = (p - LAND_AT) / (1 - LAND_AT)
-    const fade = Math.pow(1 - q, 1.6)
-    // On the beat, not on a phase of its own: a die that lands a little
-    // before or after where it hops is a die whose landing has nothing to do
-    // with its throw.
-    const cycle = q * BOUNCES
-    const hop =
-      -Math.abs(Math.sin(cycle * Math.PI)) * RISE_SHARE * BOUNCE_OF_RISE * iconPx * fade
-    // Flattest at the instant of contact, which is where the sine is zero.
-    const contact = Math.pow(1 - Math.abs(Math.sin(cycle * Math.PI)), 3) * fade
-    const sx = 1 + SQUASH * contact
-    const sy = 1 - SQUASH * contact
-    // Squashed on contact, upright throughout. The tilt that used to rock it
-    // through the bounce went the same way as the one in the air.
-    this.place(0, hop, 0, sx, sy)
-  }
-
-  private place(x: number, y: number, deg: number, sx = 1, sy = 1): void {
-    const flat = Math.abs(sx - 1) < 0.004 && Math.abs(sy - 1) < 0.004
-    if (Math.abs(x) < 0.02 && Math.abs(y) < 0.02 && Math.abs(deg) < 0.05 && flat) {
-      // Square, and cleared rather than left at a hundredth of a degree.
-      if (this.el.style.transform) this.el.style.transform = ''
-      return
-    }
-    this.el.style.transform =
-      `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${deg.toFixed(2)}deg)` +
-      (flat ? '' : ` scale(${sx.toFixed(3)}, ${sy.toFixed(3)})`)
   }
 
   private draw(): void {
@@ -725,60 +668,25 @@ const EASE_PEAK = 2
 
 
 /**
- * Where the throw stops being a spin and becomes a landing.
+ * A die turns, and it stays where it is while it does.
  *
- * The hops used to be spread across the whole roll, three of them at 3.1px on
- * a 32px icon, fading as it went. Nine percent of an icon, smeared over a
- * second, is not a bounce; it is a drift nobody could see at native size and
- * nobody could find at two and a half times it either. They are packed into
- * the last quarter now, where a die actually meets the table.
- */
-const LAND_AT = 0.75
-
-/** Hops in that last quarter. Two is a die landing; one is a drop. */
-const BOUNCES = 2
-
-/**
- * How high it hops, and how far it rises in the air, as shares of the icon.
+ * It used to toss and then land in two bounces, with a squash on each contact.
+ * The bounce was four times the arc it was a bounce from, 6.4px against 1.5px,
+ * so the largest upward movement in the whole animation happened after the die
+ * had landed and every roll ended on the die leaping off the table. Tying the
+ * bounce to the arc fixed the relationship and did not fix the complaint,
+ * which was reported again against the tuned version: the jump is the problem,
+ * not its size.
  *
- * Both were flat pixel counts, tuned against the 32px icon a phone draws. The
- * desktop row draws the same die at 38px, so the same 6.4px was a fifth of the
- * icon on one and a sixth on the other: the die landed differently on the two
- * screens for no reason anybody chose. The shares are the phone's numbers, so
- * the size it was tuned at is unchanged and the desktop now matches it.
- */
-const RISE_SHARE = 0.1
-
-/**
- * The first bounce, as a share of the arc the die fell from.
+ * So it is gone, the way the drift and the three-degree tilt went before it,
+ * and for the reason given there. The die turns about the upright axis through
+ * its top. That axis is the whole of what the animation is about, and anything
+ * moving the die off it is the one thing on screen answering to nothing.
  *
- * These were two unrelated numbers, 6.4px of hop against 1.5px of arc, and
- * nothing held them in any relation to each other. The bounce was four times
- * the throw it was a bounce from, so the largest upward movement in the whole
- * animation happened after the die had landed: the roll ended on the die
- * leaping off the table, which is what it looked like. Reported from playing.
- *
- * Tied to the arc now, so it cannot invert again. The fade takes the first
- * contact to about a third of the arc and the second to a twentieth, which is
- * a die settling rather than a die taking off.
+ * Nothing writes a CSS transform on a wireframe any more. `rest()` still
+ * clears one, which costs nothing and means a stale transform from any source
+ * cannot strand a die off its mark.
  */
-const BOUNCE_OF_RISE = 0.5
-
-/**
- * What the icon is currently drawn at. One number for the table, because every
- * row draws the same size, kept by an observer rather than measured per frame:
- * a getBoundingClientRect a die a throw is nine forced layouts a roll.
- */
-let iconPx = 32
-const sizes = new ResizeObserver((entries) => {
-  for (const e of entries) {
-    const w = e.contentRect.width
-    if (w > 0) iconPx = w
-  }
-})
-
-/** The squash on contact, and how long it holds before springing back. */
-const SQUASH = 0.14
 
 type Mode = 'rest' | 'throw' | 'blur'
 let mode: Mode = 'rest'
@@ -836,7 +744,7 @@ export function setThrow(p: number, duration: number): void {
   if (next === 'rest' && mode !== 'rest') {
     // Coming to rest stops the loop, so the settled frame has to be drawn
     // here or the die keeps whatever tilt it happened to be at.
-    for (const w of live) if (w.rolls) w.render(1, 1)
+    for (const w of live) if (w.rolls) w.render(1)
   }
   mode = next
   if (mode === 'throw') ensureLoop()
@@ -869,7 +777,7 @@ function frame(now: number): void {
 
   if (mode === 'throw') {
     const e = easeOut(progress)
-    for (const w of live) if (w.visible && w.rolls) w.render(e, progress)
+    for (const w of live) if (w.visible && w.rolls) w.render(e)
     return
   }
 
@@ -943,7 +851,6 @@ export function wireframe(id: SolidId, cls = 'solid-icon'): SVGSVGElement {
   live.add(w)
   byEl.set(w.el, w)
   observer?.observe(w.el)
-  sizes.observe(w.el)
   ensureLoop()
   return w.el
 }
