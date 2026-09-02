@@ -38,6 +38,7 @@ const LINES: Line[] = [
   'Mirror writing, right to left. Nobody has ever agreed on why.',
   'He left the Sforza horse unfinished. The bronze went to cannon instead.',
   'Sixty plates, drawn in 1497, printed in 1509.',
+  'They Crown the SUN',
   (s) => (s.wagers === 0 ? 'The table only grows. Nothing here resets yet.' : null),
   (s) => (s.wagers > 0 ? `${s.wagers} interrupted games so far.` : null),
   (s) => (s.folios > 0 ? `${s.folios} folios bound. The hand gets faster each time.` : null),
