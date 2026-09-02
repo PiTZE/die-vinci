@@ -127,7 +127,7 @@ export function automationPane(): Pane {
       // button, and every autobuyer below it is a convenience by comparison.
       autoSection = el('div', 'section')
       const ah = el('div', 'section-head auto-head')
-      ah.appendChild(el('span', 'grow', 'THE ROLL'))
+      ah.appendChild(el('span', 'grow', 'AUTO ROLL'))
       // The master, in the head, where the autobuyers' one is. It was the last
       // row under the nine it governs, next to a purchase, which made it read
       // as a tenth die rather than as the switch over all of them.
@@ -174,7 +174,7 @@ export function automationPane(): Pane {
       autobuyerSection = el('div', 'section')
       const section = autobuyerSection
       const h = el('div', 'section-head auto-head')
-      h.appendChild(el('span', 'grow', 'AUTOBUYERS'))
+      h.appendChild(el('span', 'grow', 'AUTO BUY'))
       // The group switch, in the head rather than in a row of its own: it is
       // about the whole section under it, and a row would read as a fourteenth
       // autobuyer. Each one keeps its own switch, so this stops all of them
@@ -285,6 +285,9 @@ export function automationPane(): Pane {
       const allOn = s.autobuyersOn !== false
       setText(allAutoToggle, allOn ? 'ON' : 'OFF')
       allAutoToggle.classList.toggle('buyable', allOn)
+      // Dimmed as a whole while the master holds it, so the section says at a
+      // glance that nothing in it is running.
+      autobuyerSection.classList.toggle('held-off', !allOn)
       autoSection.hidden = false
 
       const next = nextAutoRoll(s)
@@ -340,9 +343,22 @@ export function automationPane(): Pane {
         if (!open) continue
 
         setText(row.every, `${(interval(s, a.id) / 1000).toFixed(2)}s`)
-        const on = (s.autobuyers[a.id]?.on ?? true) && allOn
-        setText(row.onBtn, (s.autobuyers[a.id]?.on ?? true) ? 'ON' : 'OFF')
+        // What is actually running, not what this row was set to. With the
+        // master off these read ON and nothing happened, so the pane showed
+        // four switches saying ON above a section that was doing nothing: it
+        // reads as autobuyers ignoring the switches, and it was reported that
+        // way. The row's own setting is kept and comes back with the master.
+        const own = s.autobuyers[a.id]?.on ?? true
+        const on = own && allOn
+        setText(row.onBtn, on ? 'ON' : 'OFF')
         row.onBtn.classList.toggle('buyable', on)
+        // And it says which of the two switched it off, so turning a row back
+        // on while the master is off does not look broken either.
+        row.onBtn.title = allOn
+          ? 'Stop this one'
+          : own
+          ? 'Held off by the master switch above'
+          : 'Off, and the master switch above is off too'
 
         const m = mode(s, a.id)
         setText(row.modeBtn, m === 'single' ? '1' : m === 'ten' ? '10' : 'MAX')

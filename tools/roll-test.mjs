@@ -161,7 +161,7 @@ await ev(`(() => { const s = window.LD.state; s.autoRoll = true; s.autoRollOn = 
 await sleep(300)
 check('the master switch is there once the ladder is yours',
   (await ev(`(() => { const h = [...document.querySelectorAll('.auto-head')]
-    .find(x => x.textContent.includes('THE ROLL'))
+    .find(x => x.textContent.includes('AUTO ROLL'))
     const b = h?.querySelector('.auto-toggle')
     return !!b && !b.hidden && /ON|OFF/.test(b.textContent) })()`)) === true)
 await ev(openTab('TABLE'))
@@ -990,7 +990,7 @@ const sealed = await ev(`(async () => { const s = window.LD.state
   return { visible: !tab.hidden, shown } })()`)
 check('the tab is open before the Wager', sealed.visible === true, JSON.stringify(sealed))
 check('and holds nothing but the roll while it is',
-  sealed.shown.length === 1 && sealed.shown[0] === 'THE ROLL', JSON.stringify(sealed))
+  sealed.shown.length === 1 && sealed.shown[0] === 'AUTO ROLL', JSON.stringify(sealed))
 
 ws.close();chrome.kill();await sleep(150);try{rmSync(profile,{recursive:true,force:true})}catch{}
 console.log(`\n${res.filter(Boolean).length}/${res.length} passed`)

@@ -136,7 +136,7 @@ const SECTIONS: Section[] = [
     ],
   },
   {
-    title: 'AUTOBUYERS',
+    title: 'AUTO BUY',
     needs: afterAutobuyer,
     body: [
       'Each buys one thing on a timer. A chip spent on one cuts its interval to 0.6 of what it was, down to a floor of a tenth of a second.',

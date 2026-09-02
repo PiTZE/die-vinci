@@ -129,7 +129,7 @@ const expectCost = Math.pow(2, beforeUp.level)
 // section with the same row markup, and an unscoped query finds that first.
 await ev(`(() => {
   const list = [...document.querySelectorAll('.section')]
-    .find(x => x.textContent.startsWith('AUTOBUYERS'))
+    .find(x => x.textContent.startsWith('AUTO BUY'))
   const b = [...list.querySelectorAll('.auto-up')].find(x => !x.disabled)
   if (b) b.click()
 })()`)

@@ -622,6 +622,38 @@ try {
   }
   await evaluate(`window.LD.releaseSticky()`)
 
+  // A press after the ring comes off ends when you let go.
+  //
+  // It did not. The flag saying "this press gave its repeater to the ring" was
+  // left set when the ring was tapped off, so the next press's release
+  // declined to stop a repeater nobody was holding: MAX went on buying for
+  // ever with nothing on screen to say why, and only a reload stopped it.
+  await ready()
+  await evaluate(`window.LD.releaseSticky()`)
+  const leak = await evaluate(`(async () => {
+    const b = document.querySelector('.bar-btn.max')
+    const r = b.getBoundingClientRect()
+    const down = (id) => b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true,
+      pointerId: id, button: 0, clientX: r.x + 5, clientY: r.y + 5 }))
+    const up = (id) => window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: id }))
+    const wait = (ms) => new Promise(res => setTimeout(res, ms))
+    // Ring it, tap it off, then press it once the ordinary way.
+    down(41); await wait(1200); up(41)
+    const ringed = document.querySelectorAll('.sticky').length
+    down(42); await wait(80); up(42)
+    const off = document.querySelectorAll('.sticky').length
+    down(43); await wait(120); up(43)
+    // Nothing is touching it now. Whatever it buys must stop.
+    const s = window.LD.state
+    s.ink = new window.LD.Decimal('1e30')
+    await wait(600)
+    const a = s.solids.reduce((n, d) => n + d.bought, 0)
+    await wait(900)
+    const b2 = s.solids.reduce((n, d) => n + d.bought, 0)
+    return { ringed, off, still: b2 - a } })()`)
+  check('a ring taken off does not leave the next press running',
+    leak.ringed === 1 && leak.off === 0 && leak.still === 0, JSON.stringify(leak))
+
   // A button you cannot press yet still takes the ring, which is the reason
   // these are dimmed rather than disabled. The moment you most want the game
   // to keep pressing MAX for you is while you cannot afford anything and are

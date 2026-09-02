@@ -2105,6 +2105,14 @@
   padding-bottom: 6px;
 }
 
+/* A section its master switch has stopped. The rows keep their settings and
+   come back exactly as they were; this is only so that a section doing
+   nothing does not look like a section doing something. */
+.held-off .auto-row,
+.held-off .auto-rules {
+  opacity: 0.55;
+}
+
 /* Indented by its text rather than by its box, so the switch and the field
    stay in the same two columns as every other row's. */
 .auto-rule-label {

@@ -102,7 +102,7 @@ check('and it is never the real title',
 // Word by word, because a single word settling back is the leak that matters.
 const anyWordSettled = await ev(`(() => {
   const real = ['ROLLS ITSELF', 'EVERY DIE AT ONCE', 'STUDY AND FOLIO', 'THE WAGER',
-    'CHALLENGES', 'AUTOBUYERS']
+    'CHALLENGES', 'AUTO BUY']
   const shown = [...document.querySelectorAll('.help-head.sealed span')].map(n => n.textContent)
   for (let i = 0; i < shown.length; i++) {
     const a = (shown[i] || '').split(' '), b = (real[i] || '').split(' ')
@@ -168,14 +168,14 @@ const midHelp = await shown('HELP', '.help-head')
 check('a study opens the automator and the resets',
   midHelp.includes('EVERY DIE AT ONCE') && midHelp.includes('STUDY AND FOLIO'), midHelp)
 check('but not the Wager, challenges or autobuyers',
-  !midHelp.includes('THE WAGER') && !midHelp.includes('CHALLENGES') && !midHelp.includes('AUTOBUYERS'),
+  !midHelp.includes('THE WAGER') && !midHelp.includes('CHALLENGES') && !midHelp.includes('AUTO BUY'),
   midHelp)
 
 await ev(`(() => { const s = window.LD.state; s.wagers = 1; s.challengesDone = [1] })()`)
 await sleep(150)
 const lateHelp = await shown('HELP', '.help-head')
 check('a Wager opens the rest',
-  ['THE WAGER', 'CHALLENGES', 'AUTOBUYERS'].every((t) => lateHelp.includes(t)), lateHelp)
+  ['THE WAGER', 'CHALLENGES', 'AUTO BUY'].every((t) => lateHelp.includes(t)), lateHelp)
 const lateArchive = await shown('ARCHIVE', '.tile')
 // Sealed entries are on screen either way now, so the length barely moves.
 // What changes is how many are still redacted.
