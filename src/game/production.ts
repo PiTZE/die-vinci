@@ -647,7 +647,22 @@ function buySolidGroups(s: GameState, idx: number, groups: number): boolean {
     n === bulk.quantity
       ? bulk.price.times(factor)
       : costAt(solidScale(s, idx), owned + n - 1).times(factor).times(10)
-  if (overThreshold(s, price) || s.ink.lt(price)) return did
+
+  // The wall is on what a purchase costs, not on what the whole run adds up
+  // to. That is AD's rule and it is the only one that makes sense: its
+  // isAffordable asks `this.cost.gt(NUMBER_MAX_VALUE)` about the next
+  // purchase, and buyMaxDimension does not check the wall against its bulk at
+  // all, it takes getMaxBought's answer and pays it.
+  //
+  // Checking the sum instead is why MAX bought a trickle near the wall. A run
+  // of groups that are each far below 1.8e308 has a sum that crosses it, so
+  // the whole tier was refused for that pass, and the doubling allowance then
+  // asked for twice as many next pass and was refused again: the call gave up
+  // with most of the ink unspent, and pressing MAX bought a fraction of what
+  // it could afford. Reported as MAX buying slowly, and it is worst exactly
+  // where it is most needed, which is the last stretch before a Wager.
+  const dearest = costAt(solidScale(s, idx), owned + n - 1).times(factor).times(10)
+  if (overThreshold(s, dearest) || s.ink.lt(price)) return did
 
   s.ink = s.ink.minus(price)
   st.bought += n * 10
