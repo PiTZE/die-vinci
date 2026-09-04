@@ -9,8 +9,19 @@ import { NAV_GROUPS, groupOf, type NavGroup } from '../game/nav'
 import { anyMarked, clearMark, isMarked } from '../game/marks'
 import type { GameState, TabId } from '../state'
 
+/**
+ * How many times ABOUT has to be pressed, one after another, before something
+ * appears in OPTIONS. It lives here because the counting does, and because a
+ * shell that had to import the thing it unlocks would import it in a circle.
+ */
+const KNOCKS_FOR_THE_BOX = 9
+
 /** What a pane is allowed to do to the game. Implemented in main.ts. */
 export interface Actions {
+  /** ABOUT pressed nine times in a row. Nothing else in the game reads it. */
+  findTheBox(): void
+  /** The code came out right. */
+  solveTheBox(): void
   maxAll(): void
   buySolid(idx: number, one?: boolean): void
   buyRollRate(): void
@@ -155,6 +166,15 @@ export class Shell {
   private seenTabs = new Set<TabId>()
   private announced = false
   private announcedFull = false
+  /**
+   * Undefined until the first update has been seen.
+   *
+   * The condition latches, so comparing against `false` from the start would
+   * announce it again on every single launch once it had been found. What is
+   * wanted is the moment it turns, and a save that already holds it has no
+   * moment left to report.
+   */
+  private boxFound: boolean | undefined
   private toastTimer = 0
   private inkOut = new Readout('INK')
   private chipsOut = new Readout('CHIPS')
@@ -211,7 +231,10 @@ export class Shell {
       const mark = el('span', 'tab-mark', '')
       mark.setAttribute('aria-hidden', 'true')
       btn.appendChild(mark)
-      btn.addEventListener('click', () => this.openGroup(g))
+      btn.addEventListener('click', () => {
+        this.knock('')
+        this.openGroup(g)
+      })
       tabs.appendChild(btn)
       this.groupButtons.set(g.id, btn)
       this.groupMarks.set(g.id, mark)
@@ -224,7 +247,10 @@ export class Shell {
       const mark = el('span', 'tab-mark', '')
       mark.setAttribute('aria-hidden', 'true')
       btn.appendChild(mark)
-      btn.addEventListener('click', () => this.select(p.id))
+      btn.addEventListener('click', () => {
+        this.knock(p.id)
+        this.select(p.id)
+      })
       this.subtabStrip.appendChild(btn)
       this.tabButtons.set(p.id, btn)
       this.tabMarks.set(p.id, mark)
@@ -300,6 +326,32 @@ export class Shell {
     if (!p) return false
     return p.visible ? p.visible(this.lastState ?? ({} as GameState)) : true
   }
+
+  /**
+   * Nine presses of ABOUT, one after another, and something appears in
+   * OPTIONS. Anything else pressed puts it back to nothing.
+   *
+   * Counted here rather than in `select` because `select` also runs when the
+   * game reopens on the pane you were last looking at, and a save that comes
+   * back on ABOUT should not be handed one of the nine for free.
+   *
+   * Held in memory, never in the save. What the save keeps is the answer.
+   */
+  private knocks = 0
+
+  private knock(id: TabId | ''): void {
+    if (id !== 'about') {
+      this.knocks = 0
+      return
+    }
+    this.knocks += 1
+    if (this.knocks < KNOCKS_FOR_THE_BOX) return
+    this.knocks = 0
+    this.onKnock?.()
+  }
+
+  /** Told when the nine have been counted. */
+  onKnock?: () => void
 
   select(id: TabId): void {
     this.active = id
@@ -405,6 +457,13 @@ export class Shell {
       const a = achievementById(id)
       if (a) this.toast(`ARCHIVE  ${a.name}`)
     }
+
+    // Found. Said the way the archive says a thing has appeared, because the
+    // game already has exactly one way of saying that and a second one would
+    // be a second thing to look at.
+    const found = !!s.secret?.found
+    if (this.boxFound === false && found) this.toast('THE BOX HAS BEEN FOUND')
+    this.boxFound = found
 
     this.lastState = s
     const away = consumeAway()

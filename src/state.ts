@@ -129,6 +129,21 @@ export interface GameState {
   haltMs: number
   /** Arcanum id to level. Zero and absent are the same thing. */
   tarot: Record<string, number>
+
+  /**
+   * THE BOX. Nothing in the game reads this and nothing pays out for it.
+   *
+   * Optional so that every save written before it existed still loads: there
+   * is nothing here worth a migration step, because both halves default to
+   * false and a player who has not found it is exactly a player whose save
+   * does not mention it.
+   */
+  secret?: {
+    /** ABOUT pressed nine times in a row. The button in OPTIONS appears. */
+    found: boolean
+    /** The code has been entered. It is not asked for twice. */
+    solved: boolean
+  }
   /** Wagers called since the last draft was earned. */
   draftProgress: number
   /** A draft offered and not yet taken. Held in the save so closing the tab
@@ -243,6 +258,7 @@ export function newGame(now: number): GameState {
     marksArmed: [],
     haltMs: 0,
     tarot: {},
+    secret: { found: false, solved: false },
     draftProgress: 0,
     pendingDraft: [],
     draftsOwed: 0,

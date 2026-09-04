@@ -2,6 +2,7 @@ import { NOTATIONS } from '../format'
 import type { GameState } from '../state'
 import { el, type Actions, type Pane } from './shell'
 import { applyTheme, currentTheme, themes } from './theme'
+import { openTheBox } from './secret'
 import { installState, manualHint, onInstallChange, promptInstall } from '../install'
 import { CHANNEL_PATHS, OFFLINE_TICK_CHOICES, UI_MS_CHOICES, UI_MS_DEFAULT } from '../game/balance'
 import { listBackups } from '../backup'
@@ -123,6 +124,8 @@ export function optionsPane(): Pane {
   let shown: GameState
   let io: HTMLTextAreaElement
   let status: HTMLElement
+  /** Hidden until it has been found, and then it stays. */
+  let boxBtn: HTMLButtonElement | undefined
 
   return {
     id: 'options',
@@ -522,7 +525,22 @@ export function optionsPane(): Pane {
       paintBackups()
       setInterval(paintBackups, 5_000)
 
-      root.append(...groups, install, slots, save, backups)
+      // Nothing says what it is, and nothing else in the game refers to it.
+      // It is here once ABOUT has been pressed nine times in a row, and it is
+      // here for good after that.
+      const theBox = el('button', 'opt') as HTMLButtonElement
+      theBox.type = 'button'
+      theBox.appendChild(el('span', 'opt-name', 'THE BOX'))
+      theBox.hidden = true
+      theBox.addEventListener('click', () => {
+        openTheBox({
+          solved: shown?.secret?.solved ?? false,
+          onSolved: () => actions.solveTheBox(),
+        })
+      })
+      boxBtn = theBox
+
+      root.append(...groups, install, slots, save, backups, theBox)
       paintTheme()
 
       function say(msg: string) {
@@ -540,6 +558,7 @@ export function optionsPane(): Pane {
 
     update(s: GameState) {
       shown = s
+      if (boxBtn) boxBtn.hidden = !s.secret?.found
       for (const c of cycles) c.sync(s)
       // Hidden rather than disabled: a greyed-out switch still names its
       // action.

@@ -52,6 +52,12 @@ export const MARK_RULES: MarkRule[] = [
   // button. Reported from playing, and it is the only mark that ever pointed
   // at nothing.
 
+  // THE BOX, the moment it is found. The condition latches and never goes
+  // false again, so the rising edge marks once and never again, which is what
+  // that rule gives for free. OPTIONS is always visible, and you are on ABOUT
+  // when it fires, so the mark lands where it points.
+  { id: 'theBox', tab: 'options', when: (s) => !!s.secret?.found },
+
   // Chips you have not spent, on a grid you may not have opened since.
   {
     id: 'chips',

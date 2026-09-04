@@ -2,6 +2,7 @@ import './styles/tokens.css'
 import './styles/themes.css'
 import './styles/base.css'
 import './styles/game.css'
+import './styles/secret.css'
 
 import Decimal from './vendor/break-infinity'
 import { AUTOSAVE_MS, AWAY_NOTICE_S, CATCHUP_AFTER_S, START_INK, TICK_MS, UI_MS_DEFAULT } from './game/balance'
@@ -403,6 +404,15 @@ const actions: Actions = {
     state.options.uiMs = n
     persistSoon()
   },
+  // THE BOX. Neither of these touches anything the game reads.
+  findTheBox: () => {
+    state.secret = { found: true, solved: state.secret?.solved ?? false }
+    persistSoon()
+  },
+  solveTheBox: () => {
+    state.secret = { found: true, solved: true }
+    persistSoon()
+  },
   setConfirm: (key, on) => {
     state.options.confirms = { ...state.options.confirms, [key]: on }
     persistSoon()
@@ -445,6 +455,10 @@ const actions: Actions = {
 }
 
 const shell = new Shell(root, actions)
+// Nine presses of ABOUT, one after another. The shell counts them because the
+// shell is what hears a tab being pressed; what happens next is not its
+// business, so it just says when.
+shell.onKnock = () => actions.findTheBox()
 shell.build(
   [
     tablePane(),
