@@ -200,8 +200,14 @@ export const ROLL_COST_BASE = new Decimal(1000)
  *
  * Those were taken before studyRequirement was made to climb, and they are
  * left because they are what the dial does on its own. The climb stretches the
- * head of the run as well, so the same numbers land much longer now: with it
- * in, x20 is 6h11m, x26 is 17h07m, x33 is 66h55m, and x30 is where this sits.
+ * head of the run as well, so the same numbers land much longer with it in:
+ * x20 is 5h20m, x30 is 39h40m, x33 is 66h55m. Ten on the dial is seven and a
+ * half times the run, which is worth remembering before nudging it.
+ *
+ * Back at x20, where it started, but the run is not what it was there. It was
+ * 22 minutes with the whole table open in the first four and a half; it is
+ * 5h20m with the chain opening across the first 2h23m of it and melting
+ * arriving at the halfway mark.
  *
  * It does nothing at all for how fast the chain opens. Measured at x52, where
  * the run is sixty-five times longer than it was at x20, the ninth solid still
@@ -212,7 +218,7 @@ export const ROLL_COST_BASE = new Decimal(1000)
  * Anything that changes the chain's output changes what this should be, so
  * re-run `npm run sim` after touching solids, faces or studies.
  */
-export const ROLL_COST_MULT = new Decimal(30)
+export const ROLL_COST_MULT = new Decimal(20)
 
 export function rollIntervalMultiplier(folios: number): number {
   if (folios < 3) {
