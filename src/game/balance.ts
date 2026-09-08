@@ -191,12 +191,27 @@ export const ROLL_COST_BASE = new Decimal(1000)
  * faces are taken raw, so ink outruns x10 easily and roll rate can be bought
  * forever. At x10 the whole first Wager was twelve and a half minutes.
  *
- * The response is exponential in this number and there is no shock absorber:
- * x16 is 23 minutes, x18 is 42, x20 is an hour and a half, x25 is most of a
- * day. Anything that changes the chain's output changes what this should be,
- * so re-run `npm run sim` after touching solids, faces or studies.
+ * This is the only dial that sets how long a run lasts, and the response is
+ * exponential with no shock absorber: measured against the archive as it
+ * stands, the first Wager doubles for every five added.
+ *
+ *     x20  22m      x35  3h10m     x45  11h42m
+ *     x30  1h28m    x40  6h23m     x50  19h43m
+ *
+ * At x50 a first run is most of a day, which is where AD's own first Infinity
+ * sits for somebody playing it idly rather than optimally, and the runs after
+ * it come in around eight hours and seven.
+ *
+ * It does nothing at all for how fast the chain opens. Measured at x52, where
+ * the run is sixty-five times longer than it was at x20, the ninth solid still
+ * arrived at 4m49s against 4m30s. The early game is gated by buying dice
+ * rather than by the roll rate, so this stretches the tail and leaves the head
+ * exactly where it was. What paces discovery is studyRequirement.
+ *
+ * Anything that changes the chain's output changes what this should be, so
+ * re-run `npm run sim` after touching solids, faces or studies.
  */
-export const ROLL_COST_MULT = new Decimal(20)
+export const ROLL_COST_MULT = new Decimal(33)
 
 export function rollIntervalMultiplier(folios: number): number {
   if (folios < 3) {
@@ -218,8 +233,6 @@ export function rollIntervalMultiplier(folios: number): number {
 export const SOLIDS_AT_START = 1
 export const STUDIES_THAT_UNLOCK = SOLID_COUNT - SOLIDS_AT_START
 
-/** The study at which the chain is full and requirements start climbing. */
-const FIRST_CLIMBING_STUDY = STUDIES_THAT_UNLOCK + 1
 const STUDY_CLIMB = 15
 
 /**
@@ -228,10 +241,38 @@ const STUDY_CLIMB = 15
  * Antimatter Dimensions charges a flat 20 for every dimension shift, but it
  * hands you four dimensions to start with. Here the table opens with one die,
  * so that flat 20 sat between a new player and a chain that does anything at
- * all. Only the first one is discounted; from the second the schedule is AD's.
+ * all.
  */
 const EARLY_STUDIES = 1
 const EARLY_STUDY_REQUIREMENT = 10
+
+/**
+ * What each solid costs over the one before it, while the chain is filling.
+ *
+ * AD charges a flat 20 for every shift that unlocks a dimension, and this
+ * charged the same until it was measured. A flat number does not hold here,
+ * because this chain compounds far harder than AD's: nine tiers taking faces
+ * raw, so each solid you open makes the next twenty cheaper than the last one
+ * was. The gaps ran 94s, 56s, 31s, 31s, 26s, 23s, 20s. Discovery accelerated
+ * into nothing and the whole table was open in under five minutes, and it
+ * stayed under five minutes when the run was stretched from twenty-two
+ * minutes to a day: roll rate governs the tail, and this governs the head.
+ *
+ * Geometric rather than linear, because what it is fighting is geometric, and
+ * the useful range is very narrow. The requirement is measured against the
+ * solid you have only just opened, so it compounds with that solid's own cost
+ * curve: at 2.2 a step the third study alone took 12h41m, at 1.7 it took
+ * 1h08m, and at 1.45 the fifth took 27 hours.
+ *
+ * Spreading the chain over more studies instead was worse the other way. The
+ * early studies then measure against a solid low down the chain that you have
+ * thousands of, so they cost nothing and the whole table opened in a minute.
+ *
+ * This is also why the roll cost is not simply set to whatever gives the run
+ * you want. The two dials are not independent the way they first looked:
+ * stretching the head lengthens the whole run, so the tail needs less.
+ */
+const UNLOCK_CLIMB = 1.25
 
 /** Which solid the nth study is measured against. n is 1-based. */
 export function studyTier(n: number): number {
@@ -239,10 +280,26 @@ export function studyTier(n: number): number {
 }
 
 /** How many of that solid the nth study costs. */
+const FIRST_CLIMBING_STUDY = STUDIES_THAT_UNLOCK + 1
+
+/** What the deepest solid costs, which is where the studies past the chain
+ *  carry on from. */
+/**
+ * Rounded to the nearest five, so the schedule reads as a table somebody wrote
+ * rather than as wherever an exponential landed. It was 25, 31, 39, 49, 61,
+ * 76; it is 25, 30, 40, 50, 60, 75, within a couple of percent of the curve
+ * the whole way and every number one you could have chosen.
+ */
+const toFive = (v: number): number => Math.round(v / 5) * 5
+
+const LAST_UNLOCK = toFive(20 * Math.pow(UNLOCK_CLIMB, STUDIES_THAT_UNLOCK - 2))
+
 export function studyRequirement(n: number): number {
   if (n <= EARLY_STUDIES) return EARLY_STUDY_REQUIREMENT
-  if (n < FIRST_CLIMBING_STUDY) return 20
-  return 20 + (n - FIRST_CLIMBING_STUDY) * STUDY_CLIMB
+  if (n < FIRST_CLIMBING_STUDY) return toFive(20 * Math.pow(UNLOCK_CLIMB, n - 2))
+  // One step up rather than zero, or the first study past the chain costs
+  // exactly what the last solid did and the schedule has a flat spot in it.
+  return LAST_UNLOCK + (n - FIRST_CLIMBING_STUDY + 1) * STUDY_CLIMB
 }
 
 /**
@@ -267,12 +324,34 @@ export const STUDY_POWER = 2
 export const MELT_AT = new Decimal(1e6)
 
 /** The multiplier from melting `d4` tetrahedra at Death level `level`. */
+/**
+ * Folios held before melting is offered at all.
+ *
+ * Antimatter Dimensions opens Dimensional Sacrifice on the fifth Dimension
+ * Boost, `DimBoost.purchasedBoosts > 4`, which lands partway through a first
+ * Infinity once the chain is complete. Ours used to sit behind XIII Death,
+ * which is a card, which is behind the Wager, so a first run here had one
+ * fewer mechanic than AD's does and nothing at all arrived between the chain
+ * filling and the run ending.
+ *
+ * A folio is the closer gate in practice. Measured, the chain completes at
+ * 6h25m and the first folio lands at 7h30m, which is the same beat AD puts
+ * sacrifice on.
+ */
+export const MELT_AT_FOLIOS = 1
+
+/** What melting is worth with no card at all, and what each level of XIII
+ *  Death adds to it. The card makes melting stronger now rather than making
+ *  it exist. */
+const MELT_BASE = 0.3
+const MELT_PER_LEVEL = 0.6
+
 export function meltMultiplier(d4: Decimal, level: number): Decimal {
-  if (level <= 0 || d4.lte(1)) return new Decimal(1)
+  if (d4.lte(1)) return new Decimal(1)
   // The log keeps it from running away with the chain: a thousand times the
   // tetrahedra is a little over twice the multiplier, not a thousand times it.
   const reach = Math.pow(Math.max(0, d4.log10()), 1.4)
-  return new Decimal(1).plus(reach * level * 0.6)
+  return new Decimal(1).plus(reach * (MELT_BASE + level * MELT_PER_LEVEL))
 }
 
 // -- folios, the antimatter galaxy analogue -------------------------------

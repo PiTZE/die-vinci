@@ -99,7 +99,7 @@ export const ARCANA: TarotDef[] = [
   T('hanged', 'XII', 'The Hanged Man', 'mid',
     'a study no longer clears your roll rate'),
   T('death', 'XIII', 'Death', 'late',
-    'melt the chain into the solid at the top of it'),
+    'melting the chain pays far more'),
   T('temperance', 'XIV', 'Temperance', 'mid',
     'roll rate costs less the more this run has earned'),
   T('devil', 'XV', 'The Devil', 'mid',

@@ -115,8 +115,12 @@ const studyNeedBefore = await ev(need)
 await ev(`window.LD.state.chipUpgrades = ['timeMult','solids19','solids37','resetBoost']`)
 await sleep(150)
 const studyNeedAfter = await ev(need)
+// The discount, not the two absolute numbers. What a study costs moves
+// whenever the unlock schedule is retuned, and this check is about the chip
+// upgrade taking nine off it, which is true at any requirement.
+const studyNum = (t) => Number((t.match(/([0-9.]+)/) ?? [])[1])
 check('resetBoost lowers the study requirement by 9',
-  studyNeedBefore.includes('20 ') && studyNeedAfter.includes('11 '),
+  studyNum(studyNeedBefore) - studyNum(studyNeedAfter) === 9,
   `${studyNeedBefore} -> ${studyNeedAfter}`)
 
 // Ink held can run ahead of what the run has earned: The Hierophant pays ink

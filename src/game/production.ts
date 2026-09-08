@@ -25,6 +25,7 @@ import {
   START_INK,
   WAGER_AT,
   meltMultiplier,
+  MELT_AT_FOLIOS,
   folioRequirement,
   rollIntervalMultiplier,
   studyRequirement,
@@ -122,7 +123,10 @@ export function solidMultiplier(s: GameState, idx: number): Decimal {
 
 /** XIII Death is the gate. Without the card there is nothing to melt with. */
 export function meltUnlocked(s: GameState): boolean {
-  return levelOf(s, 'death') > 0
+  // A folio opens it, the way AD opens Dimensional Sacrifice on a boost count.
+  // Death is still a way in, so a save that holds the card before it has a
+  // folio does not lose what it had.
+  return s.folios >= MELT_AT_FOLIOS || levelOf(s, 'death') > 0
 }
 
 /** What melting right now would be worth. */

@@ -217,16 +217,31 @@ check('XII THE HANGED MAN: a reset keeps some of your roll rate',
 
 await ev(SETUP)
 
-// XIII DEATH: melting, which nothing else unlocks.
-const death = await ev(`(() => { const s = window.LD.state
+// XIII DEATH: melting pays far more.
+//
+// The card used to be the only way to melt at all. Melting opens on a folio
+// now, the way AD opens Dimensional Sacrifice on a boost count, so the card
+// makes it stronger rather than making it exist, and its own line says so.
+const death = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal
   s.tarot = {}
-  const off = window.LD.meltUnlocked(s)
-  s.tarot = { death: 1 }
-  const on = window.LD.meltUnlocked(s)
+  s.folios = 0
+  const noFolioNoCard = window.LD.meltUnlocked(s)
+  s.folios = 1
+  const onAFolio = window.LD.meltUnlocked(s)
+  // Through meltGain, which reads the card off the save, because that is what
+  // the game itself calls and it is what is exposed.
+  s.solids[0].amount = new D('1e12')
+  const bare = window.LD.meltGain(s).toNumber()
+  s.tarot = { death: 5 }
+  const withCard = window.LD.meltGain(s).toNumber()
   s.tarot = {}
-  return { off, on } })()`)
-check('XIII DEATH: melting, and nothing else unlocks it',
-  death.off === false && death.on === true, JSON.stringify(death))
+  s.folios = 0
+  return { noFolioNoCard, onAFolio, bare, withCard } })()`)
+check('XIII DEATH: a folio opens melting and the card makes it pay far more',
+  death.noFolioNoCard === false && death.onAFolio === true &&
+    death.bare > 1 && death.withCard > death.bare * 2,
+  JSON.stringify(death))
+
 
 // XIV TEMPERANCE: roll rate cheaper the deeper the run has gone.
 const temperance = await ev(`(() => { const s = window.LD.state, D = window.LD.Decimal

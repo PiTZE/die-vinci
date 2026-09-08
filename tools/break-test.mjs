@@ -198,11 +198,16 @@ const wall = await ev(`(() => { const s = window.LD.state
   // The step between consecutive levels is flat below the wall and grows past
   // it, which is the whole of AD's 0.5 e (e+1) log(scale) term.
   const below = at(101) - at(100)
+  // A second step, away from the first and still below the wall, so flatness
+  // is measured rather than compared against a number written down here. The
+  // multiplier itself is a balance dial and has moved before.
+  const alsoBelow = at(151) - at(150)
   const over = at(601) - at(600)
   s.rollUpgrades = 0
-  return { below, over } })()`)
-check('below the wall the climb is flat x20 a level',
-  Math.abs(wall.below - Math.log10(20)) < 1e-9, String(wall.below))
+  return { below, alsoBelow, over } })()`)
+check('below the wall the climb is flat, whatever the multiplier is set to',
+  Math.abs(wall.below - wall.alsoBelow) < 1e-9 && wall.below > 0,
+  `x${Math.pow(10, wall.below).toFixed(2)} a level`)
 check('past the wall the climb itself steepens', wall.over > wall.below * 100,
   `${wall.below.toFixed(3)} -> ${wall.over.toFixed(3)} orders a level`)
 
