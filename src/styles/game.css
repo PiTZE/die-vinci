@@ -518,10 +518,10 @@
 
 /* At the threshold this is the only control on the bar, so it takes all of it
    and wears the accent that nothing else does. */
-.wager-now {
-  border-color: var(--accent);
-  color: var(--accent);
-}
+/* Nothing of its own. It stands where ROLL stands and takes ROLL's place, so
+   it reads as the same button with a different job rather than as a second
+   one that happens to be there. It was picked out in the accent, which on a
+   bar holding one button is emphasis with nothing to be emphatic against. */
 
 .bar-roll-label {
   position: relative;

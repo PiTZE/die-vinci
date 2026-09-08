@@ -29,7 +29,7 @@ import {
   FACE_READABLE_S,
 } from '../game/production'
 import { FACE_AVERAGE_S, FACE_SETTLE_S, WAGER_AT } from '../game/balance'
-import { wagerProgress } from '../game/wager'
+import { canWager, wagerProgress } from '../game/wager'
 import { modifiers, towerStriking } from '../game/tarot'
 import { format, formatWhole } from '../format'
 import type { GameState } from '../state'
@@ -516,13 +516,19 @@ export function tablePane(): Pane {
       // The dice only turn while a roll is in the air. Under the automator
       // that is always, which is exactly the difference the purchase buys.
       const full = mustWager(s)
-      mustWagerNow = full
+      // Whether the Wager can be called at all, which past the wall is not the
+      // same question as whether the run has stopped. Before breaking they
+      // coincide, because the run halts the moment it is callable. After
+      // breaking nothing halts, and the button used to be hidden for the rest
+      // of the game: there was no way to call one by hand, and W did nothing.
+      const canCall = canWager(s)
+      mustWagerNow = canCall
       const spinning = rolling(s) && s.haltMs <= 0 && !full
 
       // The bar gives itself over to the one remaining move.
       resetGroup.hidden = full
       maxBtn.hidden = full
-      wagerNow.hidden = !full
+      wagerNow.hidden = !canCall
       wagerNow.textContent = confirm.isArmed('wager') ? 'SURE? THIS RESETS' : 'CALL THE WAGER'
       // Under a fast roll rate the digit would change every frame, which is
       // noise rather than a reading. The dice just spin then.
@@ -561,7 +567,9 @@ export function tablePane(): Pane {
       // the automator flag alone, which after the Wager grants the whole
       // ladder would take the button away and leave a die switched back to
       // your finger with nothing to press it.
-      rollNow.hidden = allRollThemselves(s) || full
+      // The Wager takes ROLL's place rather than sitting beside it: one button
+      // in one spot, and the one that matters is the one you get.
+      rollNow.hidden = allRollThemselves(s) || canCall
       if (!s.autoRoll) {
         ready(
           rollNow,

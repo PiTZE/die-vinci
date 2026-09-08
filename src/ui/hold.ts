@@ -129,10 +129,17 @@ export function holdable(el: HTMLElement, action: (mods: Mods) => void): void {
     // buys what the ink covers and nothing when it covers nothing. What this
     // is for is a ring left running on a button that has left the screen,
     // which nobody is watching and nothing else would stop.
-    if (el.hidden || !el.isConnected) {
+    // Gone for good, so the ring goes with it.
+    if (!el.isConnected) {
       if (isSticky(el)) releaseSticky()
       return
     }
+    // Hidden is not gone. The bar hides ROLL and MAX while a Wager is waiting
+    // to be called and shows them again straight after, and this used to take
+    // the ring off on the way past: you called a Wager and had to hold the
+    // button down for another second to get back what you had. It waits
+    // instead, and picks up where it left off when the button returns.
+    if (el.hidden) return
     action(mods)
   }
 
@@ -308,10 +315,13 @@ window.addEventListener('keydown', (e) => {
   }
   el?.classList.add('pressing')
   const rep = repeat(() => {
-    if (el && (el.hidden || !el.isConnected)) {
+    // Same rule as the pointer path: gone takes the ring with it, hidden only
+    // waits. A key ring on ROLL used to be lost the moment a Wager came due.
+    if (el && !el.isConnected) {
       if (isSticky(el)) releaseSticky()
       return
     }
+    if (el?.hidden) return
     fn({ shift: e.shiftKey })
   })
   heldKeys.set(key, rep)
