@@ -198,9 +198,10 @@ export const ROLL_COST_BASE = new Decimal(1000)
  *     x20  22m      x35  3h10m     x45  11h42m
  *     x30  1h28m    x40  6h23m     x50  19h43m
  *
- * At x50 a first run is most of a day, which is where AD's own first Infinity
- * sits for somebody playing it idly rather than optimally, and the runs after
- * it come in around eight hours and seven.
+ * Those were taken before studyRequirement was made to climb, and they are
+ * left because they are what the dial does on its own. The climb stretches the
+ * head of the run as well, so the same numbers land much longer now: with it
+ * in, x20 is 6h11m, x26 is 17h07m, x33 is 66h55m, and x30 is where this sits.
  *
  * It does nothing at all for how fast the chain opens. Measured at x52, where
  * the run is sixty-five times longer than it was at x20, the ninth solid still
@@ -211,7 +212,7 @@ export const ROLL_COST_BASE = new Decimal(1000)
  * Anything that changes the chain's output changes what this should be, so
  * re-run `npm run sim` after touching solids, faces or studies.
  */
-export const ROLL_COST_MULT = new Decimal(33)
+export const ROLL_COST_MULT = new Decimal(30)
 
 export function rollIntervalMultiplier(folios: number): number {
   if (folios < 3) {
