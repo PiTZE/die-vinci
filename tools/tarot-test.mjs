@@ -107,20 +107,27 @@ const sun = await ev(`(() => {
 check('XIX The Sun actually multiplies production',
   Number(sun.after) > Number(sun.before) * 2, JSON.stringify(sun))
 
-// XIII Death gates melting, and melting pays the deepest solid.
+// Melting, and what it pays the deepest solid.
+//
+// Two things gate it that did not used to. It opens on a folio now rather than
+// only on XIII Death, the way AD opens Dimensional Sacrifice on a boost count,
+// and it wants something at the top of the chain to melt into: AD asks the
+// same, `AntimatterDimension(8).totalAmount.gt(0)` in Sacrifice.canSacrifice.
+// Without a d72 the whole table goes and the multiplier lands on an empty row.
 const melt = await ev(`(() => {
   const s = window.LD.state, D = window.LD.Decimal
-  s.tarot = {}; s.studies = 8
+  s.tarot = {}; s.studies = 8; s.folios = 0
   const locked = window.LD.meltUnlocked(s)
   s.tarot = { death: 2 }
   s.solids[0].amount = new D('1e12')
+  s.solids[s.solids.length - 1].amount = new D(5)
   const can = window.LD.canMelt(s)
   const gain = window.LD.meltGain(s).toString()
   const before = s.meltPower.toString()
   window.LD.actions.melt()
   return { locked, can, gain, before, after: s.meltPower.toString(),
     lowerCleared: s.solids[0].amount.toString() } })()`)
-check('melting is locked until Death is held', melt.locked === false)
+check('melting is locked with no folio and no card', melt.locked === false)
 check('and then it can be melted', melt.can === true, `gain x${melt.gain}`)
 check('melting pays the top solid and empties the rest',
   Number(melt.after) > Number(melt.before) && melt.lowerCleared === '0',

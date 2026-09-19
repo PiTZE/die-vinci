@@ -346,10 +346,13 @@ const run = await ev(`(() => {
   const fill = bar.querySelector('.geo-vesica rect')
   const lensH = lens ? lens.getBBox().height : 0
   const fillH = fill ? Number(fill.getAttribute('height') || 0) : 0
-  return { hidden: bar.hidden, label: bar.querySelector('.run-bar-label').textContent,
+  return { hidden: bar.hidden,
     fill: lensH > 0 ? (fillH / lensH) * 100 : -1 } })()`)
+// The lens and nothing else. There was a percentage under it, and the check
+// read that number as well as the fill; the figure was the written version of
+// a thing already drawn, so it went and this asks only what is left.
 check('the table shows how far through the run you are',
-  run.hidden === false && /\d/.test(run.label) && run.fill > 0 && run.fill < 100,
+  run.hidden === false && run.fill > 0 && run.fill < 100,
   JSON.stringify(run))
 
 // A solid you have opened once stays on the table. A study or a folio drops the

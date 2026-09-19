@@ -186,46 +186,74 @@ export const FACE_SETTLE_S = 2.6
 /** Ink cost of the first roll-rate upgrade, then x10 each. */
 export const ROLL_COST_BASE = new Decimal(1000)
 /**
- * Antimatter Dimensions charges x10 a level for tickspeed and it holds there.
- * It does not hold here: this chain is nine tiers rather than eight and the
- * faces are taken raw, so ink outruns x10 easily and roll rate can be bought
- * forever. At x10 the whole first Wager was twelve and a half minutes.
+ * x10 a level, which is Antimatter Dimensions' own number for tickspeed.
  *
- * This is the only dial that sets how long a run lasts, and the response is
- * exponential with no shock absorber: measured against the archive as it
- * stands, the first Wager doubles for every five added.
+ * It was x20 for a long time and the reason was real: nine tiers taking faces
+ * raw outrun x10, so roll rate could be bought forever. What made x20 wrong is
+ * that the price stops being a round number. costAt works in log space, so a
+ * multiplier of ten makes every level exactly one order of magnitude, and the
+ * ladder reads 1e3, 1e4, 1e5 and on up to 1e130 with 1e131 next. At x20 those
+ * became 2e3, 4e4, 8e5, and nothing in the column was a number anybody chose.
+ * AD has the same base of 1000 and the same increase of 10 for exactly this.
  *
- *     x20  22m      x35  3h10m     x45  11h42m
- *     x30  1h28m    x40  6h23m     x50  19h43m
+ * This is the only dial that sets how long a run lasts and the response is
+ * exponential with no shock absorber. Measured with the study climb in:
  *
- * Those were taken before studyRequirement was made to climb, and they are
- * left because they are what the dial does on its own. The climb stretches the
- * head of the run as well, so the same numbers land much longer with it in:
- * x20 is 5h20m, x30 is 39h40m, x33 is 66h55m. Ten on the dial is seven and a
- * half times the run, which is worth remembering before nudging it.
+ *     x20  5h20m     x30  39h40m     x33  66h55m
  *
- * Back at x20, where it started, but the run is not what it was there. It was
- * 22 minutes with the whole table open in the first four and a half; it is
- * 5h20m with the chain opening across the first 2h23m of it and melting
- * arriving at the halfway mark.
- *
- * It does nothing at all for how fast the chain opens. Measured at x52, where
- * the run is sixty-five times longer than it was at x20, the ninth solid still
- * arrived at 4m49s against 4m30s. The early game is gated by buying dice
- * rather than by the roll rate, so this stretches the tail and leaves the head
- * exactly where it was. What paces discovery is studyRequirement.
- *
- * Anything that changes the chain's output changes what this should be, so
- * re-run `npm run sim` after touching solids, faces or studies.
+ * Ten on the dial is seven and a half times the run, which is worth
+ * remembering before nudging it. Anything that changes the chain's output
+ * changes what this should be, so re-run `npm run sim` after touching solids,
+ * faces or studies.
  */
-export const ROLL_COST_MULT = new Decimal(20)
+export const ROLL_COST_MULT = new Decimal(10)
 
-export function rollIntervalMultiplier(folios: number): number {
+/**
+ * AD's curve, exactly as getTickSpeedMultiplier() draws it.
+ *
+ * Two regimes split on the galaxy count. Under three it is linear: a base that
+ * improves slightly per galaxy, three hardcoded values its own source calls
+ * magic numbers, minus a flat 0.02 each. From three on it is exponential,
+ * 0.8 x 0.965^(n-4), which is what stops galaxies running away.
+ */
+function folioShape(folios: number): number {
   if (folios < 3) {
     const base = folios === 0 ? 1 / 1.1245 : folios === 1 ? 1 / 1.11888888 : 1 / 1.11267177
-    return Math.max(0.01, base - folios * 0.02)
+    return base - folios * 0.02
   }
   return Math.pow(0.965, folios - 4) * 0.8
+}
+
+const SHAPE_AT_ZERO = folioShape(0)
+
+/**
+ * What one roll-rate level is worth before any folio.
+ *
+ * AD's is 1/1.1245, an 11% cut to the interval a level. That is right for
+ * eight dimensions and wrong for nine tiers taking faces raw: at x10 a level,
+ * ten times the ink bought fourteen percent more rate, the chain paid it back
+ * at once, and the first Wager fell to 45 minutes.
+ *
+ * The whole curve is re-based rather than this one number being swapped, so
+ * every folio still helps in AD's proportion. Swapping only the first constant
+ * would leave a flat 0.02 a folio being subtracted from 0.97 and the three-
+ * folio regime dropping straight to 0.8, which is a cliff rather than a curve.
+ *
+ * It is a sharp dial and it is the one holding the pace, so the measurements
+ * are worth keeping. Against the ten-a-study ladder and folios at ninety:
+ *
+ *     1.03   never finishes, the seventh study alone takes 25h
+ *     1.09   folio 1 at 8h26m, Wager at 11h06m
+ *     1.10   folio 1 at 3h52m, Wager at 4h56m
+ *     1.11   folio 1 at 2h04m, Wager at 2h42m
+ *
+ * A hundredth either way roughly halves or doubles the run. Re-sim after
+ * touching anything about the chain.
+ */
+const ROLL_LEVEL = 1 / 1.09
+
+export function rollIntervalMultiplier(folios: number): number {
+  return Math.max(0.01, (folioShape(folios) / SHAPE_AT_ZERO) * ROLL_LEVEL)
 }
 
 // -- studies, the dimension shift and boost analogue ----------------------
@@ -240,46 +268,27 @@ export function rollIntervalMultiplier(folios: number): number {
 export const SOLIDS_AT_START = 1
 export const STUDIES_THAT_UNLOCK = SOLID_COUNT - SOLIDS_AT_START
 
-const STUDY_CLIMB = 15
-
 /**
- * The first study is cheaper than the rest.
+ * Ten more each, the whole way down and past the end of the chain.
  *
- * Antimatter Dimensions charges a flat 20 for every dimension shift, but it
- * hands you four dimensions to start with. Here the table opens with one die,
- * so that flat 20 sat between a new player and a chain that does anything at
- * all.
+ *     d4 10, d6 20, d8 30, d12 40, d14 50, d20 60, d26 70, d32 80,
+ *     then 90, 100, 110 and on, all measured against the d72.
+ *
+ * Antimatter Dimensions does not do this. It charges a flat 20 for every shift
+ * that unlocks a dimension and only climbs, by 15, once the chain is full. A
+ * flat number cannot work here because this chain compounds much harder than
+ * AD's: nine tiers taking faces raw, so each solid opened makes the next
+ * twenty cheaper than the last one was, and the whole table used to arrive
+ * inside five minutes with the gaps shrinking the whole way.
+ *
+ * What was here before was that same fight fought with a geometric climb of
+ * 1.25 rounded to fives, which worked and read as arbitrary. This is the same
+ * shape drawn with a ruler, and it is strictly linear, which is worth more
+ * than it looks: the reset autobuyers extrapolate how many they can take from
+ * two samples of the ladder, and a straight line makes that exact instead of
+ * approximate.
  */
-const EARLY_STUDIES = 1
-const EARLY_STUDY_REQUIREMENT = 10
-
-/**
- * What each solid costs over the one before it, while the chain is filling.
- *
- * AD charges a flat 20 for every shift that unlocks a dimension, and this
- * charged the same until it was measured. A flat number does not hold here,
- * because this chain compounds far harder than AD's: nine tiers taking faces
- * raw, so each solid you open makes the next twenty cheaper than the last one
- * was. The gaps ran 94s, 56s, 31s, 31s, 26s, 23s, 20s. Discovery accelerated
- * into nothing and the whole table was open in under five minutes, and it
- * stayed under five minutes when the run was stretched from twenty-two
- * minutes to a day: roll rate governs the tail, and this governs the head.
- *
- * Geometric rather than linear, because what it is fighting is geometric, and
- * the useful range is very narrow. The requirement is measured against the
- * solid you have only just opened, so it compounds with that solid's own cost
- * curve: at 2.2 a step the third study alone took 12h41m, at 1.7 it took
- * 1h08m, and at 1.45 the fifth took 27 hours.
- *
- * Spreading the chain over more studies instead was worse the other way. The
- * early studies then measure against a solid low down the chain that you have
- * thousands of, so they cost nothing and the whole table opened in a minute.
- *
- * This is also why the roll cost is not simply set to whatever gives the run
- * you want. The two dials are not independent the way they first looked:
- * stretching the head lengthens the whole run, so the tail needs less.
- */
-const UNLOCK_CLIMB = 1.25
+const STUDY_STEP = 10
 
 /** Which solid the nth study is measured against. n is 1-based. */
 export function studyTier(n: number): number {
@@ -287,34 +296,10 @@ export function studyTier(n: number): number {
 }
 
 /** How many of that solid the nth study costs. */
-const FIRST_CLIMBING_STUDY = STUDIES_THAT_UNLOCK + 1
-
-/** What the deepest solid costs, which is where the studies past the chain
- *  carry on from. */
-/**
- * Rounded to the nearest five, so the schedule reads as a table somebody wrote
- * rather than as wherever an exponential landed. It was 25, 31, 39, 49, 61,
- * 76; it is 25, 30, 40, 50, 60, 75, within a couple of percent of the curve
- * the whole way and every number one you could have chosen.
- */
-const toFive = (v: number): number => Math.round(v / 5) * 5
-
-const LAST_UNLOCK = toFive(20 * Math.pow(UNLOCK_CLIMB, STUDIES_THAT_UNLOCK - 2))
-
 export function studyRequirement(n: number): number {
-  if (n <= EARLY_STUDIES) return EARLY_STUDY_REQUIREMENT
-  if (n < FIRST_CLIMBING_STUDY) return toFive(20 * Math.pow(UNLOCK_CLIMB, n - 2))
-  // One step up rather than zero, or the first study past the chain costs
-  // exactly what the last solid did and the schedule has a flat spot in it.
-  return LAST_UNLOCK + (n - FIRST_CLIMBING_STUDY + 1) * STUDY_CLIMB
+  return n * STUDY_STEP
 }
 
-/**
- * A study's multiplier reaches down the chain, not across all of it. With s
- * studies, solid `tier` gets 2^(s + 1 - tier), never below 1. So the first
- * study doubles only the tetrahedra, and the deep solids are the last to
- * benefit. This is AD's multiplierToNDTier exactly.
- */
 export const STUDY_POWER = 2
 
 // -- melt, the dimensional sacrifice analogue -----------------------------
@@ -363,9 +348,17 @@ export function meltMultiplier(d4: Decimal, level: number): Decimal {
 
 // -- folios, the antimatter galaxy analogue -------------------------------
 
-/** From Galaxy.baseCost and Galaxy.costMult in src/core/galaxy.js. */
-export const FOLIO_BASE = 80
-export const FOLIO_COST_MULT = 60
+/**
+ * Ninety more each: 90 of the d72, then 180, then 270.
+ *
+ * AD's own are Galaxy.baseCost 80 and Galaxy.costMult 60, so 80 + 60n, and it
+ * stays linear only to its hundredth galaxy. Past that requirementAt adds
+ * n^2 + n for distant galaxies and multiplies by 1.002^n for remote ones.
+ * Neither of those is here, so this is linear the whole way, which is the part
+ * of AD's shape a run this length actually reaches.
+ */
+export const FOLIO_BASE = 90
+export const FOLIO_COST_MULT = 90
 
 export function folioRequirement(owned: number): number {
   return FOLIO_BASE + FOLIO_COST_MULT * owned

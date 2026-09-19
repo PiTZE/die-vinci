@@ -651,14 +651,6 @@
   color: var(--accent);
 }
 
-.run-bar-label {
-  position: relative;
-  font-size: var(--t-1);
-  letter-spacing: 0.1em;
-  color: var(--fg-dim);
-  font-variant-numeric: tabular-nums;
-}
-
 /* One button per setting, its name above its current value, pressed to move to
    the next. Sized so a phone gets two columns and a desktop four or five, which
    is the whole point of the shape. */
@@ -2364,4 +2356,54 @@
     outline-offset: 9px;
     outline-color: transparent;
   }
+}
+
+/* What a row's multiplier is made of.
+ *
+ * The row prints one number that is a dozen things multiplied together, and
+ * only one of them is round: the archive alone is 1.25^rows x 1.03^entries and
+ * lands on values like 2.006. AD breaks a dimension's multiplier into its
+ * named parts on hover; a phone has no hover, so the number is a button and
+ * this opens under the row until it is tapped again.
+ */
+.solid-mult {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* Dotted, so it reads as something you can open without spending the accent
+     on it. The accent means affordable-and-unbought and nothing else. */
+  border-bottom: 1px dotted var(--line);
+}
+
+.solid-parts {
+  grid-column: 1 / -1;
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 3px;
+  font-size: var(--t-1);
+}
+
+.solid-part {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.solid-part-name {
+  color: var(--fg-muted);
+  letter-spacing: 0.08em;
+}
+
+.solid-part-val {
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.solid-part-none {
+  color: var(--fg-muted);
 }

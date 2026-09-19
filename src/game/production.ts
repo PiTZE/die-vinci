@@ -88,34 +88,64 @@ export function chargeBack(s: GameState): number {
   return Math.max(0, Math.min(1, 1 - s.haltMs / HALT_MS))
 }
 
-export function solidMultiplier(s: GameState, idx: number): Decimal {
+/** One named factor of a row's multiplier, for the breakdown under it. */
+export interface MultPart {
+  label: string
+  value: Decimal
+  /** Reshapes everything above it rather than multiplying alongside. */
+  exponent?: boolean
+}
+
+/**
+ * What a row's multiplier is made of, in the order it is applied.
+ *
+ * The row prints one number and it is the product of a dozen things, only one
+ * of which is round: the archive alone is 1.25^rows x 1.03^entries, which
+ * lands on values like 2.006 and multiplies everything else. Asked what the
+ * number meant, there was nowhere to look.
+ *
+ * Antimatter Dimensions answers this by breaking a dimension's multiplier into
+ * its named parts on hover. This is the same list, and solidMultiplier folds
+ * it rather than repeating it, so the total and the breakdown cannot drift.
+ */
+export function multiplierParts(s: GameState, idx: number): MultPart[] {
   const st = s.solids[idx - 1]
   const r = restrictions(s)
   const m = modifiers(s)
   const perTen = r.perTen === null ? perTenMultiplier(s) : new Decimal(r.perTen)
   const weaken = idx === 1 && r.weakenFirst > 1 ? new Decimal(r.weakenFirst) : new Decimal(1)
-  let out = perTen
-    .pow(Math.floor(st.bought / 10))
-    .div(weaken)
-    .times(studyBonus(s, idx))
-    .times(timeMultiplier(s))
-    .times(runMultiplier(s))
-    .times(pairMultiplier(s, idx))
-    .times(unspentMultiplier(s, idx))
-    // The archive pays, the way Antimatter Dimensions' achievements do.
-    .times(achievementPower(s))
-    // And whatever the break grid has bought, which is nothing until the wall
-    // comes down.
-    .times(breakMultiplier(s))
-    // The codices, which is AD's line for AD's reason: infinity power lands on
-    // every dimension separately, so it compounds through the whole chain.
-    .times(esperienzaMultiplier(s))
-  // XI Strength reshapes the multiplier rather than adding to it, so it
-  // compounds with everything above instead of sitting beside it.
-  if (m.solidExp !== 1) out = out.pow(m.solidExp)
-  // IV The Emperor and whatever melting has left behind: the deep end, and
-  // nothing else. Both land on the solid the whole chain is feeding.
-  if (idx === openSolids(s)) out = out.times(m.topMult).times(s.meltPower)
+
+  const parts: MultPart[] = []
+  const add = (label: string, value: Decimal): void => {
+    // Anything sitting at one is not doing anything, and a list of x1 is a
+    // list you stop reading.
+    if (!value.eq(1)) parts.push({ label, value })
+  }
+
+  add('EVERY TEN', perTen.pow(Math.floor(st.bought / 10)).div(weaken))
+  add('STUDIES', studyBonus(s, idx))
+  add('TIME PLAYED', timeMultiplier(s))
+  add('THIS RUN', runMultiplier(s))
+  add('PAIRS', pairMultiplier(s, idx))
+  add('CHIPS UNSPENT', unspentMultiplier(s, idx))
+  add('ARCHIVE', achievementPower(s))
+  add('BREAK GRID', breakMultiplier(s))
+  add('CODICES', esperienzaMultiplier(s))
+  if (m.solidExp !== 1) {
+    parts.push({ label: 'STRENGTH', value: new Decimal(m.solidExp), exponent: true })
+  }
+  if (idx === openSolids(s)) {
+    add('THE EMPEROR', m.topMult)
+    add('MELTED', s.meltPower)
+  }
+  return parts
+}
+
+export function solidMultiplier(s: GameState, idx: number): Decimal {
+  let out = new Decimal(1)
+  for (const p of multiplierParts(s, idx)) {
+    out = p.exponent ? out.pow(p.value.toNumber()) : out.times(p.value)
+  }
   return out
 }
 
@@ -136,6 +166,15 @@ export function meltGain(s: GameState): Decimal {
 
 export function canMelt(s: GameState): boolean {
   if (!meltUnlocked(s) || openSolids(s) < SOLIDS.length) return false
+  // And something at the top of it to melt into.
+  //
+  // Melting destroys everything below the deepest solid and leaves a
+  // multiplier on it, so with none of that solid there is nothing for the
+  // multiplier to land on: the whole table goes and the run gets a number
+  // sitting on an empty row. AD asks the same thing of its own sacrifice,
+  // `AntimatterDimension(8).totalAmount.gt(0)` in Sacrifice.canSacrifice,
+  // alongside the boost count.
+  if (s.solids[SOLIDS.length - 1].amount.lte(0)) return false
   if (s.solids[0].amount.lt(MELT_AT)) return false
   // Nothing to gain is nothing to offer. The multiplier replaces rather than
   // stacks, so melting for less than you already hold is a button that

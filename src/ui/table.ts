@@ -15,6 +15,7 @@ import {
   rollCost,
   rollRate,
   solidMultiplier,
+  multiplierParts,
   studyReq,
   openSolids,
   rollDuration,
@@ -46,6 +47,8 @@ interface Row {
   icon: SVGSVGElement
   face: HTMLElement
   mult: HTMLElement
+  /** The breakdown under it, filled only while it is open. */
+  parts: HTMLElement
   amount: HTMLElement
   rate: HTMLElement
   buy: HTMLButtonElement
@@ -208,8 +211,30 @@ export function tablePane(): Pane {
   let resetGroup: HTMLElement
   let runBar: HTMLElement
   let runLens: Vesica
-  let runLabel: HTMLElement
   let lastFace = 0
+  /** The last state seen, so an open breakdown can be repainted from a tap
+   *  rather than only on the next frame. */
+  let seen: GameState | null = null
+
+  /** Fills one row's breakdown. Named parts in the order they are applied,
+   *  which is the order multiplierParts returns them in, so the list reads the
+   *  same way the number is built. */
+  function paintParts(idx: number, into: HTMLElement): void {
+    if (!seen) return
+    into.replaceChildren()
+    const n = seen.options.notation
+    for (const p of multiplierParts(seen, idx)) {
+      const line = el('div', 'solid-part')
+      line.append(el('span', 'solid-part-name', p.label))
+      line.append(el('span', 'solid-part-val', p.exponent
+        ? `^${p.value.toNumber().toFixed(2)}`
+        : `x${format(p.value, n)}`))
+      into.appendChild(line)
+    }
+    if (!into.childElementCount) {
+      into.appendChild(el('div', 'solid-part-none', 'nothing yet'))
+    }
+  }
   const steady = new Steady()
 
 
@@ -304,9 +329,24 @@ export function tablePane(): Pane {
         // The multiplier shares the rate line. On a 390px screen the name row
         // ellipsised it away entirely, which is worse than small.
         const rate = el('div', 'solid-rate')
-        const mult = el('span', 'solid-mult', '')
+        // Pressable, because the number it prints is a dozen things multiplied
+        // together and there was nowhere to look to find out which. AD breaks
+        // a dimension's multiplier into its named parts on hover; a phone has
+        // no hover, so this opens on a tap and stays open until tapped again.
+        const mult = el('button', 'solid-mult', '') as HTMLButtonElement
+        mult.type = 'button'
+        mult.title = 'What this multiplier is made of'
         const flow = el('span', '', '')
         rate.append(mult, ' ', flow)
+
+        const parts = el('div', 'solid-parts')
+        parts.hidden = true
+        mult.addEventListener('click', () => {
+          parts.hidden = !parts.hidden
+          // Filled on open rather than every frame: it is nine rows of a dozen
+          // Decimals and nobody is looking at it most of the time.
+          if (!parts.hidden) paintParts(def.idx, parts)
+        })
 
         const buy = el('button', 'solid-buy', '')
         buy.type = 'button'
@@ -337,10 +377,10 @@ export function tablePane(): Pane {
         buy.append(steps, buyLabel, buyCost)
         // Shift buys a single die, the way AD's shift+1-8 does.
         holdable(buy, (m) => actions.buySolid(def.idx, m.shift))
-        r.append(amount, rate, buy)
+        r.append(amount, rate, buy, parts)
 
         chain.appendChild(r)
-        rows.push({ root: r, icon, face, mult, blocks, amount, rate: flow, buy, buyLabel, buyCost, lastFace: 0, shownFace: 0, drawnFace: 0, fromFace: 0, settledFor: 0 })
+        rows.push({ root: r, icon, face, mult, parts, blocks, amount, rate: flow, buy, buyLabel, buyCost, lastFace: 0, shownFace: 0, drawnFace: 0, fromFace: 0, settledFor: 0 })
       }
 
       const roll = el('div', 'section table-roll')
@@ -428,8 +468,7 @@ export function tablePane(): Pane {
       // nothing else.
       runBar = el('div', 'run-bar')
       runLens = vesica(120)
-      runLabel = el('span', 'run-bar-label', '')
-      runBar.append(runLens.root, runLabel)
+      runBar.append(runLens.root)
 
       root.append(grid, runBar)
 
@@ -505,6 +544,7 @@ export function tablePane(): Pane {
     },
 
     update(s: GameState) {
+      seen = s
       const n = s.options.notation
       const now = Date.now()
       // openSolids, not unlockedSolids, because a challenge can cut the chain
@@ -639,6 +679,7 @@ export function tablePane(): Pane {
         const st = s.solids[def.idx - 1]
         const mult = solidMultiplier(s, def.idx)
         setText(r.mult, `x${format(mult, n)}`)
+        if (!r.parts.hidden) paintParts(def.idx, r.parts)
 
         const into = st.bought % 10
         for (let i = 0; i < 10; i++) r.blocks[i].classList.toggle('on', i < into)
@@ -786,17 +827,15 @@ export function tablePane(): Pane {
       // close again, when a study drops the ink back under the threshold, and
       // the spoiler test reads textContent, which includes hidden nodes. A
       // label left behind would name the Wager to someone who has not met it.
-      if (!showRun) setText(runLabel, '')
       if (showRun) {
         // wagerProgress, not a second copy of the maths. It measures what the
         // run has earned rather than what it is holding, so a study no longer
         // throws the bar away along with the table.
-        // The number and nothing else. The two circles are the label: this is
-        // the only thing on the table drawn rather than written, it sits above
-        // the chain on every screen, and three words in front of the figure
-        // said what the figure was already saying.
-        const pct = wagerProgress(s) * 100
-        setText(runLabel, `${pct.toFixed(2)}%`)
+        //
+        // The two circles and nothing under them. The figure was there because
+        // a bar needs a number to mean anything; this is not a bar, it is the
+        // lens filling, and a percentage to two decimals underneath was the
+        // written version of a thing already drawn.
         runLens.set(wagerProgress(s))
       }
 

@@ -25,6 +25,9 @@ import {
   folioUnlocked,
   inkPerSecond,
   solidMultiplier,
+  // What that multiplier is made of, so a check can fold the breakdown and
+  // compare it against the total the row prints.
+  multiplierParts,
   canBuyGroup,
   canMelt,
   doMelt,
@@ -708,6 +711,7 @@ const hook: Record<string, unknown> = {
   exportSave: (st: GameState) => exportSave(st),
   importSave: (blob: string, now: number) => importSave(blob, now),
   solidMultiplier,
+  multiplierParts,
   inkPerSecond,
   meltUnlocked,
   // The auto-roll ladder, so its suite can assert the unlock rule rather than

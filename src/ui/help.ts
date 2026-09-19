@@ -54,7 +54,7 @@ const afterWager = (s: GameState) => s.wagers > 0
 const hasTarot = (s: GameState) => s.wagers > 0
 /** A card explains itself once you hold it, and says nothing before. */
 const holds = (id: string) => (s: GameState) => (s.tarot?.[id] ?? 0) > 0
-const hasMelt = (s: GameState) => (s.tarot?.death ?? 0) > 0
+const hasMelt = (s: GameState) => s.folios > 0 || (s.tarot?.death ?? 0) > 0
 const hasCodices = (s: GameState) => (s.codexOpen ?? 0) > 0
 const afterAutobuyer = (s: GameState) =>
   s.challengesDone.length > 0 || Object.values(s.autobuyers).some((a) => a.unlocked)
@@ -63,27 +63,26 @@ const SECTIONS: Section[] = [
   {
     title: 'ROLLING',
     body: [
-      'Nothing happens until you roll. Press ROLL and the dice spin, and when they land each one shows a face: a d4 lands on 1 to 4, a d12 on 1 to 12.',
+      'Nothing produces until the dice land. Press ROLL and they spin; when they stop, each shows a face. A d4 lands on 1 to 4, a d12 on 1 to 12.',
       'The face is what each of those dice is worth this roll. Four d4 landing on 4 make sixteen. Every multiplier you own stacks on top of that.',
-      'A die with more faces is worth more for that reason alone. A d72 averages 36.5 a face where a d4 averages 2.5, and the swing either way of that average is about 58% at every size.',
+      'The face is taken raw, so a deeper die is worth more before any multiplier. A die averages about half its faces: a d72 is worth around 36 a roll where a d4 is worth around 2.',
       'You cannot roll faster than the roll rate. Holding the button rolls as fast as it allows, and no faster.',
     ],
   },
   {
     title: 'THE TABLE',
     body: [
-      'Nine solids in a chain. Each one produces the solid above it in the list, and the tetrahedron produces ink. Ink buys everything.',
+      'Nine solids in a chain. Each produces the one above it and the tetrahedron produces ink, so a die you buy at the deep end is feeding everything shallower than it. Ink buys everything.',
       'You start with one die. A study unlocks the next.',
       'Every ten of a solid doubles its multiplier. The counter in the corner of the buy button shows how far into the current ten you are, and the two fills behind it show what you own and what your ink covers.',
-      'Each solid is a plate Leonardo drew for Pacioli in 1497.',
     ],
   },
   {
     title: 'ROLL RATE',
     body: [
       'How long a roll takes. Faster rolls mean more of them, so it multiplies the whole chain at once. That is why it sits above the table rather than beside it.',
-      'Each upgrade costs twenty times the last.',
-      { text: 'Folios make every one of them worth more, permanently.',
+      'Each upgrade costs ten times the last, so the price is a round number every time: 1,000 ink, then 10,000, then 100,000, on up.',
+      { text: 'A folio makes every upgrade after it worth more, and it keeps doing that for the rest of the run.',
         needs: (s) => s.folios > 0 || s.wagers > 0 },
     ],
   },
@@ -92,10 +91,10 @@ const SECTIONS: Section[] = [
     needs: hasAutoRoll,
     body: [
       'A die can be bought its own roll, in AUTOMATION. It opens once you have opened the die below it on the chain, so the first one arrives with your first study.',
-      'It buys you nothing but your hands back. Holding already rolls as fast as the roll rate allows, so what changes is whether you have to be there, and the price is ink you would otherwise have spent on dice.',
+      'It buys no speed. Holding already rolls as fast as the roll rate allows, so what changes is whether you have to be there. The price is ink you would have spent on dice.',
       'Your first Wager hands over whatever you have not bought, for nothing, and it stays handed over. It also leaves you some ink, because a table that rolls itself with one die on it takes a while to say anything.',
       'A die that rolls itself reads per second on the table. One still waiting on you reads per roll, and shows no face when you are not pressing.',
-      'The deepest die opens once the whole chain is on the table, and costs more than the eight below it together.',
+      'The deepest die opens once the whole chain is on the table, and is by far the most expensive of them.',
       'Any die that rolls itself can be switched off again, which is the only way to watch a single one land once it is automated.',
     ],
   },
@@ -104,9 +103,7 @@ const SECTIONS: Section[] = [
     needs: afterAutomator,
     body: [
       'Your first Wager hands over the whole ladder, free, and you never lose it. Not to a study, not to a folio, not to another Wager.',
-      'It used to be a purchase of its own, one chip. It is not any more: the ladder already sells you your hands back a die at a time, and charging again at the prestige would be charging twice for the same thing.',
       'AUTOMATION grows a master switch above the nine. Turn it off and the whole table waits for you again, which is the only way to watch a run land one throw at a time once everything is automatic.',
-      'Holding ROLL gives exactly the roll rate, because a roll refuses to start while one is in the air. None of this is extra speed. It is only whether you have to be there.',
     ],
   },
   {
@@ -114,17 +111,19 @@ const SECTIONS: Section[] = [
     needs: afterStudy,
     body: [
       'A study unlocks the next solid and multiplies the ones below it. Its multiplier reaches down the chain rather than across, so the deep solids benefit last.',
-      'A folio is a study that also clears your studies. What it leaves behind is a permanently better roll rate.',
-      'Both clear the table and your ink. That is the trade.',
+      'The first study wants 10 of your deepest solid, the second 20, the third 30, and ten more every time after that.',
+      'A folio is a study that also clears your studies. What it leaves behind makes every roll rate upgrade you buy afterwards worth more.',
+      'The first folio wants 90 of the deepest solid on the table, the second 180, and ninety more each time.',
+      'Both clear the table and your ink.',
     ],
   },
   {
     title: 'THE WAGER',
     needs: nearWager,
     body: [
-      'At 1.8e308 ink you can call the Wager, named for the interrupted game of dice Pacioli posed in 1494.',
-      'It clears everything on the table and pays one chip. Chips buy the grid, and the grid makes the next run faster. That is the whole loop.',
-      'The number is where a double stops being able to count, which is a fair place for a game about chance to break.',
+      'At 1.8e308 ink you can call the Wager.',
+      'It clears everything on the table and pays one chip. Chips buy the grid, and the grid makes the next run faster.',
+      'Until you break that number the run halts there, and calling is the only move left.',
     ],
   },
   {
@@ -132,14 +131,14 @@ const SECTIONS: Section[] = [
     needs: afterWager,
     body: [
       'Each is a run under a restriction, cleared by reaching the Wager while it is active.',
-      'Clearing one awards an autobuyer. That is how the game stops needing your hands.',
+      'Clearing one awards an autobuyer.',
     ],
   },
   {
     title: 'AUTO BUY',
     needs: afterAutobuyer,
     body: [
-      'Each buys one thing on a timer. A chip spent on one cuts its interval to 0.6 of what it was, down to a floor of a tenth of a second.',
+      'Each buys one thing on a timer. A chip spent on one cuts its interval to 0.6 of what it was, down to a tenth of a second.',
       'The mode button sets what each purchase does: one, a group of ten, or as many as the ink allows.',
     ],
   },
@@ -177,7 +176,7 @@ const SECTIONS: Section[] = [
         body: [
           "Loads the dice. Every die is likelier to land high, and the face is what a die is worth, so this multiplies every tier of the chain at once.",
           "Each level closes a quarter of the remaining gap to a ceiling of 0.85, so level one is worth 0.21 and level nine 0.79. Every level is worth taking and none of them reaches the end.",
-          "At level nine a d72 averages 59.8 a face rather than 36.5, and a d4 averages 3.4 rather than 2.5.",
+          "At level nine a d72 averages around 60 a roll rather than 36, and a d4 around 3 rather than 2.",
           "A perfectly loaded die is worth exactly twice its fair average and no more, which is why this is a middling card however far you push it.",
           "How loaded the dice are, where 0 is fair and 1 always lands on the maximum." + ' ' + levels((l) => `bias ${n(magicianBias(l))}`),
         ],
@@ -285,8 +284,8 @@ const SECTIONS: Section[] = [
         title: "XIII DEATH",
         needs: holds("death"),
         body: [
-          "Unlocks melting, and it is the only way to get it. Melting destroys the shallow end of the chain to multiply the deepest solid.",
-          "The card multiplies nothing by itself. Its level is what decides how much a melt is worth and how far it reaches.",
+          "Melting is opened by your first folio, not by this. What the card changes is what a melt pays.",
+          "It multiplies nothing on its own. Its level decides how much a melt is worth and how far it reaches, and a melt with no card at all is worth about a third of one at the first level.",
           "Its level is read by melting rather than by anything on the table, so there is no ladder here: a melt is worth more and reaches further the higher it is.",
         ],
       },
@@ -370,9 +369,11 @@ const SECTIONS: Section[] = [
     title: 'MELTING',
     needs: hasMelt,
     body: [
-      'Death lets you melt the table. Everything below your deepest solid is destroyed, and what is left carries a multiplier for all of it.',
-      'The multiplier replaces the one you had rather than adding to it, so melting early for a small number gains you nothing. The question is when, not whether.',
-      'It is offered only when it would beat what you already hold.',
+      'Your first folio opens melting. Everything below your deepest solid is destroyed, and that solid carries a multiplier for all of it.',
+      'You need at least one of that deepest solid for it to land on, and a million tetrahedra to melt.',
+      'The multiplier replaces the one you had rather than adding to it, so a small melt now costs you a large one later. The button only appears when melting would beat what you already hold.',
+      { text: 'XIII Death does not unlock this. It decides how much a melt is worth.',
+        needs: holds('death') },
     ],
   },
   {
@@ -380,8 +381,8 @@ const SECTIONS: Section[] = [
     needs: hasCodices,
     body: [
       'A second chain, bought with chips. A codex feeds the one below it and the first one makes esperienza, which multiplies every solid on the table.',
-      'A Wager keeps every codex you bought and takes back everything they produced, so a long run is worth more than a short one for the first time.',
-      'They open on how deep a single run has gone, not on what you can pay. Every threshold is past the old wall, which is the reason to run past it.',
+      'A Wager keeps every codex you bought and takes back everything they produced, so what you carry between runs is the chain itself rather than its output.',
+      'They open on how deep a single run has gone rather than on what you can pay, and every threshold is past the old wall. Calling a Wager the moment it pays will never reach the next one.',
     ],
   },
   {
@@ -400,7 +401,7 @@ const SECTIONS: Section[] = [
     title: 'YOUR SAVE',
     body: [
       'It lives in this browser and never leaves it. Three slots, and rolling backups at five minutes, thirty minutes and four hours, plus one taken before any update that changes the save.',
-      'OPTIONS shows whether the browser has agreed not to evict it. The game keeps asking for that, but Chrome answers silently and can refuse an installed app for reasons it will not explain.',
+      'OPTIONS shows whether the browser has agreed not to evict it. The game keeps asking, and the browser may refuse without saying why.',
       'While it says evictable, the backups are still inside the same browser and go with it. Bind a save file on a desktop, or export a copy on a phone. That is the only copy eviction cannot reach.',
     ],
   },
