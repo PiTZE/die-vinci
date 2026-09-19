@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.3.9",
   "type": "module",
+  "license": "MIT",
   "description": "A game about Leo. An incremental dice game built on the solids Leonardo drew for Pacioli.",
   "scripts": {
     "dev": "vite",
